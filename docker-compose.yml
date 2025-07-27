@@ -2,17 +2,13 @@ version: '3.8'
 
 services:
   house-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: josojmf/house-app:latest
     container_name: house-app
     ports:
       - "5000:5000"
-    volumes:
-      - .:/app
     environment:
-      MONGO_USER: joso
-      MONGO_PASS: XyGItdDKpWkfJfjT
-      VAPID_PUBLIC_KEY: BBvemqYjH5Al2LXlB1xN_Q_TRo-YL70eFoFDheEv-dN8S3xTPgp2XXWD67FtnC3LWagbuY4Isfslq-BdYFBLEAM
-      VAPID_PRIVATE_KEY: zvbHKe97bF31FC3iFet-4pbXFzN9TJa_b-QLtfdG_Lg
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
     restart: unless-stopped
