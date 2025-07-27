@@ -116,15 +116,76 @@
   background-color: #ef4444;
   color: white;
 }
-
-/* Responsive ajustes */
 @media (max-width: 600px) {
-  #addTaskBtn {
-    bottom: 120px;
-    right: 20px;
+  /* Contenedor del calendario */
+  #calendar {
+    margin: 1.2rem 0.5rem;
+    padding: 0.8rem;
+    border-radius: 10px;
   }
 
+  /* Cabecera del calendario (toolbar) */
+  .fc-header-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.1rem !important;
+    text-align: center;
+  }
+
+  .fc-button-group {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem;
+  }
+
+  .fc-button {
+    font-size: 0.8rem !important;
+    padding: 0.3rem 0.6rem !important;
+  }
+
+  /* Botón flotante */
+  #addTaskBtn {
+    bottom: 20px;
+    right: 20px;
+    width: 55px;
+    height: 55px;
+    font-size: 24px;
+  }
+
+  /* Título */
+  h1.title {
+    position: relative;
+    top: 1rem;
+    left: 0;
+    font-size: 1.5rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+
+  /* Modal de añadir tarea */
   .overlay-content {
     padding: 20px;
+    max-width: 90%;
+    width: 90%;
+  }
+
+  .overlay-content input,
+  .overlay-content select,
+  .overlay-content textarea {
+    font-size: 14px;
+  }
+
+  .form-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .form-buttons button {
+    width: 100%;
   }
 }

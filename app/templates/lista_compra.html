@@ -6,8 +6,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>📝 Lista de la compra semanal</h1>
+    <h1 class="title">📝 Lista de la compra semanal</h1>
 
     <form id="addItemForm" class="add-item-form">
         <input type="text" id="itemNombre" placeholder="Producto" required>
@@ -32,7 +31,6 @@
     {% else %}
     <p class="empty-message">Tu lista está vacía. ¡Añade productos para empezar!</p>
     {% endif %}
-</div>
 
 <script>
     document.getElementById('addItemForm').addEventListener('submit', async (e) => {

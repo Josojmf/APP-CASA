@@ -1,3 +1,9 @@
+.titleMenus {
+  font-size: 2rem;
+  color: #1f2937;
+  text-align: center;
+  margin-bottom: 20px;
+}
 .week-grid {
   display: flex;
   justify-content: space-between;

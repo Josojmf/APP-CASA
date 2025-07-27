@@ -8,7 +8,7 @@
 {% block content %}
 <h1 class="title">Miembros de la casa</h1>
 
-<div class="cards-container" id="cardsContainer">
+<div id="cardsContainer">
     {% for user in users %}
     {% include "components/user_card.html" %}
     {% endfor %}

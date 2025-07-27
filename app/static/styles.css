@@ -26,6 +26,16 @@ h1 {
     padding: 40px;
 }
 
+.title {
+    font-size: 2rem;
+    color: #333;
+    text-align: center;
+    margin: 50px 0 30px; /* 👈 más espacio arriba y abajo */
+    animation: fadeSlideDown 1s ease forwards;
+    opacity: 0;
+    transform: translateY(-30px); /* opcional, para que baje suavemente */
+}
+
 .user-card {
     background: white;
     border-radius: 15px;
@@ -124,6 +134,182 @@ nav a:hover {
     color: #ffeb3b;
 }
 
+.navbar {
+    background: #4CAF50;
+    padding: 10px 20px;
+    position: relative;
+    z-index: 1001;
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.menu-toggle {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.8rem;
+    display: none;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.menu-toggle:hover {
+    transform: scale(1.1);
+}
+
+.menu-actions {
+    position: relative;
+    z-index: 1;
+    top: 10000px;
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links li a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+.nav-links li a:hover {
+    color: #ffeb3b;
+}
+
+/* --- Mobile styles --- */
+@media (max-width: 768px) {
+    .menu-toggle {
+        display: block;
+    }
+
+    .nav-links {
+        position: absolute;
+        top: 60px;
+        right: 0;
+        background: #4CAF50;
+        flex-direction: column;
+        width: 100%;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s ease;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    }
+
+    .nav-links.open {
+        max-height: 400px; /* Ajusta según nº de enlaces */
+    }
+
+    .nav-links li {
+        padding: 15px 20px;
+        border-top: 1px solid rgba(255,255,255,0.2);
+    }
+}
+
+.day-column {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    padding: 20px;
+    transition: transform 0.3s;
+}
+
+.day-column h3 {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+/* Estilo de cada comida o cena */
+.meal {
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.meal-img {
+    width: 100%;
+    border-radius: 10px;
+    margin-top: 10px;
+    object-fit: cover;
+}
+
+/* Botón de + y reiniciar */
+.menus-actions {
+    position: relative;
+    
+    z-index: 1000;
+    margin: 20px 0;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.floating-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.reset-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Vista móvil */
+@media (max-width: 768px) {
+    .week-grid {
+        grid-template-columns: 1fr; /* 👈 una columna por fila */
+        padding: 10px;
+    }
+
+    .menus-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .floating-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+    }
+
+    .reset-btn {
+        width: 90%;
+        margin-bottom: 10px;
+    }
+
+    .meal-img {
+        height: 150px;
+    }
+}
 footer {
     position: fixed;
     bottom: 0;
@@ -136,6 +322,7 @@ footer {
 }
 
 .tareas-container {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 30px;
@@ -269,26 +456,51 @@ footer {
     background: #bbb;
 }
 
-#addTaskBtn {    
+#addTaskBtn {
     position: fixed;
-    bottom: 150px;
-    right: 80px;
-    background: #28a745;
+    bottom: 20px;
+    right: 20px;
+    width: 65px;
+    height: 65px;
+    background: linear-gradient(135deg, #28a745, #218838);
     color: white;
     border: none;
     border-radius: 50%;
-    width: 60px;
-    height: 60px;
     font-size: 2rem;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
     cursor: pointer;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-    transition: transform 0.3s, background 0.3s;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.4s;
+    z-index: 999;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 #addTaskBtn:hover {
-    transform: scale(1.1);
-    background: #218838;
+    transform: scale(1.1) rotate(5deg);
+    background: linear-gradient(135deg, #218838, #1e7e34);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
 }
+
+#addTaskBtn::after {
+    content: "Nueva tarea";
+    position: absolute;
+    bottom: 75px;
+    right: 0;
+    background: #333;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+
+#addTaskBtn:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
