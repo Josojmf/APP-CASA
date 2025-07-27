@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+{% block title %}Tareas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/tareas.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1>📋 Listado de tareas por usuario</h1>
+
+<div class="tareas-container">
+    {% for user in users %}
+    <div class="tareas-list">
+        <h2>{{ user['nombre'] }}</h2>
+        <ul>
+            {% if user.tareas %}
+                {% for tarea in user.tareas %}
+                <li>
+                    <input type="checkbox" class="tarea-checkbox"
+                           data-user="{{ user['_id'] }}"
+                           data-titulo="{{ tarea['titulo'] }}"
+                           data-due-date="{{ tarea['due_date'] }}">
+                    <span>{{ tarea['titulo'] }} 🕒 {{ tarea['due_date'] }}</span>
+                    <div>{{ tarea['pasos'] }}</div>
+                </li>
+                {% endfor %}
+            {% else %}
+                <li><em>Sin tareas</em></li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endfor %}
+</div>
+
+<button id="addTaskBtn" class="floating-btn btn-tareas" title="Añadir tarea">➕</button>
+
+<div id="overlay" class="overlay">
+    <div class="overlay-content">
+        <h2>Añadir nueva tarea</h2>
+        <form id="taskForm">
+            <label for="titulo">Título:</label>
+            <input type="text" id="titulo" name="titulo" required>
+
+            <label for="asignee">Asignado a:</label>
+            <select id="asignee" name="asignee" required>
+                <option value="">Seleccionar usuario</option>
+                {% for user in users %}
+                <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="due_date">Fecha límite:</label>
+            <input type="date" id="due_date" name="due_date" required>
+
+            <label for="pasos">Pasos (opcional):</label>
+            <textarea id="pasos" name="pasos" rows="3"></textarea>
+
+            <div class="form-buttons">
+                <button type="submit">Guardar</button>
+                <button type="button" id="cancelBtn">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('addTaskBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'flex';
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'none';
+    });
+
+    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const data = {
+            titulo: document.getElementById('titulo').value,
+            asignee: document.getElementById('asignee').value,
+            due_date: document.getElementById('due_date').value,
+            pasos: document.getElementById('pasos').value,
+        };
+
+        try {
+            const res = await fetch('/api/add_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            if (!res.ok) {
+                console.error("Error al añadir tarea");
+                return;
+            }
+
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('taskForm').reset();
+            window.location.reload();
+        } catch (error) {
+            console.error("Error:", error);
+        }
+    });
+
+    document.querySelectorAll('.tarea-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', async function () {
+            if (!this.checked) return;
+
+            const user = this.getAttribute('data-user');
+            const titulo = this.getAttribute('data-titulo');
+            const due_date = this.getAttribute('data-due-date');
+
+            try {
+                const res = await fetch('/api/completar_tarea', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: user,
+                        tarea: {
+                            titulo,
+                            due_date
+                        }
+                    }),
+                });
+
+                if (res.ok) {
+                    this.closest('li').remove();
+                } else {
+                    console.error("No se pudo completar la tarea.");
+                }
+            } catch (err) {
+                console.error("Error al completar tarea:", err);
+            }
+        });
+    });
+</script>
+{% endblock %}

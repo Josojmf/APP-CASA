@@ -1,0 +1,101 @@
+{% extends "layout.html" %}
+{% block title %}Tareas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/configuracion.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1>Configuración</h1>
+
+<div class="tareas-container">
+    {% for usuario, tareas in tareas_por_usuario.items() %}
+    <div class="tareas-list">
+        <h2>{{ usuario }}</h2>
+        <ul>
+            {% for tarea in tareas %}
+            <li>
+                <input type="checkbox" class="tarea-checkbox" data-tarea-id="{{ tarea['_id'] }}">
+                <span>{{ tarea['titulo'] }}</span>
+            </li>
+            {% else %}
+            <li><em>Sin tareas</em></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Botón flotante -->
+<button id="addTaskBtn" title="Añadir tarea">➕</button>
+
+<!-- Overlay y formulario -->
+<div id="overlay" class="overlay">
+    <div class="overlay-content">
+        <h2>Añadir nueva tarea</h2>
+        <form id="taskForm">
+            <label for="titulo">Título:</label>
+            <input type="text" id="titulo" name="titulo" required>
+
+            <label for="asignee">Asignado a:</label>
+            <select id="asignee" name="asignee" required>
+                <option value="">Seleccionar usuario</option>
+                {% for user in users %}
+                <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="due_date">Fecha límite:</label>
+            <input type="date" id="due_date" name="due_date" required>
+
+            <label for="pasos">Pasos (opcional):</label>
+            <textarea id="pasos" name="pasos" rows="3"></textarea>
+
+            <div class="form-buttons">
+                <button type="submit">Guardar</button>
+                <button type="button" id="cancelBtn">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('addTaskBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'flex';
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'none';
+    });
+
+    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const data = {
+            titulo: document.getElementById('titulo').value,
+            asignee: document.getElementById('asignee').value,
+            due_date: document.getElementById('due_date').value,
+            pasos: document.getElementById('pasos').value,
+        };
+
+        try {
+            const res = await fetch('/api/add_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            if (!res.ok) {
+                console.error("Error al añadir tarea");
+                return;
+            }
+
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('taskForm').reset();
+            window.location.reload();
+        } catch (error) {
+            console.error("Error:", error);
+        }
+    });
+</script>
+{% endblock %}

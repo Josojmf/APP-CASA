@@ -1,0 +1,11 @@
+=======================================
+
+Public Key:
+BBvemqYjH5Al2LXlB1xN_Q_TRo-YL70eFoFDheEv-dN8S3xTPgp2XXWD67FtnC3LWagbuY4Isfslq-BdYFBLEAM
+
+Private Key:
+zvbHKe97bF31FC3iFet-4pbXFzN9TJa_b-QLtfdG_Lg
+
+=======================================
+
+(base) PS C:\INFORMATICA\House-App> 

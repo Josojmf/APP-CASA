@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block title %}Inicio{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/home.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1 class="title">Miembros de la casa</h1>
+
+<div class="cards-container" id="cardsContainer">
+    {% for user in users %}
+    {% include "components/user_card.html" %}
+    {% endfor %}
+</div>
+
+<button id="refreshBtn">Refrescar estados 🔄</button>
+
+<script>
+    const cardsContainer = document.getElementById('cardsContainer');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    async function fetchUserCards() {
+        try {
+            const response = await fetch('/users_cards');
+            const html = await response.text();
+            cardsContainer.innerHTML = html;
+        } catch (error) {
+            console.error("Error al cargar tarjetas:", error);
+        }
+    }
+
+    // Delegación: escuchamos clics en el contenedor
+    cardsContainer.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('toggle-btn')) {
+            const userId = e.target.dataset.userId;
+            try {
+                const res = await fetch('/api/toggle_encasa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId }),
+                });
+
+                if (!res.ok) {
+                    console.error("Error al cambiar estado");
+                    return;
+                }
+
+                // Fetch de la tarjeta actualizada
+                const response = await fetch(`/user_card/${userId}`);
+                const html = await response.text();
+
+                const userCard = document.getElementById(`user-card-${userId}`);
+                userCard.outerHTML = html;
+
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshBtn.addEventListener('click', fetchUserCards);
+        fetchUserCards();  // ✅ Refrescar automáticamente al cargar la página
+    });
+</script>
+{% endblock %}

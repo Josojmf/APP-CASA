@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% block title %}Lista de la compra{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/lista_compra.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>📝 Lista de la compra semanal</h1>
+
+    <form id="addItemForm" class="add-item-form">
+        <input type="text" id="itemNombre" placeholder="Producto" required>
+        <input type="number" id="itemCantidad" placeholder="Cantidad (ej. 2kg, 1 litro...)" min="0" max="1000" required>
+        <button type="submit">Añadir</button>
+    </form>
+
+    {% if items %}
+    <ul id="lista" class="shopping-list">
+        {% for item in items %}
+        <li data-id="{{ item._id }}">
+            <div class="item-info">
+                {{ item.nombre }}
+                <span class="item-qty">{{ item.cantidad }}</span>
+            </div>
+            <button class="delete-btn eliminar">❌</button>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <button id="eliminarTodo" class="clear-list-btn">Eliminar toda la lista</button>
+    {% else %}
+    <p class="empty-message">Tu lista está vacía. ¡Añade productos para empezar!</p>
+    {% endif %}
+</div>
+
+<script>
+    document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nombre = document.getElementById('itemNombre').value.trim();
+        const cantidad = document.getElementById('itemCantidad').value.trim();
+        if (!nombre || !cantidad) return;
+
+        const res = await fetch('/api/lista_compra', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, cantidad })
+        });
+
+        if (res.ok) window.location.reload();
+    });
+
+    document.querySelectorAll('.eliminar').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.target.closest('li').dataset.id;
+            if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+            const res = await fetch(`/api/lista_compra/${id}`, { method: 'DELETE' });
+            if (res.ok) window.location.reload();
+        });
+    });
+
+    const eliminarTodoBtn = document.getElementById('eliminarTodo');
+    if (eliminarTodoBtn) {
+        eliminarTodoBtn.addEventListener('click', async () => {
+            if (!confirm('¿Eliminar toda la lista de la compra?')) return;
+            const res = await fetch('/api/lista_compra_all', { method: 'DELETE' });
+            if (res.ok) window.location.reload();
+        });
+    }
+</script>
+{% endblock %}

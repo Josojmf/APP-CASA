@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <title>{% block title %}Ciclón 2 House{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/global.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <header class="main-header">
+        <nav class="navbar">
+            <div class="logo">
+                <i class="fa-solid fa-house"></i>
+                <span>House App</span>
+            </div>
+            <button class="menu-toggle" id="menuToggle" aria-label="Menú móvil">
+                <i class="fa fa-bars"></i>
+            </button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/"><i class="fa-solid fa-home"></i> Inicio</a></li>
+                <li><a href="/tareas"><i class="fa-solid fa-list-check"></i> Tareas</a></li>
+                <li><a href="/calendario"><i class="fa-solid fa-calendar-days"></i> Calendario</a></li>
+                <li><a href="/menus"><i class="fa-solid fa-utensils"></i> Menús</a></li>
+                <li><a href="/lista_compra"><i class="fa-solid fa-cart-shopping"></i> Lista de la compra</a></li>
+                <li><a href="/configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <button type="button" id="enableNotifications">
+            Activar notificaciones 🔔
+        </button>
+        <p id="notifStatus">Estado notificaciones: No aceptadas ❌</p>
+        <p>Desarrollado por Joso</p>
+        &copy; {{ 2025 }} House App. Todos los derechos reservados.
+    </footer>
+
+   <script>
+    // 🟦 Navbar responsive toggle
+    document.addEventListener("DOMContentLoaded", () => {
+        const toggleBtn = document.getElementById('menuToggle');
+        const nav = document.getElementById('navLinks');
+        toggleBtn.addEventListener('click', () => {
+            nav.classList.toggle('open');
+        });
+    });
+
+    // 🟩 Utilidad para convertir la clave VAPID
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+    }
+
+    // 🟨 Gestión de notificaciones
+    document.addEventListener("DOMContentLoaded", async () => {
+        console.log("📲 DOM completamente cargado");
+
+        const notifBtn = document.getElementById('enableNotifications');
+        const notifStatus = document.getElementById('notifStatus');
+
+        if (!notifBtn || !notifStatus) {
+            console.warn("❗ Botón o estado de notificaciones no encontrados en el DOM");
+            return;
+        }
+
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            console.log("✅ El navegador soporta Service Worker y Push API");
+
+            try {
+                const reg = await navigator.serviceWorker.register('/static/sw.js');
+                console.log("🛠️ Service Worker registrado correctamente:", reg);
+
+                let existingSub = await reg.pushManager.getSubscription();
+                console.log("🔍 Suscripción existente:", existingSub);
+
+                if (Notification.permission === "granted" && existingSub) {
+                    notifBtn.style.display = "none";
+                    notifStatus.textContent = "Estado notificaciones: Aceptadas ✅";
+                    console.log("🔔 Notificaciones ya aceptadas anteriormente");
+                } else if (Notification.permission === "denied") {
+                    notifStatus.textContent = "Estado notificaciones: Bloqueadas 🚫";
+                    console.log("🔕 Permiso de notificación bloqueado");
+                } else {
+                    notifStatus.textContent = "Estado notificaciones: No aceptadas ❌";
+                    console.log("🕓 Pendiente de aceptar notificaciones");
+                }
+
+                notifBtn.addEventListener('click', async () => {
+                    console.log("🖱️ Clic en botón de activar notificaciones");
+
+                    try {
+                        const perm = await Notification.requestPermission();
+                        console.log("🔐 Permiso recibido:", perm);
+
+                        if (perm !== "granted") {
+                            alert("Permiso no concedido");
+                            notifStatus.textContent = "Estado notificaciones: No aceptadas ❌";
+                            return;
+                        }
+
+                        // Volver a registrar por seguridad
+                        const reg = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register('/static/sw.js');
+                        console.log("🔁 Service Worker disponible:", reg);
+
+                        // Desuscribir antigua si existía
+                        const oldSub = await reg.pushManager.getSubscription();
+                        if (oldSub) {
+                            console.log("♻️ Cancelando suscripción antigua");
+                            await oldSub.unsubscribe();
+                        }
+
+                        // Suscripción nueva
+                        const applicationServerKey = urlBase64ToUint8Array("{{ vapid_public_key }}");
+                        const subscription = await reg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey
+                        });
+
+                        console.log("📬 Suscripción generada:", subscription);
+
+                        // Guardar en el backend
+                        const response = await fetch('/api/save_subscription', {
+                            method: 'POST',
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(subscription)
+                        });
+
+                        const serverMsg = await response.text();
+                        console.log("📨 Respuesta del servidor:", serverMsg);
+
+                        notifBtn.style.display = "none";
+                        notifStatus.textContent = "Estado notificaciones: Aceptadas ✅";
+                        console.log("✅ Suscripción y guardado exitoso");
+
+                    } catch (error) {
+                        console.error("❌ Error al activar notificaciones:", error);
+                        notifStatus.textContent = "Estado notificaciones: Error ⚠️";
+                    }
+                });
+            } catch (error) {
+                console.error("❌ Error al registrar el Service Worker:", error);
+                notifStatus.textContent = "Estado notificaciones: Error ⚠️";
+            }
+        } else {
+            notifStatus.textContent = "Estado notificaciones: No soportado 🚫";
+            console.warn("📵 Push API o Service Worker no soportados en este navegador");
+        }
+    });
+</script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

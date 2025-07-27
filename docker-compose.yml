@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  house-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: house-app
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    restart: unless-stopped

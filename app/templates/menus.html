@@ -1,0 +1,178 @@
+{% extends "layout.html" %}
+{% block title %}Menús de la semana{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/menus.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <h1>🍽️ Menús de la semana</h1>
+
+    <div class="menus-actions">
+        <button id="resetWeekBtn" class="reset-btn">🗑 Reiniciar semana</button>
+        <button id="addMenuBtn" class="floating-btn" title="Añadir menú">➕</button>
+    </div>
+
+    <div class="week-grid">
+        {% for day in ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'] %}
+        <div class="day-column">
+            <h3>{{ day }}</h3>
+            {% for momento in ['comida', 'cena'] %}
+            <div class="meal" data-dia="{{ day }}" data-momento="{{ momento }}">
+                <span class="label">{{ momento|capitalize }}:</span>
+                {% if menus[day][momento] %}
+                <span class="meal-title">{{ menus[day][momento]['titulo'] }}</span>
+                <img src="{{ menus[day][momento]['img'] }}" alt="{{ menus[day][momento]['titulo'] }}" class="meal-img">
+                {% endif %}
+                <div class="assignment">
+                    <span class="assigned-to">Le toca a: <strong>{{ menus[day][momento].asignado if menus[day][momento]
+                            and menus[day][momento]['asignado'] else 'No asignado' }}</strong></span>
+                    <button class="assign-btn" onclick="openAssignOverlay('{{ day }}', '{{ momento }}')">🔐
+                        Asignar</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<!-- Modal para añadir menú -->
+<div id="overlay" class="overlay">
+    <div class="overlay-content fade-in-modal">
+        <h2>Añadir nuevo menú</h2>
+        <form id="menuForm">
+            <label for="dia">Día:</label>
+            <select id="dia" name="dia" required>
+                <option value="">Seleccionar día</option>
+                {% for day in ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'] %}
+                <option value="{{ day }}">{{ day }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="momento">Momento:</label>
+            <select id="momento" name="momento" required>
+                <option value="comida">Comida</option>
+                <option value="cena">Cena</option>
+            </select>
+
+            <label for="titulo">Título del plato:</label>
+            <input type="text" id="titulo" name="titulo" required>
+
+            <div class="form-buttons">
+                <button type="submit">Guardar</button>
+                <button type="button" id="cancelBtn">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Overlay para asignación -->
+<div id="assignOverlay" class="overlay">
+    <div class="overlay-content fade-in-modal">
+        <h2>Asignar persona a la comida</h2>
+        <form id="assignForm">
+            <input type="hidden" id="assignDia" name="dia">
+            <input type="hidden" id="assignMomento" name="momento">
+
+            <label for="asignado">Asignar a:</label>
+            <select id="asignado" name="asignado" required>
+                <option value="">Seleccionar miembro</option>
+                {% for user in users %}
+                <option value="{{ user.nombre }}">{{ user.nombre }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="form-buttons">
+                <button type="submit">Asignar</button>
+                <button type="button" onclick="closeAssignOverlay()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('addMenuBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'flex';
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'none';
+    });
+
+    document.getElementById('menuForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            dia: document.getElementById('dia').value,
+            momento: document.getElementById('momento').value,
+            titulo: document.getElementById('titulo').value
+        };
+
+        const res = await fetch('/api/add_menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            document.getElementById('overlay').style.display = 'none';
+            window.location.reload();
+        } else {
+            alert("Error al guardar");
+        }
+    });
+
+    document.getElementById('resetWeekBtn').addEventListener('click', async () => {
+        if (confirm("¿Estás seguro de que quieres borrar todos los menús de la semana?")) {
+            const res = await fetch('/api/reset_menus', { method: 'DELETE' });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                alert("Error al reiniciar la semana.");
+            }
+        }
+    });
+
+    function openAssignOverlay(dia, momento) {
+        document.getElementById('assignDia').value = dia;
+        document.getElementById('assignMomento').value = momento;
+        document.getElementById('assignOverlay').style.display = 'flex';
+    }
+
+    function closeAssignOverlay() {
+        document.getElementById('assignOverlay').style.display = 'none';
+    }
+
+    document.getElementById('assignForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const dia = document.getElementById('assignDia').value;
+        const tipo = document.getElementById('assignMomento').value;
+        const miembro = document.getElementById('asignado').value;
+
+        const res = await fetch('/api/asignar_comida', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dia, tipo, miembro })
+        });
+
+        if (res.ok) {
+            closeAssignOverlay();
+
+            // Actualiza dinámicamente el texto "Le toca a:"
+            const mealEl = document.querySelector(`.meal[data-dia="${dia}"][data-momento="${tipo}"]`);
+            if (mealEl) {
+                const assignedEl = mealEl.querySelector(".assigned-to strong");
+                if (assignedEl) {
+                    assignedEl.textContent = miembro;
+                }
+            }
+        } else {
+            alert("Error al asignar persona.");
+        }
+    });
+</script>
+{% endblock %}

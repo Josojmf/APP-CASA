@@ -1,0 +1,294 @@
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+h1 {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 2.5rem;
+    animation: fadeSlideDown 1s ease forwards;
+    opacity: 0;
+}
+
+.cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    padding: 40px;
+}
+
+.user-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    overflow: hidden;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.8s forwards;
+}
+
+.user-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.2);
+}
+
+.user-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-bottom: 1px solid #eee;
+}
+
+.user-card h3 {
+    margin: 10px 0 5px;
+    font-size: 1.4rem;
+    color: #333;
+}
+
+.user-card p {
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+
+.en-casa {
+    color: green;
+    font-weight: bold;
+}
+
+.fuera {
+    color: red;
+    font-weight: bold;
+}
+
+button {
+    padding: 10px 20px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: block;
+    margin: 20px auto;
+    font-size: 1rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+button:hover {
+    background: #45a049;
+}
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeSlideDown {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Navbar */
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #4CAF50;
+    padding: 10px 30px;
+}
+
+nav a {
+    color: white;
+    margin-right: 20px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+nav a:hover {
+    color: #ffeb3b;
+}
+
+footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    text-align: center;
+    padding: 15px;
+    background: #4CAF50;
+    color: white;
+    margin-top: auto;
+}
+
+.tareas-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    padding: 40px;
+}
+
+.tareas-list {
+    background: #ffffff;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    padding: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tareas-list:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.2);
+}
+
+.tareas-list h2 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.tareas-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tareas-list li {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #f5f7fa;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.tareas-list li:hover {
+    background: #e0f7fa;
+}
+
+.tarea-checkbox {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    accent-color: #4CAF50;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.tarea-checkbox:hover {
+    transform: scale(1.2);
+}
+
+.tareas-list li span {
+    flex: 1;
+}
+
+
+.overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.overlay-content {
+    background: #fff;
+    padding: 30px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+.overlay-content h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+.overlay-content form {
+    display: flex;
+    flex-direction: column;
+}
+
+.overlay-content input,
+.overlay-content textarea {
+    margin-bottom: 15px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.form-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.form-buttons button {
+    flex: 1;
+    margin: 0 5px;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.form-buttons button[type="submit"] {
+    background: #4CAF50;
+    color: white;
+}
+
+.form-buttons button[type="submit"]:hover {
+    background: #45a049;
+}
+
+.form-buttons button[type="button"] {
+    background: #ccc;
+}
+
+.form-buttons button[type="button"]:hover {
+    background: #bbb;
+}
+
+#addTaskBtn {    
+    position: fixed;
+    bottom: 150px;
+    right: 80px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+    cursor: pointer;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    transition: transform 0.3s, background 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#addTaskBtn:hover {
+    transform: scale(1.1);
+    background: #218838;
+}

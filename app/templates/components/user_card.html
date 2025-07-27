@@ -1,0 +1,15 @@
+<div class="user-card" id="user-card-{{ user['_id'] }}">
+    <div class="user-card-img-container">
+        <img src="data:image/jpeg;base64,{{ user['imagen'] }}" alt="Imagen de {{ user['nombre'] }}">
+    </div>
+    <h3>{{ user['nombre'] }}</h3>
+    <p>Estado:
+        {% if user['encasa'] %}
+        <span class="en-casa">En casa 🏠</span>
+        <button class="toggle-btn" data-user-id="{{ user['_id'] }}">Salgo de casa!</button>
+        {% else %}
+        <span class="fuera">Fuera 🚶‍♂️</span>
+        <button class="toggle-btn" data-user-id="{{ user['_id'] }}">Llego a casa!</button>
+        {% endif %}
+    </p>
+</div>
