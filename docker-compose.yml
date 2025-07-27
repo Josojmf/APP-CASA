@@ -10,4 +10,9 @@ services:
       - "5000:5000"
     volumes:
       - .:/app
+    environment:
+      MONGO_USER: joso
+      MONGO_PASS: XyGItdDKpWkfJfjT
+      VAPID_PUBLIC_KEY: BBvemqYjH5Al2LXlB1xN_Q_TRo-YL70eFoFDheEv-dN8S3xTPgp2XXWD67FtnC3LWagbuY4Isfslq-BdYFBLEAM
+      VAPID_PRIVATE_KEY: zvbHKe97bF31FC3iFet-4pbXFzN9TJa_b-QLtfdG_Lg
     restart: unless-stopped
