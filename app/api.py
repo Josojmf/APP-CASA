@@ -211,15 +211,25 @@ def eliminar_todos_items():
 def recibir_ubicacion():
     data = request.get_json()
 
-    usuario = data.get("tid") or data.get("user")
-    lat = data.get("lat")
-    lon = data.get("lon")
-    ts = datetime.utcnow()
-
-    if not lat or not lon or not usuario:
+    if not data or "lat" not in data or "lon" not in data or "tid" not in data:
         return jsonify({"error": "Faltan datos obligatorios"}), 400
 
-    # Guarda ubicación en colección de ubicaciones
+    # 🔁 Equivalencia de TID (OwnTracks usa solo 2 caracteres)
+    TID_TO_USER = {
+        "jo": "joso",
+        "an": "ana",
+        "pa": "papa",
+        "ma": "mama"
+    }
+
+    usuario_tid = data.get("tid")
+    usuario = TID_TO_USER.get(usuario_tid, usuario_tid)  # fallback si no mapeado
+
+    lat = data["lat"]
+    lon = data["lon"]
+    ts = datetime.utcnow()
+
+    # Guardar en colección de ubicaciones (histórico)
     mongo.db.ubicaciones.insert_one({
         "usuario": usuario,
         "lat": lat,
@@ -227,16 +237,10 @@ def recibir_ubicacion():
         "timestamp": ts
     })
 
-    # También actualiza el campo last_location en el documento del usuario
+    # Actualizar en users.last_location (actualización en tiempo real)
     mongo.db.users.update_one(
         {"nombre": usuario},
-        {"$set": {
-            "last_location": {
-                "lat": lat,
-                "lon": lon,
-                "time": ts
-            }
-        }}
+        {"$set": {"last_location": {"lat": lat, "lon": lon, "time": ts}}}
     )
 
     return jsonify({"ok": True})
