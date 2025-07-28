@@ -9,6 +9,8 @@ main = Blueprint('main', __name__)
 
 @main.route('/')
 def index():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     users = list(mongo.db.users.find())
     vapid_public_key = current_app.config["VAPID_PUBLIC_KEY"]
     return render_template("index.html", users=users, vapid_public_key=vapid_public_key)
