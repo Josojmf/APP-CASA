@@ -4,6 +4,16 @@ from bson import ObjectId
 from pywebpush import webpush, WebPushException
 import json
 from app.sockets_utils import notificar_tarea_a_usuario
+from flask import session
+from urllib.parse import urlparse
+
+def get_vapid_claims(endpoint_url):
+    parsed = urlparse(endpoint_url)
+    return {
+        "aud": f"{parsed.scheme}://{parsed.netloc}",
+        "sub": "mailto:joso.jmf@gmail.com"  # o tu email
+    }
+
 
 
 api = Blueprint('api', __name__)
@@ -35,25 +45,37 @@ def toggle_encasa():
 
     mensaje = f"{user['nombre']} {'ha llegado a casa 🏠' if new_status else 'ha salido de casa 🚶‍♂️'}"
 
-    # Obtener claves y claims desde config
+    # 🔐 Obtener clave privada
     vapid_private_key = current_app.config["VAPID_PRIVATE_KEY"]
-    vapid_claims = current_app.config["VAPID_CLAIMS"]
 
-    # Obtener suscripciones
-    subs = mongo.db.subscriptions.find()
-    for sub in subs:
-        try:
-            webpush(
-                subscription_info=sub,
-                data=json.dumps({"title": "House App", "body": mensaje}),
-                vapid_private_key=vapid_private_key,
-                vapid_claims=vapid_claims
-            )
-            print(f"✅ Notificación enviada: {mensaje}")
-        except WebPushException as ex:
-            print("❌ Error enviando notificación:", repr(ex))
+    # 🔍 Buscar TODAS las subscripciones (de todos los usuarios)
+    subscripciones = mongo.db.subscriptions.find()
+
+    # 📤 Enviar notificación a cada una de las subs
+    for sub_doc in subscripciones:
+        for sub in sub_doc.get("subscriptions", []):
+            try:
+                endpoint = sub.get("endpoint")
+                if not endpoint:
+                    continue  # Skip si endpoint no válido
+
+                claims = get_vapid_claims(endpoint)
+                webpush(
+                    subscription_info=sub,
+                    data=json.dumps({
+                        "title": "House App",
+                        "body": mensaje,
+                        "tag": "encasa-status"
+                    }),
+                    vapid_private_key=vapid_private_key,
+                    vapid_claims=claims
+                )
+                print(f"✅ Notificación enviada a {sub_doc['user']}: {endpoint}")
+            except WebPushException as ex:
+                print(f"❌ Error en {sub.get('endpoint', 'sin endpoint')}: {repr(ex)}")
 
     return jsonify({"success": True, "new_status": new_status})
+
 
 @api.route('/api/add_task', methods=['POST'])
 def add_task():
@@ -116,24 +138,33 @@ def completar_tarea():
         print(f"[ERROR al completar tarea]: {e}")
         return jsonify({"error": "Error al borrar tarea"}), 500
 
-@api.route('/api/save_subscription', methods=['POST'])
+@api.route("/api/save_subscription", methods=["POST"])
 def save_subscription():
-    subscription = request.get_json()
-    if not subscription:
-        return jsonify({"error": "No se recibió suscripción"}), 400
-
+    from flask import request, session
     user = session.get("user")
     if not user:
-        return jsonify({"error": "No autenticado"}), 401
+        return jsonify({"error": "Not logged in"}), 401
 
-    # Asociar suscripción al usuario
-    subscription["usuario"] = user
+    subscription = request.get_json()
 
-    # Opcional: evitar duplicados
-    mongo.db.subscriptions.delete_many({"usuario": user})
-    mongo.db.subscriptions.insert_one(subscription)
+    # Verificar si ya existe alguna subscripción para ese usuario
+    existing = mongo.db.subscriptions.find_one({"user": user})
 
-    return jsonify({"success": True})
+    if existing:
+        # Si ya tiene esa misma suscripción (por endpoint), no la volvemos a guardar
+        if not any(s["endpoint"] == subscription["endpoint"] for s in existing["subscriptions"]):
+            mongo.db.subscriptions.update_one(
+                {"user": user},
+                {"$push": {"subscriptions": subscription}}
+            )
+    else:
+        # Primer registro de suscripciones para este usuario
+        mongo.db.subscriptions.insert_one({
+            "user": user,
+            "subscriptions": [subscription]
+        })
+
+    return jsonify({"message": "Suscripción guardada correctamente"})
 
 
 @api.route("/api/lista_compra", methods=["GET"])

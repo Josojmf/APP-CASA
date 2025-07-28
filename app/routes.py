@@ -10,6 +10,11 @@ import os
 
 main = Blueprint('main', __name__)
 
+@main.route("/sw.js")
+def service_worker():
+    return current_app.send_static_file("sw.js")
+
+
 @main.route('/')
 def index():
     if "user" not in session:
@@ -212,3 +217,30 @@ def lista_compra():
         return redirect(url_for("auth.login"))
     items = list(mongo.db.lista_compra.find())
     return render_template("lista_compra.html", items=items)
+
+@main.route("/api/test-push/<username>")
+def test_push(username):
+    from pywebpush import webpush, WebPushException
+    from flask import current_app
+    import json
+
+    subscripcion = mongo.db.subscriptions.find_one({"usuario": username})
+    if not subscripcion:
+        return jsonify({"error": f"No se encontró subscripción para {username}"}), 404
+
+    try:
+        webpush(
+            subscription_info=subscripcion,
+            data=json.dumps({
+                "title": f"🔔 Test push a {username}",
+                "body": f"Hola {username}, esta es una notificación de prueba."
+            }),
+            vapid_private_key=current_app.config["VAPID_PRIVATE_KEY"],
+            vapid_claims=current_app.config["VAPID_CLAIMS"]
+        )
+        print(f"📲 Test push enviada a {username}")
+        return jsonify({"status": "ok", "message": f"Push enviada a {username}"})
+
+    except WebPushException as ex:
+        print(f"❌ Error al enviar push: {repr(ex)}")
+        return jsonify({"error": "Fallo al enviar push", "details": str(ex)}), 500
