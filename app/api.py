@@ -9,10 +9,10 @@ from urllib.parse import urlparse
 from datetime import datetime
 
 TID_TO_USERNAME = {
-     "jo": "joso",
-     "an": "ana",
-     "pa": "papa",
-      "ma": "mama"
+     "jo": "Joso",
+     "an": "Ana",
+     "pa": "Papa",
+      "ma": "Mama"
 }
 
 
