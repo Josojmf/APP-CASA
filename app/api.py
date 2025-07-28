@@ -3,6 +3,8 @@ from app import mongo
 from bson import ObjectId
 from pywebpush import webpush, WebPushException
 import json
+from app.sockets_utils import notificar_tarea_a_usuario
+
 
 api = Blueprint('api', __name__)
 
@@ -53,30 +55,6 @@ def toggle_encasa():
 
     return jsonify({"success": True, "new_status": new_status})
 
-@api.route('/api/completar_tarea', methods=['POST'])
-def completar_tarea():
-    data = request.json
-    user_id = data.get('user_id')
-    tarea = data.get('tarea')
-
-    if not user_id or not tarea:
-        return jsonify({"error": "Datos incompletos"}), 400
-
-    try:
-        obj_id = ObjectId(user_id)
-    except Exception:
-        return jsonify({"error": "ID no válido"}), 400
-
-    result = mongo.db.users.update_one(
-        {"_id": obj_id},
-        {"$pull": {"tareas": tarea}}
-    )
-
-    if result.modified_count == 0:
-        return jsonify({"error": "Tarea no encontrada"}), 404
-
-    return jsonify({"success": True})
-
 @api.route('/api/add_task', methods=['POST'])
 def add_task():
     data = request.get_json()
@@ -96,7 +74,8 @@ def add_task():
     nueva_tarea = {
         "titulo": titulo,
         "due_date": due_date,
-        "pasos": pasos
+        "pasos": pasos,
+        "asignado": asignee  # solo con esto basta
     }
 
     mongo.db.users.update_one(
@@ -104,7 +83,38 @@ def add_task():
         {"$push": {"tareas": nueva_tarea}}
     )
 
+    notificar_tarea_a_usuario(nueva_tarea)  # 🎯 Solo le llega al usuario asignado
+
     return jsonify({"success": True})
+
+@api.route('/api/completar_tarea', methods=['POST'])
+def completar_tarea():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    tarea = data.get('tarea')
+
+    if not user_id or not tarea:
+        return jsonify({"error": "Datos incompletos"}), 400
+
+    try:
+        mongo.db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$pull": {
+                "tareas": {
+                    "titulo": tarea['titulo'],
+                    "due_date": tarea['due_date']
+                }
+            }}
+        )
+        mongo.db.tareas.delete_one({
+            "usuario": mongo.db.users.find_one({"_id": ObjectId(user_id)})["nombre"],
+            "titulo": tarea['titulo'],
+            "due_date": tarea['due_date']
+        })
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        print(f"[ERROR al completar tarea]: {e}")
+        return jsonify({"error": "Error al borrar tarea"}), 500
 
 @api.route('/api/save_subscription', methods=['POST'])
 def save_subscription():

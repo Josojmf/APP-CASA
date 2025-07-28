@@ -11,6 +11,8 @@
   gap: 2rem;
   margin-top: 2rem;
   width: 100%;
+  position: relative;
+  top: 10%;
 }
 
 .user-button {

@@ -3,6 +3,9 @@ from app import mongo
 from bson import ObjectId
 from ddgs import DDGS
 from datetime import datetime, timedelta
+from app.sockets_utils import notificar_tarea_a_usuario
+
+
 import os
 
 main = Blueprint('main', __name__)

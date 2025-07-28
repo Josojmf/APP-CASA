@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for
 from app import mongo
+from app.globals import user_sockets
 
 auth = Blueprint("auth", __name__)
 
@@ -12,11 +13,16 @@ def login():
 def select_user():
     username = request.form.get('username')
     if username:
-        session['user'] = username
+        session['user'] = username  
         return redirect(url_for('main.index'))
     return redirect(url_for('auth.login'))
 
-@auth.route('/logout')
+@auth.route("/logout")
 def logout():
-    session.pop('user', None)
-    return redirect(url_for('auth.login'))
+    username = session.get("username")
+    session.clear()
+
+    if username in user_sockets:
+        del user_sockets[username]
+        print(f"[LOGOUT] {username} eliminado de sockets")
+    return redirect(url_for("auth.login")) 
