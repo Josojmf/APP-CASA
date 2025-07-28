@@ -55,11 +55,14 @@ main {
 
 /* Navegación */
 .nav-links {
-    list-style: none;
     display: flex;
-    margin: 0;
+    align-items: center;
+    gap: 20px;
+    list-style: none;
     padding: 0;
+    margin: 0;
 }
+
 
 .nav-links li {
     margin-left: 20px;
@@ -358,4 +361,45 @@ button:hover {
     color: #1f2937;
     animation: fadeInUp 0.8s ease forwards;
     opacity: 0;
+}
+
+.user-info {
+    font-size: 1rem;
+    color: #333;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-info {
+    font-size: 1rem;
+    color: #333;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.logout-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s ease;
+}
+
+.logout-btn:hover {
+    background-color: #c0392b;
 }

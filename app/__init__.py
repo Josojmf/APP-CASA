@@ -5,6 +5,9 @@ from flask_socketio import SocketIO
 from dotenv import load_dotenv
 import os
 
+# Mover importación del blueprint después de definir mongo y app
+# from app.auth import auth
+
 # Cargar variables desde .env
 load_dotenv()
 
@@ -13,6 +16,7 @@ socketio = SocketIO(cors_allowed_origins="*")
 
 def create_app():
     app = Flask(__name__, static_url_path='/static')
+    app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 
     # Leer usuario y password desde .env
     mongo_user = os.getenv("MONGO_USER")
@@ -42,13 +46,15 @@ def create_app():
     CORS(app)
     socketio.init_app(app)
 
-    # Importar blueprints
+    # Importar blueprints después de inicializar mongo
     from app.routes import main
     from app.api import api
+    from app.auth import auth
 
     app.register_blueprint(main)
+    app.register_blueprint(auth)
     app.register_blueprint(api)
-    
+
     @app.context_processor
     def inject_vapid_key():
         return dict(vapid_public_key=VAPID_PUBLIC_KEY)

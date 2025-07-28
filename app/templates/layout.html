@@ -34,7 +34,18 @@
                     <li><a href="/menus"><i class="fa-solid fa-utensils"></i> Menús</a></li>
                     <li><a href="/lista_compra"><i class="fa-solid fa-cart-shopping"></i> Lista de la compra</a></li>
                     <li><a href="/configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
+                    {% if session.get('user') %}
+                    <li class="nav-user">
+                        <span class="user-info">
+                            <i class="fa-solid fa-user"></i> {{ session.get('user') }}
+                        </span>
+                        <a href="{{ url_for('auth.logout') }}" class="logout-btn">
+                            <i class="fa-solid fa-right-from-bracket"></i> Salir
+                        </a>
+                    </li>
+                    {% endif %}
                 </ul>
+
             </div>
         </nav>
     </header>
@@ -165,6 +176,14 @@
                 console.warn("📵 Push API o Service Worker no soportados en este navegador");
             }
         });
+    </script>
+    <script>
+        function logoutUser() {
+            console.log("🚪 Cerrando sesión desde el frontend...");
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = "/login";  // o "/" si redirige al login
+        }
     </script>
 
     {% block extra_js %}{% endblock %}

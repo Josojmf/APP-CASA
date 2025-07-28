@@ -11,4 +11,5 @@ services:
       MONGO_PASS: ${MONGO_PASS}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      SECRET_KEY: ${SECRET_KEY}
     restart: unless-stopped

@@ -1,17 +1,9 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, current_app
 from app import mongo
 from bson import ObjectId
-import os
-from flask import current_app
-from flask import request, jsonify
 from ddgs import DDGS
 from datetime import datetime, timedelta
-
-
-
-
-# VAPID PUBLIC KEY IS ON .env
-VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
+import os
 
 main = Blueprint('main', __name__)
 
@@ -20,7 +12,6 @@ def index():
     users = list(mongo.db.users.find())
     vapid_public_key = current_app.config["VAPID_PUBLIC_KEY"]
     return render_template("index.html", users=users, vapid_public_key=vapid_public_key)
-
 
 @main.route('/users_cards')
 def users_cards():
@@ -36,6 +27,8 @@ def user_card(user_id):
 
 @main.route('/tareas')
 def tareas():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     users = list(mongo.db.users.find())
     for user in users:
         user['_id'] = str(user['_id'])
@@ -45,6 +38,8 @@ def tareas():
 
 @main.route("/calendario")
 def calendario():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     users = list(mongo.db.users.find())
     for user in users:
         user['_id'] = str(user['_id'])
@@ -65,6 +60,8 @@ def calendario():
 
 @main.route('/configuracion')
 def configuracion():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     users = list(mongo.db.users.find())
     for user in users:
         user['_id'] = str(user['_id'])
@@ -79,6 +76,8 @@ def get_food_image(query):
 
 @main.route('/menus')
 def mostrar_menus():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
     menus_data = {dia: {} for dia in dias}
 
@@ -99,22 +98,20 @@ def mostrar_menus():
     users = list(mongo.db.users.find({}, {"nombre": 1}))
     return render_template("menus.html", menus=menus_data, users=users)
 
-
 @main.route('/api/add_menu', methods=['POST'])
 def add_menu():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     data = request.get_json()
 
-    # Verificamos si ya existe la entrada
     existing = mongo.db.menus.find_one({
         "dia": data["dia"],
         "momento": data["momento"]
     })
 
-    # Si ya tenía imagen, la conservamos
     if existing and "img" in existing:
         image_url = existing["img"]
     else:
-        # Solo busca si no existía
         try:
             image_url = get_food_image(data["titulo"])
         except:
@@ -132,54 +129,45 @@ def add_menu():
 
 @main.route('/api/reset_menus', methods=['DELETE'])
 def reset_menus():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     mongo.db.menus.delete_many({})
     return jsonify({"status": "reseteado"})
 
 def get_fecha_real_desde_dia_semana(dia_nombre):
     dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
     hoy = datetime.now()
-    dia_actual = hoy.weekday()  # lunes=0 ... domingo=6
+    dia_actual = hoy.weekday()
     indice_dia = dias.index(dia_nombre)
     diferencia = (indice_dia - dia_actual + 7) % 7
     fecha_objetivo = hoy + timedelta(days=diferencia)
-    return fecha_objetivo.strftime("%Y-%m-%d")  # formato ISO
-
-def get_fecha_real_desde_dia_semana(dia_nombre):
-    dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
-    hoy = datetime.now()
-    dia_actual = hoy.weekday()  # lunes=0 ... domingo=6
-    indice_dia = dias.index(dia_nombre)
-    diferencia = (indice_dia - dia_actual + 7) % 7
-    fecha_objetivo = hoy + timedelta(days=diferencia)
-    return fecha_objetivo.strftime("%Y-%m-%d")  # formato ISO
+    return fecha_objetivo.strftime("%Y-%m-%d")
 
 @main.route("/api/asignar_comida", methods=["POST"])
 def asignar_comida():
-    data = request.json
-    dia = data.get("dia")           # "Lunes", "Martes", etc.
-    tipo = data.get("tipo")         # "comida" o "cena"
-    miembro = data.get("miembro")   # nombre del usuario
+    if "user" not in session:
+        return jsonify({"error": "No autorizado"}), 401
 
-    # 1. Actualizar asignación en colección `menus`
+    data = request.json
+    dia = data.get("dia")
+    tipo = data.get("tipo")
+    miembro = data.get("miembro")
+
     mongo.db.menus.update_one(
         {"dia": dia},
         {"$set": {f"asignaciones.{tipo}": miembro}},
         upsert=True
     )
 
-    # 2. Obtener título del menú
     menu = mongo.db.menus.find_one({"dia": dia})
     if not menu:
         return jsonify({"error": "Menú no encontrado"}), 404
 
     titulo = menu.get("titulo", "Comida asignada")
-    momento = tipo.capitalize()  # "Comida" o "Cena"
+    momento = tipo.capitalize()
     tarea_titulo = f"Preparar {momento}: {titulo}"
-
-    # 3. Obtener la fecha real del día (ISO)
     fecha_real = get_fecha_real_desde_dia_semana(dia)
 
-    # 4. Eliminar tarea previa del mismo momento y día en todos los usuarios
     mongo.db.users.update_many(
         {},
         {"$pull": {
@@ -190,26 +178,22 @@ def asignar_comida():
         }}
     )
 
-    # 5. Eliminar duplicado también de la colección global `tareas`
     mongo.db.tareas.delete_many({
         "titulo": tarea_titulo,
         "due_date": fecha_real
     })
 
-    # 6. Crear nueva tarea
     nueva_tarea = {
         "titulo": tarea_titulo,
         "due_date": fecha_real,
         "pasos": f"Encargado de preparar la {momento.lower()} del día {dia}"
     }
 
-    # 7. Insertar en usuario asignado
     mongo.db.users.update_one(
         {"nombre": miembro},
         {"$push": {"tareas": nueva_tarea}}
     )
 
-    # 8. Insertar en colección global `tareas`
     mongo.db.tareas.insert_one({
         "usuario": miembro,
         **nueva_tarea
@@ -217,8 +201,9 @@ def asignar_comida():
 
     return jsonify({"status": "ok", "tarea_creada": True})
 
-
 @main.route("/lista_compra")
 def lista_compra():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
     items = list(mongo.db.lista_compra.find())
     return render_template("lista_compra.html", items=items)

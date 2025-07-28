@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% block title %}Login{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/login.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1 class="title">¿Quién eres?</h1>
+
+<div id="userSelectionContainer">
+    {% for user in users %}
+    <form method="POST" action="{{ url_for('auth.select_user') }}" class="user-form">
+        <input type="hidden" name="username" value="{{ user.nombre }}">
+        <button type="submit" class="user-button">
+            <img src="data:image/jpeg;base64,{{ user.imagen }}" alt="{{ user.nombre }}">
+            <span>{{ user.nombre }}</span>
+        </button>
+    </form>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function logoutUser() {
+        console.log("🚪 Cerrando sesión desde el frontend...");
+        sessionStorage.clear();
+        localStorage.clear();
+        window.location.href = "/login";
+    }
+</script>
+{% endblock %}

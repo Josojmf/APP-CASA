@@ -1,0 +1,60 @@
+.title {
+  font-size: 2rem;
+  margin: 2rem;
+  color: #3f3f3f;
+  text-align: center;
+}
+#userSelectionContainer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
+  width: 100%;
+}
+
+.user-button {
+  width: 20%; /* cada una ocupa 20% del ancho */
+  min-width: 220px; /* evita que se colapsen en pantallas pequeñas */
+  max-width: 300px;
+  background: white;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.user-button:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.15);
+}
+
+.user-button img {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #4f46e5;
+}
+
+.user-button span {
+  display: block;
+  margin-top: 1rem;
+  font-weight: bold;
+  font-size: 1.4rem;
+  color: #333;
+}
+
+@media (max-width: 768px) {
+  .user-button {
+    width: 45%;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-button {
+    width: 80%;
+  }
+}
