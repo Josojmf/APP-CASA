@@ -121,8 +121,20 @@ def save_subscription():
     subscription = request.get_json()
     if not subscription:
         return jsonify({"error": "No se recibió suscripción"}), 400
+
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "No autenticado"}), 401
+
+    # Asociar suscripción al usuario
+    subscription["usuario"] = user
+
+    # Opcional: evitar duplicados
+    mongo.db.subscriptions.delete_many({"usuario": user})
     mongo.db.subscriptions.insert_one(subscription)
+
     return jsonify({"success": True})
+
 
 @api.route("/api/lista_compra", methods=["GET"])
 def obtener_lista():
