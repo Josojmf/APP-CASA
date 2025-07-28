@@ -284,12 +284,18 @@ def toggle_theme():
     session["theme"] = new_theme
     return jsonify({"success": True})
 
-@main.route('/mapa')
+@main.route("/mapa")
 def mapa():
-    if "user" not in session:
-        return redirect(url_for("auth.login"))
-
-    posiciones = list(mongo.db.ubicaciones.find())
-    for pos in posiciones:
-        pos["_id"] = str(pos["_id"])
+    usuarios = list(mongo.db.users.find({}, {"nombre": 1, "last_location": 1, "imagen": 1}))
+    posiciones = []
+    for user in usuarios:
+        loc = user.get("last_location")
+        if loc and "lat" in loc and "lon" in loc:
+            posiciones.append({
+                "user": user["nombre"],
+                "lat": loc["lat"],
+                "lon": loc["lon"],
+                "time": loc.get("time"),
+                "imagen": user.get("imagen") or "/static/img/default-avatar.png"
+            })
     return render_template("mapa.html", posiciones=posiciones)

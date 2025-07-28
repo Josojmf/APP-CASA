@@ -223,25 +223,39 @@ def recibir_ubicacion():
 
     return jsonify({"ok": True})
 
-@api.route('/api/owntracks', methods=['POST'])
-def recibir_ubicacion_owntracks():
+@api.route("/api/owntracks", methods=["POST"])
+def recibir_posicion():
     data = request.get_json()
+    lat = data.get("lat")
+    lon = data.get("lon")
+    user = data.get("user")
+    time = data.get("tst")  # timestamp
 
-    if not data or "lat" not in data or "lon" not in data or "_type" != "location":
-        return jsonify({"error": "Datos inválidos"}), 400
-
-    user = data.get("user") or session.get("user")
-    if not user:
-        return jsonify({"error": "Sin usuario"}), 400
+    if lat is None or lon is None or not user:
+        return jsonify({"error": "Datos incompletos"}), 400
 
     mongo.db.ubicaciones.update_one(
         {"user": user},
-        {"$set": {
-            "lat": data["lat"],
-            "lon": data["lon"],
-            "time": data.get("tst"),  # timestamp unix
-        }},
+        {"$set": {"lat": lat, "lon": lon, "time": time}},
         upsert=True
     )
+    return jsonify({"success": True})
 
-    return jsonify({"ok": True})
+
+@api.route("/api/ubicaciones")
+def ubicaciones():
+    usuarios = list(mongo.db.users.find({}, {"nombre": 1, "last_location": 1, "imagen": 1}))
+    posiciones = []
+    for user in usuarios:
+        loc = user.get("last_location")
+        if loc and "lat" in loc and "lon" in loc:
+            posiciones.append({
+                "user": user["nombre"],
+                "lat": loc["lat"],
+                "lon": loc["lon"],
+                "time": loc.get("time"),
+                "imagen": user.get("imagen") or "/static/img/default-avatar.png"
+            })
+    return jsonify(posiciones)
+
+

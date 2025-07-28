@@ -2,9 +2,22 @@
 {% block title %}📍 Mapa en tiempo real{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
 <style>
-  #map { height: 80vh; width: 100%; margin-top: 20px; border-radius: 12px; }
+    #map {
+        height: 80vh;
+        width: 100%;
+        margin-top: 20px;
+        border-radius: 12px;
+    }
+
+    .custom-marker-img {
+        border-radius: 50%;
+        border: 2px solid white;
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+    }
 </style>
 {% endblock %}
 
@@ -16,18 +29,33 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
-  const posiciones = {{ posiciones | tojson }};
-  const map = L.map('map').setView([40.4168, -3.7038], 6);  // España centro
+    const map = L.map('map').setView([40.4168, -3.7038], 13);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-  }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-  posiciones.forEach(pos => {
-    if (pos.lat && pos.lon) {
-      const marker = L.marker([pos.lat, pos.lon]).addTo(map);
-      marker.bindPopup(`<strong>${pos.user || 'Usuario'}</strong><br>${pos.time || ''}`);
-    }
-  });
+    fetch("/api/ubicaciones")
+        .then(res => res.json())
+        .then(posiciones => {
+            posiciones.forEach(pos => {
+                if (pos.lat && pos.lon) {
+                    const icon = L.divIcon({
+                        className: '',
+                        html: `<img src="${pos.imagen}" class="custom-marker-img" />`,
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20],
+                        popupAnchor: [0, -20]
+                    });
+
+                    const marker = L.marker([pos.lat, pos.lon], { icon }).addTo(map);
+                    marker.bindPopup(`<strong>${pos.user}</strong><br>${pos.time || ''}`);
+                }
+            });
+        })
+        .catch(err => {
+            console.error("Error al cargar las ubicaciones:", err);
+        });
 </script>
 {% endblock %}
