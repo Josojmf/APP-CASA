@@ -10,32 +10,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    - name: 📦 Checkout repo
       uses: actions/checkout@v3
 
-    - name: Log in to Docker Hub
+    - name: 🔐 Log in to Docker Hub
       run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-    - name: Build Docker image
+    - name: 🏗️ Build Docker image
       run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest .
 
-    - name: Push Docker image
+    - name: 📤 Push Docker image
       run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
 
-    - name: Deploy on DigitalOcean Droplet
+    - name: 🚀 Deploy on DigitalOcean Droplet (with retries, sanity checks and logs)
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.DROPLET_HOST }}
         username: root
         key: ${{ secrets.DROPLET_SSH_KEY }}
+        script_stop: true
         script: |
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
-          docker stop house-app || true
-          docker rm house-app || true
-          docker run -d --name house-app -p 5000:5000 \
-            -e MONGO_USER="${{ secrets.MONGO_USER }}" \
-            -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
-            -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
-            -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
-            --restart unless-stopped \
-            ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+          set -e
+
+          echo "🔄 Intentando desplegar (máx 3 intentos)..."
+          for i in 1 2 3; do
+            echo "🔁 Intento $i..."
+
+            echo "🛑 Parando contenedor si está en ejecución..."
+            docker stop house-app 2>/dev/null || true
+
+            echo "🧹 Eliminando contenedor si existe..."
+            docker rm house-app 2>/dev/null || true
+
+            echo "⬇️ Pulling imagen desde Docker Hub..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+
+            echo "🚀 Lanzando nuevo contenedor..."
+            docker run -d --name house-app -p 5000:5000 \
+              -e MONGO_USER="${{ secrets.MONGO_USER }}" \
+              -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
+              -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
+              -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
+              --restart unless-stopped \
+              ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+
+            echo "⏳ Esperando 10 segundos para verificar estado..."
+            sleep 10
+
+            echo "🧪 Sanity check..."
+            if docker ps | grep house-app && docker logs house-app | tail -n 20; then
+              echo "✅ Despliegue exitoso."
+              exit 0
+            else
+              echo "⚠️ Algo falló, intentando de nuevo..."
+              sleep 5
+            fi
+          done
+
+          echo "❌ Despliegue fallido tras 3 intentos."
+          exit 1
