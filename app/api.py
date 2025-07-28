@@ -211,17 +211,36 @@ def eliminar_todos_items():
 def recibir_ubicacion():
     data = request.get_json()
 
-    if not data or "lat" not in data or "lon" not in data or "tid" not in data:
+    usuario = data.get("tid") or data.get("user")
+    lat = data.get("lat")
+    lon = data.get("lon")
+    ts = datetime.utcnow()
+
+    if not lat or not lon or not usuario:
         return jsonify({"error": "Faltan datos obligatorios"}), 400
 
+    # Guarda ubicación en colección de ubicaciones
     mongo.db.ubicaciones.insert_one({
-        "usuario": data.get("tid"),  # Ej: "joso"
-        "lat": data["lat"],
-        "lon": data["lon"],
-        "timestamp": datetime.utcnow()
+        "usuario": usuario,
+        "lat": lat,
+        "lon": lon,
+        "timestamp": ts
     })
 
+    # También actualiza el campo last_location en el documento del usuario
+    mongo.db.users.update_one(
+        {"nombre": usuario},
+        {"$set": {
+            "last_location": {
+                "lat": lat,
+                "lon": lon,
+                "time": ts
+            }
+        }}
+    )
+
     return jsonify({"ok": True})
+
 
 @api.route("/api/owntracks", methods=["POST"])
 def recibir_posicion():
@@ -229,17 +248,30 @@ def recibir_posicion():
     lat = data.get("lat")
     lon = data.get("lon")
     user = data.get("user")
-    time = data.get("tst")  # timestamp
+    time = data.get("tst") or datetime.utcnow()
 
     if lat is None or lon is None or not user:
         return jsonify({"error": "Datos incompletos"}), 400
 
     mongo.db.ubicaciones.update_one(
-        {"user": user},
-        {"$set": {"lat": lat, "lon": lon, "time": time}},
+        {"usuario": user},
+        {"$set": {"lat": lat, "lon": lon, "timestamp": time}},
         upsert=True
     )
+
+    mongo.db.users.update_one(
+        {"nombre": user},
+        {"$set": {
+            "last_location": {
+                "lat": lat,
+                "lon": lon,
+                "time": time
+            }
+        }}
+    )
+
     return jsonify({"success": True})
+
 
 
 @api.route("/api/ubicaciones")
