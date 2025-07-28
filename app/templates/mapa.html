@@ -14,9 +14,25 @@
     .custom-marker-img {
         border-radius: 50%;
         border: 2px solid white;
-        width: 40px;
-        height: 40px;
+        width: 60px;
+        height: 60px;
         object-fit: cover;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }
+
+    .custom-marker-text {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: #4a5568;
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+        border: 2px solid white;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
     }
 </style>
 {% endblock %}
@@ -41,12 +57,18 @@
         .then(posiciones => {
             posiciones.forEach(pos => {
                 if (pos.lat && pos.lon) {
+                    const hasImage = pos.imagen && pos.imagen !== "" && !pos.imagen.includes("default-avatar");
+
+                    const html = hasImage
+                        ? `<img src="${pos.imagen}" class="custom-marker-img" />`
+                        : `<div class="custom-marker-text">${pos.user}</div>`;
+
                     const icon = L.divIcon({
                         className: '',
-                        html: `<img src="${pos.imagen}" class="custom-marker-img" />`,
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20],
-                        popupAnchor: [0, -20]
+                        html,
+                        iconSize: [60, 60],
+                        iconAnchor: [30, 30],
+                        popupAnchor: [0, -30]
                     });
 
                     const marker = L.marker([pos.lat, pos.lon], { icon }).addTo(map);
