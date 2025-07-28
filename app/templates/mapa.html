@@ -30,7 +30,7 @@
         background: #4a5568;
         color: white;
         font-weight: bold;
-        font-size: 18px;
+        font-size: 20px;
         border: 2px solid white;
         box-shadow: 0 0 5px rgba(0,0,0,0.3);
     }
@@ -61,7 +61,7 @@
 
                     const html = hasImage
                         ? `<img src="${pos.imagen}" class="custom-marker-img" />`
-                        : `<div class="custom-marker-text">${pos.user}</div>`;
+                        : `<div class="custom-marker-text">${pos.user.charAt(0).toUpperCase()}</div>`;
 
                     const icon = L.divIcon({
                         className: '',
@@ -71,8 +71,18 @@
                         popupAnchor: [0, -30]
                     });
 
+                    const fecha = new Date(pos.time);
+                    const horaFormateada = fecha.toLocaleString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+
                     const marker = L.marker([pos.lat, pos.lon], { icon }).addTo(map);
-                    marker.bindPopup(`<strong>${pos.user}</strong><br>${pos.time || ''}`);
+                    marker.bindPopup(`<strong>${pos.user}</strong><br>${horaFormateada}`);
                 }
             });
         })
