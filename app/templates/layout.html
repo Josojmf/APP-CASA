@@ -24,24 +24,25 @@
                 <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú">
                     <i class="fa fa-bars"></i>
                 </button>
-                <ul class="nav-links" id="navLinks">
-                    <li><a href="/"><i class="fa-solid fa-home"></i> Inicio</a></li>
-                    <li><a href="/tareas"><i class="fa-solid fa-list-check"></i> Tareas</a></li>
-                    <li><a href="/calendario"><i class="fa-solid fa-calendar-days"></i> Calendario</a></li>
-                    <li><a href="/menus"><i class="fa-solid fa-utensils"></i> Menús</a></li>
-                    <li><a href="/lista_compra"><i class="fa-solid fa-cart-shopping"></i> Lista de la compra</a></li>
-                    <li><a href="/configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
-                    {% if session.get('user') %}
-                    <li class="nav-user">
-                        <span class="user-info"><i class="fa-solid fa-user"></i> {{ session.get('user') }}</span>
-                        <a href="{{ url_for('auth.logout') }}" class="logout-btn">
-                            <i class="fa-solid fa-right-from-bracket"></i> Salir
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
             </div>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/"><i class="fa-solid fa-home"></i> Inicio</a></li>
+                <li><a href="/tareas"><i class="fa-solid fa-list-check"></i> Tareas</a></li>
+                <li><a href="/calendario"><i class="fa-solid fa-calendar-days"></i> Calendario</a></li>
+                <li><a href="/menus"><i class="fa-solid fa-utensils"></i> Menús</a></li>
+                <li><a href="/lista_compra"><i class="fa-solid fa-cart-shopping"></i> Lista de la compra</a></li>
+                <li><a href="/configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
+                {% if session.get('user') %}
+                <li class="nav-user">
+                    <span class="user-info"><i class="fa-solid fa-user"></i> {{ session.get('user') }}</span>
+                    <a href="{{ url_for('auth.logout') }}" class="logout-btn">
+                        <i class="fa-solid fa-right-from-bracket"></i> Salir
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
         </nav>
+
     </header>
 
     <main>
@@ -142,4 +143,5 @@
 
     {% block extra_js %}{% endblock %}
 </body>
+
 </html>

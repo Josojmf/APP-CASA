@@ -40,33 +40,46 @@ main {
 .logo {
     display: flex;
     align-items: center;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #10b981;
+    font-size: 1.6rem;
+    font-weight: 600;
+    gap: 8px;
+    color: #1f2937;
 }
 
+
 .menu-toggle {
-    display: none;
+    font-size: 1.8rem;
     background: none;
     border: none;
-    font-size: 1.8rem;
+    color: #1f2937;
     cursor: pointer;
+    z-index: 1001;
 }
+
 
 /* Navegación */
 .nav-links {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    list-style: none;
-    padding: 0;
-    margin: 0;
+    flex-direction: column;
+    position: absolute;
+    top: 65px;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    display: none;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    padding: 30px 20px;
+    z-index: 1000;
 }
 
+.nav-links.open {
+    display: flex;
+}
 
 .nav-links li {
-    margin-left: 20px;
+    margin: 12px 0;
+    text-align: center;
 }
+
 
 .nav-links a {
     text-decoration: none;
@@ -314,6 +327,7 @@ button:hover {
     }
 
     .menu-toggle {
+        display: block;
         color: #1f2937;
         align-self: flex-end;
         position: relative;
@@ -372,6 +386,14 @@ button:hover {
     font-weight: 500;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
 
 .nav-user {
     display: flex;
