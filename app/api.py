@@ -8,6 +8,13 @@ from flask import session
 from urllib.parse import urlparse
 from datetime import datetime
 
+TID_TO_USERNAME = {
+     "jo": "joso",
+     "an": "ana",
+     "pa": "papa",
+      "ma": "mama"
+}
+
 
 def get_vapid_claims(endpoint_url):
     parsed = urlparse(endpoint_url)
@@ -202,11 +209,6 @@ def marcar_comprado(item_id):
     )
     return jsonify({"success": True})
 
-@api.route("/api/lista_compra_all", methods=["DELETE"])
-def eliminar_todos_items():
-    mongo.db.lista_compra.delete_many({})
-    return jsonify({"success": True})
-    
 @api.route("/api/ubicacion", methods=["POST"])
 def recibir_ubicacion():
     data = request.get_json()
@@ -215,15 +217,11 @@ def recibir_ubicacion():
         return jsonify({"error": "Faltan datos obligatorios"}), 400
 
     # 🔁 Equivalencia de TID (OwnTracks usa solo 2 caracteres)
-    TID_TO_USER = {
-        "jo": "joso",
-        "an": "ana",
-        "pa": "papa",
-        "ma": "mama"
-    }
+    tid = data.get("tid")
+    usuario = TID_TO_USERNAME.get(tid)
 
-    usuario_tid = data.get("tid")
-    usuario = TID_TO_USER.get(usuario_tid, usuario_tid)  # fallback si no mapeado
+    if not usuario:
+        return jsonify({"error": "Usuario no reconocido"}), 400
 
     lat = data["lat"]
     lon = data["lon"]
@@ -244,6 +242,7 @@ def recibir_ubicacion():
     )
 
     return jsonify({"ok": True})
+
 
 
 @api.route("/api/owntracks", methods=["POST"])
