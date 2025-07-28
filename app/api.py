@@ -6,6 +6,8 @@ import json
 from app.sockets_utils import notificar_tarea_a_usuario
 from flask import session
 from urllib.parse import urlparse
+from datetime import datetime
+
 
 def get_vapid_claims(endpoint_url):
     parsed = urlparse(endpoint_url)
@@ -205,3 +207,41 @@ def eliminar_todos_items():
     mongo.db.lista_compra.delete_many({})
     return jsonify({"success": True})
     
+@api.route("/api/ubicacion", methods=["POST"])
+def recibir_ubicacion():
+    data = request.get_json()
+
+    if not data or "lat" not in data or "lon" not in data or "tid" not in data:
+        return jsonify({"error": "Faltan datos obligatorios"}), 400
+
+    mongo.db.ubicaciones.insert_one({
+        "usuario": data.get("tid"),  # Ej: "joso"
+        "lat": data["lat"],
+        "lon": data["lon"],
+        "timestamp": datetime.utcnow()
+    })
+
+    return jsonify({"ok": True})
+
+@api.route('/api/owntracks', methods=['POST'])
+def recibir_ubicacion_owntracks():
+    data = request.get_json()
+
+    if not data or "lat" not in data or "lon" not in data or "_type" != "location":
+        return jsonify({"error": "Datos inválidos"}), 400
+
+    user = data.get("user") or session.get("user")
+    if not user:
+        return jsonify({"error": "Sin usuario"}), 400
+
+    mongo.db.ubicaciones.update_one(
+        {"user": user},
+        {"$set": {
+            "lat": data["lat"],
+            "lon": data["lon"],
+            "time": data.get("tst"),  # timestamp unix
+        }},
+        upsert=True
+    )
+
+    return jsonify({"ok": True})
