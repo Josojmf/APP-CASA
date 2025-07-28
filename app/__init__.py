@@ -1,12 +1,9 @@
-from flask import Flask
+from flask import Flask, session
 from flask_pymongo import PyMongo
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 import os
-
-# Mover importación del blueprint después de definir mongo y app
-# from app.auth import auth
 
 # Cargar variables desde .env
 load_dotenv()
@@ -58,5 +55,10 @@ def create_app():
     @app.context_processor
     def inject_vapid_key():
         return dict(vapid_public_key=VAPID_PUBLIC_KEY)
+
+    @app.before_request
+    def aplicar_tema_por_defecto():
+        if "theme" not in session:
+            session["theme"] = "light"
 
     return app

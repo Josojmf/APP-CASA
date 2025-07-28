@@ -68,22 +68,6 @@ def calendario():
     vapid_public_key = current_app.config["VAPID_PUBLIC_KEY"]
     return render_template("calendario.html", users=users, events=eventos, vapid_public_key=vapid_public_key)
 
-@main.route('/configuracion')
-def configuracion():
-    if "user" not in session:
-        return redirect(url_for("auth.login"))
-    users = list(mongo.db.users.find())
-    for user in users:
-        user['_id'] = str(user['_id'])
-    return render_template("configuracion.html", users=users)
-
-def get_food_image(query):
-    with DDGS() as ddgs:
-        results = ddgs.images(query + " comida plato", max_results=1)
-        if results and isinstance(results, list):
-            return results[0].get("image", "/static/img/default_food.jpg")
-        return "/static/img/default_food.jpg"
-
 @main.route('/menus')
 def mostrar_menus():
     if "user" not in session:
@@ -244,3 +228,58 @@ def test_push(username):
     except WebPushException as ex:
         print(f"❌ Error al enviar push: {repr(ex)}")
         return jsonify({"error": "Fallo al enviar push", "details": str(ex)}), 500
+
+@main.route('/configuracion')
+def configuracion():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
+    users = list(mongo.db.users.find())
+    for user in users:
+        user['_id'] = str(user['_id'])
+    return render_template("configuracion.html", users=users)
+
+@main.route('/api/add_user', methods=['POST'])
+def add_user():
+    data = request.json
+    nombre = data.get("nombre")
+    imagen = data.get("imagen")  # Base64 con encabezado data:image/...
+    # remove data:image/jpeg;base64, if present
+    if imagen and imagen.startswith("data:image/"):
+        imagen = imagen.split(",")[1]
+    if imagen:
+        imagen = imagen.strip()
+    else:
+        imagen = None
+        
+
+    if not nombre or not imagen:
+        return jsonify({"error": "Nombre e imagen son obligatorios"}), 400
+
+    if mongo.db.users.find_one({"nombre": nombre}):
+        return jsonify({"error": "Ya existe un usuario con ese nombre"}), 409
+
+    mongo.db.users.insert_one({
+        "nombre": nombre,
+        "encasa": True,
+        "imagen": imagen,
+        "tareas": [],
+        "calendario": []
+    })
+    return jsonify({"success": True}), 201
+
+
+@main.route('/api/delete_user/<user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    try:
+        obj_id = ObjectId(user_id)
+    except:
+        return jsonify({"error": "ID no válido"}), 400
+    mongo.db.users.delete_one({"_id": obj_id})
+    mongo.db.subscriptions.delete_many({"user": user_id})  # Opcional: limpiar subs
+    return jsonify({"success": True}), 200
+
+@main.route('/api/toggle_theme', methods=['POST'])
+def toggle_theme():
+    new_theme = request.json.get("theme")
+    session["theme"] = new_theme
+    return jsonify({"success": True})

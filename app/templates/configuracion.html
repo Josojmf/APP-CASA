@@ -1,101 +1,110 @@
 {% extends "layout.html" %}
-{% block title %}Tareas{% endblock %}
+{% block title %}Configuración{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/configuracion.css') }}">
 {% endblock %}
 
 {% block content %}
-<h1>Configuración</h1>
+<h1 class="title">⚙️ Panel de Configuración</h1>
 
-<div class="tareas-container">
-    {% for usuario, tareas in tareas_por_usuario.items() %}
-    <div class="tareas-list">
-        <h2>{{ usuario }}</h2>
-        <ul>
-            {% for tarea in tareas %}
-            <li>
-                <input type="checkbox" class="tarea-checkbox" data-tarea-id="{{ tarea['_id'] }}">
-                <span>{{ tarea['titulo'] }}</span>
-            </li>
-            {% else %}
-            <li><em>Sin tareas</em></li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endfor %}
-</div>
+<section class="theme-toggle">
+    <h2>Cambiar tema</h2>
+    <label class="switch">
+        <input type="checkbox" id="themeSwitch">
+        <span class="slider round"></span>
+    </label>
+</section>
 
-<!-- Botón flotante -->
-<button id="addTaskBtn" title="Añadir tarea">➕</button>
+<section class="user-management">
+    <h2>Usuarios</h2>
+    <form id="addUserForm">
+        <input type="text" id="nuevoUsuario" placeholder="Nombre del nuevo usuario" required>
+        <input type="file" id="imagenUsuario" accept="image/png, image/jpeg" required>
+        <button type="submit">Añadir</button>
+    </form>
 
-<!-- Overlay y formulario -->
-<div id="overlay" class="overlay">
-    <div class="overlay-content">
-        <h2>Añadir nueva tarea</h2>
-        <form id="taskForm">
-            <label for="titulo">Título:</label>
-            <input type="text" id="titulo" name="titulo" required>
+    <ul class="user-list">
+        {% for user in users %}
+        <li>
+            <span class="user-info">
+                👤 {{ user.nombre }} {% if user.encasa %}🟢 En casa{% else %}🔴 Fuera{% endif %}
+            </span>
+            <button class="delete-btn" onclick="eliminarUsuario('{{ user._id }}')">Eliminar</button>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}
 
-            <label for="asignee">Asignado a:</label>
-            <select id="asignee" name="asignee" required>
-                <option value="">Seleccionar usuario</option>
-                {% for user in users %}
-                <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="due_date">Fecha límite:</label>
-            <input type="date" id="due_date" name="due_date" required>
-
-            <label for="pasos">Pasos (opcional):</label>
-            <textarea id="pasos" name="pasos" rows="3"></textarea>
-
-            <div class="form-buttons">
-                <button type="submit">Guardar</button>
-                <button type="button" id="cancelBtn">Cancelar</button>
-            </div>
-        </form>
-    </div>
-</div>
-
+{% block extra_js %}
 <script>
-    document.getElementById('addTaskBtn').addEventListener('click', () => {
-        document.getElementById('overlay').style.display = 'flex';
-    });
+    function eliminarUsuario(userId) {
+        if (confirm("¿Estás seguro de que quieres eliminar este usuario?")) {
+            fetch(`/api/delete_user/${userId}`, { method: "DELETE" })
+                .then(res => {
+                    if (res.ok) location.reload();
+                    else alert("⚠️ Error al eliminar usuario");
+                });
+        }
+    }
 
-    document.getElementById('cancelBtn').addEventListener('click', () => {
-        document.getElementById('overlay').style.display = 'none';
-    });
-
-    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+    document.getElementById("addUserForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+        const nombre = document.getElementById("nuevoUsuario").value.trim();
+        const imagenInput = document.getElementById("imagenUsuario");
+        const archivo = imagenInput.files[0];
 
-        const data = {
-            titulo: document.getElementById('titulo').value,
-            asignee: document.getElementById('asignee').value,
-            due_date: document.getElementById('due_date').value,
-            pasos: document.getElementById('pasos').value,
-        };
+        if (!nombre || !archivo) {
+            alert("Debes rellenar el nombre y subir una imagen.");
+            return;
+        }
 
-        try {
-            const res = await fetch('/api/add_task', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+        if (!["image/jpeg", "image/png"].includes(archivo.type)) {
+            alert("Solo se permiten imágenes JPG o PNG.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function () {
+            const base64Img = reader.result;
+
+            const res = await fetch("/api/add_user", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nombre, imagen: base64Img })
             });
 
-            if (!res.ok) {
-                console.error("Error al añadir tarea");
-                return;
-            }
+            if (res.ok) location.reload();
+            else alert("⚠️ Error al añadir usuario");
+        };
+        reader.readAsDataURL(archivo);
+    });
 
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('taskForm').reset();
-            window.location.reload();
-        } catch (error) {
-            console.error("Error:", error);
-        }
+    document.addEventListener("DOMContentLoaded", () => {
+        const switchElement = document.getElementById("themeSwitch");
+        const currentTheme = document.body.classList.contains("dark") ? "dark" : "light";
+        switchElement.checked = currentTheme === "dark";
+
+        switchElement.addEventListener("change", async () => {
+            const newTheme = switchElement.checked ? "dark" : "light";
+
+            const res = await fetch("/api/toggle_theme", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ theme: newTheme })
+            });
+
+            if (res.ok) {
+                // Opción 1: cambiar la clase directamente (cambio visual inmediato sin recarga)
+                document.body.classList.remove("light", "dark");
+                document.body.classList.add(newTheme);
+
+                // Opción 2 (RECOMENDADA): forzar recarga para aplicar desde backend/session
+                location.reload();
+            }
+        });
     });
 </script>
+
 {% endblock %}
