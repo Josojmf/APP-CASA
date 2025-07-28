@@ -11,15 +11,6 @@
         border-radius: 12px;
     }
 
-    .custom-marker-img {
-        border-radius: 50%;
-        border: 2px solid white;
-        width: 60px;
-        height: 60px;
-        object-fit: cover;
-        box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    }
-
     .custom-marker-text {
         display: flex;
         align-items: center;
@@ -27,12 +18,12 @@
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        background: #4a5568;
+        background: #7c3aed; /* fondo violeta */
         color: white;
         font-weight: bold;
-        font-size: 20px;
+        font-size: 22px;
         border: 2px solid white;
-        box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
     }
 </style>
 {% endblock %}
@@ -56,30 +47,34 @@
         .then(res => res.json())
         .then(posiciones => {
             posiciones.forEach(pos => {
-                if (pos.lat && pos.lon) {
-                    const hasImage = pos.imagen && pos.imagen !== "" && !pos.imagen.includes("default-avatar");
-
-                    const html = hasImage
-                        ? `<img src="${pos.imagen}" class="custom-marker-img" />`
-                        : `<div class="custom-marker-text">${pos.user.charAt(0).toUpperCase()}</div>`;
+                if (pos.lat && pos.lon && pos.user) {
+                    const initial = pos.user.charAt(0).toUpperCase();
 
                     const icon = L.divIcon({
                         className: '',
-                        html,
+                        html: `<div class="custom-marker-text">${initial}</div>`,
                         iconSize: [60, 60],
                         iconAnchor: [30, 30],
                         popupAnchor: [0, -30]
                     });
 
-                    const fecha = new Date(pos.time);
-                    const horaFormateada = fecha.toLocaleString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    });
+                    // Validar y formatear fecha
+                    let horaFormateada = '';
+                    if (pos.time) {
+                        const fecha = new Date(pos.time);
+                        if (!isNaN(fecha.getTime())) {
+                            horaFormateada = fecha.toLocaleString('es-ES', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                            });
+                        } else {
+                            horaFormateada = 'Hora no disponible';
+                        }
+                    }
 
                     const marker = L.marker([pos.lat, pos.lon], { icon }).addTo(map);
                     marker.bindPopup(`<strong>${pos.user}</strong><br>${horaFormateada}`);
