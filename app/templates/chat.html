@@ -20,6 +20,7 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     const socket = io();
+    const currentUser = "{{ session['username'] }}"; // Usuario actual
 
     document.addEventListener("DOMContentLoaded", () => {
         fetch("/chat/messages")
@@ -27,7 +28,7 @@
             .then(data => {
                 data.forEach((msg, i) => {
                     setTimeout(() => {
-                        addMessage(msg.user, msg.photo, msg.message, false);
+                        addMessage(msg.user, msg.photo, msg.message);
                     }, i * 80);
                 });
                 scrollToBottom();
@@ -35,7 +36,7 @@
     });
 
     socket.on('chat_message', (data) => {
-        addMessage(data.user, data.photo, data.message, true);
+        addMessage(data.user, data.photo, data.message);
     });
 
     function sendMessage() {
@@ -46,19 +47,29 @@
         }
     }
 
-    function addMessage(user, photo, text, scroll = true) {
+    function addMessage(user, photoBase64, text) {
         const msgDiv = document.createElement("div");
-        msgDiv.classList.add("message");
+
+        // Si el mensaje es mío → clase "sent", si no "received"
+        const isMine = (user === currentUser);
+        msgDiv.classList.add("message", isMine ? "sent" : "received");
+
+        // Si la imagen viene en base64 la cargamos como data URI
+        const photoSrc = photoBase64.startsWith("data:image")
+            ? photoBase64
+            : `data:image/jpeg;base64,${photoBase64}`;
+
         msgDiv.innerHTML = `
-            <img src="${photo}" alt="${user}">
-            <div class="message-content">
-                <strong>${user}</strong>
-                ${text}
-            </div>
-        `;
+        <img src="${photoSrc}" alt="${user}">
+        <div class="message-content">
+            <strong>${user}</strong>
+            ${text}
+        </div>
+    `;
         document.getElementById("messages").appendChild(msgDiv);
-        if (scroll) scrollToBottom();
+        scrollToBottom();
     }
+
 
     function scrollToBottom() {
         const msgBox = document.getElementById("messages");
