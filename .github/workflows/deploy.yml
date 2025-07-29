@@ -47,12 +47,14 @@ jobs:
 
             echo "🚀 Lanzando nuevo contenedor..."
             docker run -d --name house-app -p 5000:5000 \
-              -e MONGO_USER="${{ secrets.MONGO_USER }}" \
-              -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
-              -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
-              -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
-              --restart unless-stopped \
-              ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+          -e MONGO_USER="${{ secrets.MONGO_USER }}" \
+          -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
+          -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
+          -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
+          -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+          --restart unless-stopped \
+          ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
 
             echo "⏳ Esperando 10 segundos para verificar estado..."
             sleep 10

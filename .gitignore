@@ -1,0 +1,65 @@
+# ===============================
+# Archivos de configuración local
+# ===============================
+.env
+*.env
+.env.*
+.env.local
+config/*.env
+
+# ===============================
+# Archivos de Python
+# ===============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+
+# ===============================
+# Entornos virtuales
+# ===============================
+venv/
+env/
+.venv/
+ENV/
+
+# ===============================
+# Archivos temporales y de logs
+# ===============================
+*.log
+*.tmp
+*.temp
+*.swp
+*.bak
+
+# ===============================
+# Archivos de sistema
+# ===============================
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Archivos de compilación y cache
+# ===============================
+*.egg-info/
+dist/
+build/
+
+# ===============================
+# Archivos de IDE
+# ===============================
+.vscode/
+.idea/
+*.iml
+
+# ===============================
+# Docker
+# ===============================
+docker-compose.override.yml
+*.pid
+
+# ===============================
+# Node / Frontend (si aplica)
+# ===============================
+node_modules/

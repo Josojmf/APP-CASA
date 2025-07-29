@@ -333,3 +333,7 @@ def get_chat_messages():
 
     return jsonify(messages), 200
 
+@main.route("/asistente-familiar")
+def asistente_familiar_page():
+    return render_template("ai.html")
+

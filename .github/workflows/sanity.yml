@@ -1,0 +1,110 @@
+name: "🌡️ Sanity Check - House App"
+
+on:
+  workflow_run:
+    workflows: ["CI/CD AB-RENOVA - Build, Push & Deploy"]
+    types:
+      - completed
+
+jobs:
+  wait-then-check:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: ⏳ Esperar 2 minutos antes del sanity check
+        run: sleep 120
+
+      - name: 🔍 Sanity Check Completo
+        id: sanity
+        run: |
+          echo "===== 🌐 INICIO SANITY CHECK ====="
+          echo "Fecha/Hora: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "" > sanity_report.txt
+          echo "Sanity Check - House App" >> sanity_report.txt
+          echo "Fecha/Hora: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> sanity_report.txt
+          echo "---------------------------------------------" >> sanity_report.txt
+
+          ALL_OK=true
+
+          # -------- Comprobar WEB PRINCIPAL --------
+          MAIN_URL="https://www.house-app.casa/"
+          echo "🌐 Comprobando $MAIN_URL"
+          STATUS=$(curl -s -L -o /tmp/out_main.html -w "%{http_code}" "$MAIN_URL")
+          CONTENT_TYPE=$(file /tmp/out_main.html)
+          if [[ "$STATUS" != "200" || "$CONTENT_TYPE" != *"HTML"* ]]; then
+            echo "❌ ERROR en $MAIN_URL (HTTP $STATUS, Tipo: $CONTENT_TYPE)"
+            echo "❌ ERROR en $MAIN_URL (HTTP $STATUS, Tipo: $CONTENT_TYPE)" >> sanity_report.txt
+            head -n 20 /tmp/out_main.html >> sanity_report.txt
+            ALL_OK=false
+          else
+            echo "✅ $MAIN_URL OK (HTTP $STATUS)"
+            echo "✅ $MAIN_URL OK (HTTP $STATUS)" >> sanity_report.txt
+          fi
+
+          # -------- Páginas HTML --------
+          PAGES=(
+            "https://www.house-app.casa/calendario"
+            "https://www.house-app.casa/lista"
+            "https://www.house-app.casa/mapa"
+            "https://www.house-app.casa/configuracion"
+            "https://www.house-app.casa/menus" # si existe como HTML
+          )
+          for url in "${PAGES[@]}"; do
+            echo "🌐 Comprobando $url"
+            STATUS=$(curl -s -L -o /tmp/out.html -w "%{http_code}" "$url")
+            CONTENT_TYPE=$(file /tmp/out.html)
+            if [[ "$STATUS" != "200" || "$CONTENT_TYPE" != *"HTML"* ]]; then
+              echo "❌ ERROR en $url (HTTP $STATUS, Tipo: $CONTENT_TYPE)"
+              echo "❌ ERROR en $url (HTTP $STATUS, Tipo: $CONTENT_TYPE)" >> sanity_report.txt
+              head -n 20 /tmp/out.html >> sanity_report.txt
+              ALL_OK=false
+            else
+              echo "✅ $url OK (HTTP $STATUS)"
+              echo "✅ $url OK (HTTP $STATUS)" >> sanity_report.txt
+            fi
+          done
+
+          # -------- Endpoints API --------
+          ENDPOINTS=(
+            "https://www.house-app.casa/api/ubicaciones"
+            "https://www.house-app.casa/api/users"
+            "https://www.house-app.casa/api/lista_compra"
+          )
+          for endpoint in "${ENDPOINTS[@]}"; do
+            echo "🔗 Comprobando API: $endpoint"
+            STATUS=$(curl -s -L -o /tmp/out.json -w "%{http_code}" "$endpoint")
+            CONTENT_TYPE=$(file /tmp/out.json)
+            if [[ "$STATUS" != "200" || "$CONTENT_TYPE" != *"JSON"* ]]; then
+              echo "❌ ERROR en $endpoint (HTTP $STATUS, Tipo: $CONTENT_TYPE)"
+              echo "❌ ERROR en $endpoint (HTTP $STATUS, Tipo: $CONTENT_TYPE)" >> sanity_report.txt
+              head -n 20 /tmp/out.json >> sanity_report.txt
+              ALL_OK=false
+            else
+              echo "✅ $endpoint OK (HTTP $STATUS)"
+              echo "✅ $endpoint OK (HTTP $STATUS)" >> sanity_report.txt
+            fi
+          done
+
+          echo "===== FIN SANITY CHECK =====" >> sanity_report.txt
+
+          if [[ "$ALL_OK" == false ]]; then
+            echo "result=fail" >> $GITHUB_OUTPUT
+          else
+            echo "result=ok" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📧 Enviar notificación si falla
+        if: steps.sanity.outputs.result == 'fail'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "🚨 Sanity Check House App - FALLO DETECTADO"
+          to: "joso.jmf@gmail.com"
+          from: "House App Monitor <${{ secrets.SMTP_USERNAME }}> "
+          body: |
+            El sanity check ha detectado problemas en House App.
+            Revisa el archivo adjunto para más detalles.
+          attachments: sanity_report.txt

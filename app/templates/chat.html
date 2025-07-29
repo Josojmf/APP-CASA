@@ -17,12 +17,26 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"
+    const socket =
+    function escapeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function normalizeUserName(name) {
+        if (!name) return "";
+        return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+    }
+
     const socket = io();
     const currentUser = "{{ session['user'] }}"; // Usuario actual
+    const storedUser = localStorage.getItem("user") || currentUser;
+    const normalizedUser = normalizeUserName(storedUser);
 
     document.addEventListener("DOMContentLoaded", () => {
+        // Cargar mensajes anteriores
         fetch("/chat/messages")
             .then(res => res.json())
             .then(data => {
@@ -33,16 +47,18 @@
                 });
                 scrollToBottom();
             });
+
+        // Obtener foto del usuario actual desde la API con nombre normalizado
+        fetch(`/api/user/profile/${normalizedUser}`)
+            .then(res => res.json())
+            .then(userData => {
+                if (userData.avatar) {
+                    window.currentUserPhoto = userData.avatar;
+                } else {
+                    window.currentUserPhoto = "/static/images/default-avatar.png";
+                }
+            });
     });
-    fetch(`/user/profile/${localStorage.getItem("user") || currentUser}`)
-        .then(res => res.json())
-        .then(userData => {
-            if (userData.imagen) {
-                window.currentUserPhoto = userData.imagen.startsWith("data:image")
-                    ? userData.imagen
-                    : `data:image/jpeg;base64,${userData.imagen}`;
-            }
-        });
 
     socket.on('chat_message', (data) => {
         addMessage(data.user, data.photo, data.message);
@@ -52,14 +68,13 @@
         const message = document.getElementById("message").value.trim();
         if (message) {
             socket.emit("send_message", {
-                user: localStorage.getItem("user") || currentUser,
-                photo: window.currentUserPhoto || "", // 👈 añadimos la foto
+                user: normalizedUser,
+                photo: window.currentUserPhoto || "/static/images/default-avatar.png",
                 message
             });
             document.getElementById("message").value = "";
         }
     }
-
 
     function scrollToBottom() {
         const messagesDiv = document.getElementById("messages");
@@ -68,38 +83,36 @@
         }
     }
 
-    function addMessage(user, photoBase64, text) {
+    function addMessage(user, photo, text) {
         const msgDiv = document.createElement("div");
-
-        // Clase según si es mío o no
-        const storedUser = localStorage.getItem("user") || currentUser;
-        const isMine = (user === storedUser);
+        const isMine = (user === normalizedUser);
         msgDiv.classList.add("message", isMine ? "sent" : "received");
 
-        let photoSrc;
-        if (photoBase64 && photoBase64.trim() !== "") {
-            // Si ya es un Base64 válido
-            if (photoBase64.startsWith("data:image")) {
-                photoSrc = photoBase64;
-            } else {
-                // Forzamos a que sea un Base64 válido
-                photoSrc = `data:image/jpeg;base64,${photoBase64}`;
-            }
-        } else {
-            // Avatar por defecto si no hay imagen en DB
-            photoSrc = "/static/images/default-avatar.png";
-        }
+        const photoSrc = (photo && photo.trim() !== "")
+            ? photo
+            : "/static/images/default-avatar.png";
 
         msgDiv.innerHTML = `
-        <img src="${photoSrc}" alt="${user}">
-        <div class="message-content">
-            <strong>${user}</strong>
-            ${text}
-        </div>
-    `;
+            <img src="${photoSrc}" alt="${user}">
+            <div class="message-content">
+                <strong>${escapeHTML(user)}</strong>
+                ${escapeHTML(text)}
+            </div>
+        `;
         document.getElementById("messages").appendChild(msgDiv);
         scrollToBottom();
     }
 
+    // Enviar con Enter
+    document.getElementById("message").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage();
+    });
+
+
+</script>
+{% endblock %}
+e) => {
+        if (e.key === "Enter") sendMessage();
+    });
 </script>
 {% endblock %}

@@ -7,6 +7,7 @@ from app.socket_utils import notificar_tarea_a_usuario
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import traceback
+import base64
 
 # ==========================================
 # Mapeo entre TID de OwnTracks y nombre de usuario real
@@ -232,7 +233,8 @@ def marcar_comprado(item_id):
 @api.route("/api/ubicacion", methods=["POST"])
 def recibir_ubicacion():
     """
-    Guarda la ubicación recibida de OwnTracks, manteniendo histórico.
+    Guarda solo la última ubicación recibida de OwnTracks para cada usuario.
+    Borra automáticamente todas las anteriores del mismo usuario.
     """
     data = request.get_json()
     if not data or "lat" not in data or "lon" not in data or "tid" not in data:
@@ -247,6 +249,11 @@ def recibir_ubicacion():
     lon = data["lon"]
     ts = datetime.utcnow()
 
+    # 1️⃣ Borrar todas las ubicaciones anteriores de ese usuario
+    mongo.db.ubicaciones.delete_many({"usuario": usuario})
+
+    # 2️⃣ Insertar la nueva ubicación
+    print(f"📍 Recibiendo ubicación de {usuario}")
     mongo.db.ubicaciones.insert_one({
         "usuario": usuario,
         "lat": lat,
@@ -254,6 +261,7 @@ def recibir_ubicacion():
         "timestamp": ts
     })
 
+    # 3️⃣ Actualizar el campo "last_location" en la colección de usuarios
     mongo.db.users.update_one(
         {"nombre": usuario},
         {"$set": {"last_location": {"lat": lat, "lon": lon, "time": ts}}}
@@ -299,19 +307,22 @@ def recibir_posicion():
 # ===================================================
 @api.route('/api/ubicaciones')
 def obtener_ubicaciones():
-    ubicaciones = list(mongo.db.ubicaciones.find().sort("tst", -1))
+    usuarios = mongo.db.ubicaciones.distinct("usuario")
     resultado = []
-    for ubicacion in ubicaciones:
-        time_value = ubicacion.get("tst")
+
+    for usuario in usuarios:
+        ultima = mongo.db.ubicaciones.find({"usuario": usuario}).sort("timestamp", -1).limit(1)[0]
+        time_value = ultima.get("timestamp")
         if isinstance(time_value, datetime):
             time_value = time_value.isoformat()
-        
+
         resultado.append({
-            "user": ubicacion.get("user"),
-            "lat": ubicacion.get("lat"),
-            "lon": ubicacion.get("lon"),
+            "user": ultima.get("usuario"),
+            "lat": ultima.get("lat"),
+            "lon": ultima.get("lon"),
             "time": time_value
         })
+
     print("📤 Enviando ubicaciones al mapa:", resultado)
     return jsonify(resultado)
 
@@ -345,3 +356,51 @@ def send_push_to_all(title, body, url="/", icon="/static/icons/house-icon.png"):
                 print(f"❌ Error al enviar push a {sub_doc['user']}: {repr(ex)}")
             except Exception as e:
                 print(f"❌ Error inesperado al enviar push: {traceback.format_exc()}")
+
+
+@api.route("/api/user/profile/<nombre>", methods=["GET"])
+def get_user_profile(nombre):
+    user = mongo.db.users.find_one({"nombre": nombre})
+    if not user:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    imagen_data = user.get("imagen")
+    if not imagen_data:
+        # Imagen por defecto si no tiene
+        return jsonify({
+            "avatar": "/static/images/default-avatar.png"
+        })
+
+    # Devolver en formato data URL válido
+    return jsonify({
+        "avatar": f"data:image/jpeg;base64,{imagen_data}"
+    })
+
+@api.route("/api/chatfd", methods=["POST"])
+def chat_familiar():
+    q = request.json.get("prompt", "").strip()
+    if not q:
+        return jsonify({"error": "No prompt"}), 400
+
+    # Guardar historial en sesión
+    if "chat_history" not in session:
+        session["chat_history"] = []
+
+    session["chat_history"].append({"role": "user", "content": q})
+
+    headers = {"Authorization": f"Bearer {current_app.config['GROQ_API_KEY']}"}
+    payload = {
+        "model": "llama-3-8b-instant",
+        "messages": session["chat_history"]
+    }
+
+    resp = requests.post("https://api.groq.cloud/v1/chat/completions", json=payload, headers=headers)
+    if resp.status_code != 200:
+        return jsonify({"error": "Groq error", "detail": resp.text}), resp.status_code
+
+    answer = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    # Añadir respuesta de la IA al historial
+    session["chat_history"].append({"role": "assistant", "content": answer})
+
+    return jsonify({"answer": answer})
