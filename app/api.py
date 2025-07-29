@@ -77,7 +77,8 @@ def toggle_encasa():
 
     new_status = not user.get('encasa', False)
     mongo.db.users.update_one({"_id": obj_id}, {"$set": {"encasa": new_status}})
-    hora = datetime.now().strftime("%H:%M")
+    hora = datetime.now().strftime("%H:%M") 
+    hora = (datetime.now() + timedelta(hours=2)).strftime("%H:%M")
     mensaje = f"{user['nombre']} {'ha llegado a casa 🏠' if new_status else 'ha salido de casa 🚶‍♂️'} a las {hora}"
     send_push_to_all(
         title="House App",

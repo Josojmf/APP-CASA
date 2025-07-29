@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="title">💬 Chat de la Casa</h1>
+<h1 class="titleChat">💬 Chat de la Casa</h1>
 <div class="chat-container">
     <div id="messages" class="messages"></div>
     <div id="chat-input">
@@ -42,40 +42,44 @@
     function sendMessage() {
         const message = document.getElementById("message").value.trim();
         if (message) {
-            socket.emit("send_message", { message });
+            socket.emit("send_message", {
+                user: localStorage.getItem("usuario") || currentUser,
+                message
+            });
             document.getElementById("message").value = "";
         }
     }
 
-   function addMessage(user, photoBase64, text) {
-    const msgDiv = document.createElement("div");
 
-    // Clase según si es mío o no
-    const isMine = (user === currentUser);
-    msgDiv.classList.add("message", isMine ? "sent" : "received");
+    function addMessage(user, photoBase64, text) {
+        const msgDiv = document.createElement("div");
 
-    let photoSrc;
-    if (photoBase64 && photoBase64.trim() !== "") {
-        // Si ya empieza por data:image no tocamos
-        if (photoBase64.startsWith("data:image")) {
-            photoSrc = photoBase64;
+        // Clase según si es mío o no
+        const isMine = (user === currentUser);
+        msgDiv.classList.add("message", isMine ? "sent" : "received");
+
+        let photoSrc;
+        if (photoBase64 && photoBase64.trim() !== "") {
+            // Si ya empieza por data:image no tocamos
+            if (photoBase64.startsWith("data:image")) {
+                photoSrc = photoBase64;
+            } else {
+                photoSrc = `data:image/jpeg;base64,${photoBase64}`;
+            }
         } else {
-            photoSrc = `data:image/jpeg;base64,${photoBase64}`;
+            // Avatar por defecto si no hay imagen
+            photoSrc = "/static/images/default-avatar.png";
         }
-    } else {
-        // Avatar por defecto si no hay imagen
-        photoSrc = "/static/images/default-avatar.png";
-    }
 
-    msgDiv.innerHTML = `
+        msgDiv.innerHTML = `
         <img src="${photoSrc}" alt="${user}">
         <div class="message-content">
             <strong>${user}</strong>
             ${text}
         </div>
     `;
-    document.getElementById("messages").appendChild(msgDiv);
-    scrollToBottom();
-}
+        document.getElementById("messages").appendChild(msgDiv);
+        scrollToBottom();
+    }
 </script>
 {% endblock %}

@@ -84,8 +84,37 @@ def notificar_tarea_a_usuario(tarea):
 # ============================================================
 def register_chat_events():
     """Registra eventos de chat en tiempo real con Socket.IO"""
-    @socketio.on("send_message")
-    def handle_send_message(data):
+@socketio.on("send_message")
+def handle_send_message(data):
+    # Preferir el usuario enviado por el cliente si existe
+    user = data.get("user") or session.get("username", "Anónimo")
+    photo = session.get("photo", "/static/images/default-avatar.png")
+    message = data.get("message", "").strip()
+
+    if not message:
+        return
+
+    msg_doc = {
+        "user": user,
+        "photo": photo,
+        "message": message,
+        "timestamp": datetime.utcnow()
+    }
+    mongo.db.messages.insert_one(msg_doc)
+
+    socketio.emit("chat_message", {
+        "user": msg_doc["user"],
+        "photo": msg_doc["photo"],
+        "message": msg_doc["message"],
+        "timestamp": msg_doc["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
+    })
+
+    send_push_to_all(
+        title=f"💬 Mensaje nuevo de {user}",
+        body=message,
+        url="/chat"
+    )
+
         # Usuario autenticado
         user = session.get("username", "Anónimo")
         photo = session.get("photo", "/static/images/default-avatar.png")
