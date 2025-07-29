@@ -82,18 +82,18 @@ def notificar_tarea_a_usuario(tarea):
 # ============================================================
 #   EVENTOS DE CHAT
 # ============================================================
-def register_chat_events():
-    """Registra eventos de chat en tiempo real con Socket.IO"""
 @socketio.on("send_message")
 def handle_send_message(data):
-    # Preferir el usuario enviado por el cliente si existe
+    """Maneja el envío de mensajes de chat en tiempo real."""
+    # Preferir el usuario enviado por el cliente si existe, si no, el de la sesión
     user = data.get("user") or session.get("username", "Anónimo")
     photo = session.get("photo", "/static/images/default-avatar.png")
     message = data.get("message", "").strip()
 
     if not message:
-        return
+        return  # Evitar mensajes vacíos
 
+    # Guardar mensaje en MongoDB
     msg_doc = {
         "user": user,
         "photo": photo,
@@ -102,6 +102,7 @@ def handle_send_message(data):
     }
     mongo.db.messages.insert_one(msg_doc)
 
+    # Emitir mensaje a todos (broadcast)
     socketio.emit("chat_message", {
         "user": msg_doc["user"],
         "photo": msg_doc["photo"],
@@ -109,40 +110,9 @@ def handle_send_message(data):
         "timestamp": msg_doc["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
     })
 
+    # Notificación push a todos
     send_push_to_all(
         title=f"💬 Mensaje nuevo de {user}",
         body=message,
         url="/chat"
     )
-
-        # Usuario autenticado
-        user = session.get("username", "Anónimo")
-        photo = session.get("photo", "/static/images/default-avatar.png")
-        message = data.get("message", "").strip()
-
-        if not message:
-            return  # Evitar mensajes vacíos
-
-        # Guardar mensaje en MongoDB
-        msg_doc = {
-            "user": user,
-            "photo": photo,
-            "message": message,
-            "timestamp": datetime.utcnow()
-        }
-        mongo.db.messages.insert_one(msg_doc)
-
-        # Emitir mensaje a todos (broadcast)
-        socketio.emit("chat_message", {
-            "user": msg_doc["user"],
-            "photo": msg_doc["photo"],
-            "message": msg_doc["message"],
-            "timestamp": msg_doc["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
-        })
-
-        # Notificación push a todos
-        send_push_to_all(
-            title=f"💬 Mensaje nuevo de {user}",
-            body=message,
-            url="/chat"
-        )
