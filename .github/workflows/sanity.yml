@@ -44,7 +44,7 @@ jobs:
           # -------- Páginas HTML --------
           PAGES=(
             "https://www.house-app.casa/calendario"
-            "https://www.house-app.casa/lista"
+            "https://www.house-app.casa/lista_compra"
             "https://www.house-app.casa/mapa"
             "https://www.house-app.casa/configuracion"
             "https://www.house-app.casa/menus" # si existe como HTML

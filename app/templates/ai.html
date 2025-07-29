@@ -1,38 +1,56 @@
 {% extends "layout.html" %}
-{% block title %}💬 Chat{% endblock %}
+{% block title %}💬 Asistente Familiar{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/ai.css') }}">
 {% endblock %}
 
 {% block content %}
+<div class="chat-container">
+    <h2 class="titleChat">🤖 Asistente Familiar</h2>
+    <div id="ai-messages" class="messages"></div>
 
-<div id="family-ai-chat">
-    <h2>Asistente Familiar</h2>
-    <div id="ai-messages"></div>
-    <input id="ai-input" type="text" placeholder="Escribe algo..." />
-    <button onclick="askAI()">Preguntar</button>
+    <div id="chat-input">
+        <input id="ai-input" type="text" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter') askAI()" />
+        <button onclick="askAI()">➤</button>
+    </div>
 </div>
 
 <script>
     async function askAI() {
-        const prompt = document.getElementById("ai-input").value.trim();
+        const input = document.getElementById("ai-input");
+        const prompt = input.value.trim();
         if (!prompt) return;
-        append("Tú", prompt);
-        const res = await fetch("/api/chatfd", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt })
-        });
-        const data = await res.json();
-        const reply = data.answer || data.error || "Sin respuesta";
-        append("IA", reply);
+
+        appendMessage("sent", "Tú", prompt);
+        input.value = "";
+
+        try {
+            const res = await fetch("/api/chatfd", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt })
+            });
+            const data = await res.json();
+            const reply = data.answer || data.error || "Sin respuesta";
+            appendMessage("received", "IA", reply);
+        } catch {
+            appendMessage("received", "IA", "Error al conectar con el servidor.");
+        }
     }
 
-    function append(who, msg) {
-        const div = document.createElement("div");
-        div.textContent = `${who}: ${msg}`;
-        document.getElementById("ai-messages").appendChild(div);
+    function appendMessage(type, sender, text) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `message ${type}`;
+        msgDiv.innerHTML = `
+            <img src="${type === 'sent' ? '/static/img/user.png' : '/static/img/ai.png'}" alt="${sender}">
+            <div class="message-content">
+                <strong>${sender}</strong>
+                <span>${text}</span>
+            </div>
+        `;
+        document.getElementById("ai-messages").appendChild(msgDiv);
+        msgDiv.scrollIntoView({ behavior: "smooth" });
     }
 </script>
 {% endblock %}
