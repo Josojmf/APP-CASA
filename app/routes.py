@@ -3,7 +3,7 @@ from app import mongo
 from bson import ObjectId
 from ddgs import DDGS
 from datetime import datetime, timedelta
-from app.sockets_utils import notificar_tarea_a_usuario
+from app.socket_utils import notificar_tarea_a_usuario
 
 
 import os
