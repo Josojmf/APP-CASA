@@ -387,8 +387,10 @@ def chat_familiar():
         session["chat_history"] = []
 
     session["chat_history"].append({"role": "user", "content": q})
+    #bearer is on github secrets and passed as env variable in compose 
+    API_KEY= os.getenv("GROQ_API_KEY")
 
-    headers = {"Authorization": f"Bearer {current_app.config['GROQ_API_KEY']}"}
+    headers = {"Authorization": f"Bearer {API_KEY}"}
     payload = {
         "model": "llama-3-8b-instant",
         "messages": session["chat_history"]
