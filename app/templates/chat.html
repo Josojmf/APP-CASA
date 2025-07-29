@@ -50,6 +50,12 @@
         }
     }
 
+    function scrollToBottom() {
+        const messagesDiv = document.getElementById("messages");
+        if (messagesDiv) {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    }
 
     function addMessage(user, photoBase64, text) {
         const msgDiv = document.createElement("div");
@@ -60,14 +66,15 @@
 
         let photoSrc;
         if (photoBase64 && photoBase64.trim() !== "") {
-            // Si ya empieza por data:image no tocamos
+            // Si ya es un Base64 válido
             if (photoBase64.startsWith("data:image")) {
                 photoSrc = photoBase64;
             } else {
+                // Forzamos a que sea un Base64 válido
                 photoSrc = `data:image/jpeg;base64,${photoBase64}`;
             }
         } else {
-            // Avatar por defecto si no hay imagen
+            // Avatar por defecto si no hay imagen en DB
             photoSrc = "/static/images/default-avatar.png";
         }
 
@@ -81,5 +88,6 @@
         document.getElementById("messages").appendChild(msgDiv);
         scrollToBottom();
     }
+
 </script>
 {% endblock %}
