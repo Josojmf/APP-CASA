@@ -19,7 +19,7 @@ def create_app():
     mongo_user = os.getenv("MONGO_USER")
     mongo_pass = os.getenv("MONGO_PASS")
 
-    # Leer claves VAPID directamente desde .env
+    # Leer claves VAPID desde .env
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
     VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
 
@@ -31,7 +31,7 @@ def create_app():
     cluster = "final.yzzh9ig.mongodb.net"
     dbname = "house_app"
 
-    # Construir URI completa
+    # Construir URI
     mongo_uri = f"mongodb+srv://{mongo_user}:{mongo_pass}@{cluster}/{dbname}?retryWrites=true&w=majority&appName=Final"
 
     app.config["MONGO_URI"] = mongo_uri
@@ -43,14 +43,22 @@ def create_app():
     CORS(app)
     socketio.init_app(app)
 
+    # ✅ Crear índices una sola vez al arrancar la app
+    with app.app_context():
+        mongo.db.messages.create_index("timestamp")
+
     # Importar blueprints después de inicializar mongo
     from app.routes import main
     from app.api import api
     from app.auth import auth
+    from app.socket_utils import register_chat_events
 
     app.register_blueprint(main)
     app.register_blueprint(auth)
     app.register_blueprint(api)
+
+    # Registrar eventos de chat
+    register_chat_events()
 
     @app.context_processor
     def inject_vapid_key():

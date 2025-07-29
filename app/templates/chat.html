@@ -21,12 +21,21 @@
 <script>
     const socket = io();
 
-    socket.on('connect', () => {
-        console.log('✅ Conectado al servidor de chat');
+    document.addEventListener("DOMContentLoaded", () => {
+        fetch("/chat/messages")
+            .then(res => res.json())
+            .then(data => {
+                data.forEach((msg, i) => {
+                    setTimeout(() => {
+                        addMessage(msg.user, msg.photo, msg.message, false);
+                    }, i * 80);
+                });
+                scrollToBottom();
+            });
     });
 
     socket.on('chat_message', (data) => {
-        addMessage(data.user, data.photo, data.message);
+        addMessage(data.user, data.photo, data.message, true);
     });
 
     function sendMessage() {
@@ -37,10 +46,9 @@
         }
     }
 
-    function addMessage(user, photo, text) {
+    function addMessage(user, photo, text, scroll = true) {
         const msgDiv = document.createElement("div");
         msgDiv.classList.add("message");
-
         msgDiv.innerHTML = `
             <img src="${photo}" alt="${user}">
             <div class="message-content">
@@ -48,9 +56,13 @@
                 ${text}
             </div>
         `;
-
         document.getElementById("messages").appendChild(msgDiv);
-        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+        if (scroll) scrollToBottom();
+    }
+
+    function scrollToBottom() {
+        const msgBox = document.getElementById("messages");
+        msgBox.scrollTop = msgBox.scrollHeight;
     }
 </script>
 {% endblock %}

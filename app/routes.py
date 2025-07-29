@@ -299,3 +299,23 @@ def mapa():
                 "imagen": user.get("imagen") or "/static/img/default-avatar.png"
             })
     return render_template("mapa.html", posiciones=posiciones)
+
+@main.route("/chat/messages", methods=["GET"])
+def get_chat_messages():
+    # Asegurar índice para mejorar rendimiento
+    mongo.db.messages.create_index("timestamp")
+
+    # Obtener últimos 50 mensajes y ponerlos en orden cronológico ascendente
+    messages = list(mongo.db.messages.find().sort("timestamp", -1).limit(50))
+    messages.reverse()
+
+    # Convertir ObjectId y datetime a strings para JSON
+    for m in messages:
+        m["_id"] = str(m["_id"])
+        m["timestamp"] = (
+            m.get("timestamp").strftime("%Y-%m-%d %H:%M:%S")
+            if m.get("timestamp") else None
+        )
+
+    return jsonify(messages), 200
+

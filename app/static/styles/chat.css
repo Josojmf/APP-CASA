@@ -35,6 +35,8 @@
     background: var(--color-bg);
     border-radius: var(--radius);
     scroll-behavior: smooth;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Scrollbar personalizada */
