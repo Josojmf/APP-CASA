@@ -1,28 +1,38 @@
+{% extends "layout.html" %}
+{% block title %}💬 Chat{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/ai.css') }}">
+{% endblock %}
+
+{% block content %}
+
 <div id="family-ai-chat">
-  <h2>Asistente Familiar</h2>
-  <div id="ai-messages"></div>
-  <input id="ai-input" type="text" placeholder="Escribe algo..." />
-  <button onclick="askAI()">Preguntar</button>
+    <h2>Asistente Familiar</h2>
+    <div id="ai-messages"></div>
+    <input id="ai-input" type="text" placeholder="Escribe algo..." />
+    <button onclick="askAI()">Preguntar</button>
 </div>
 
 <script>
-  async function askAI() {
-    const prompt = document.getElementById("ai-input").value.trim();
-    if (!prompt) return;
-    append("Tú", prompt);
-    const res = await fetch("/api/chatfd", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-    const reply = data.answer || data.error || "Sin respuesta";
-    append("IA", reply);
-  }
+    async function askAI() {
+        const prompt = document.getElementById("ai-input").value.trim();
+        if (!prompt) return;
+        append("Tú", prompt);
+        const res = await fetch("/api/chatfd", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        const reply = data.answer || data.error || "Sin respuesta";
+        append("IA", reply);
+    }
 
-  function append(who, msg) {
-    const div = document.createElement("div");
-    div.textContent = `${who}: ${msg}`;
-    document.getElementById("ai-messages").appendChild(div);
-  }
+    function append(who, msg) {
+        const div = document.createElement("div");
+        div.textContent = `${who}: ${msg}`;
+        document.getElementById("ai-messages").appendChild(div);
+    }
 </script>
+{% endblock %}

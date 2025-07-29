@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import traceback
 import base64
+import os
 
 # ==========================================
 # Mapeo entre TID de OwnTracks y nombre de usuario real
