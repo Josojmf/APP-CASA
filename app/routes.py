@@ -300,6 +300,20 @@ def mapa():
             })
     return render_template("mapa.html", posiciones=posiciones)
 
+@main.route("/chat")
+def chat():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
+
+    # Recuperar últimos mensajes para mostrarlos en el chat
+    messages = list(mongo.db.messages.find().sort("timestamp", -1).limit(50))
+    messages.reverse()
+    for m in messages:
+        m["_id"] = str(m["_id"])
+        m["timestamp"] = m.get("timestamp").strftime("%Y-%m-%d %H:%M:%S") if m.get("timestamp") else None
+
+    return render_template("chat.html", messages=messages)
+
 @main.route("/chat/messages", methods=["GET"])
 def get_chat_messages():
     # Asegurar índice para mejorar rendimiento
