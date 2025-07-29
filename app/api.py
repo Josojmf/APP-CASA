@@ -3,7 +3,7 @@ from app import mongo
 from bson import ObjectId
 from pywebpush import webpush, WebPushException
 import json
-from app.sockets_utils import notificar_tarea_a_usuario
+from app.socket_utils import notificar_tarea_a_usuario
 from urllib.parse import urlparse
 from datetime import datetime
 import traceback
