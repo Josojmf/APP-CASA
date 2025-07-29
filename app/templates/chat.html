@@ -47,32 +47,35 @@
         }
     }
 
-    function addMessage(user, photoBase64, text) {
-        const msgDiv = document.createElement("div");
+   function addMessage(user, photoBase64, text) {
+    const msgDiv = document.createElement("div");
 
-        // Si el mensaje es mío → clase "sent", si no "received"
-        const isMine = (user === currentUser);
-        msgDiv.classList.add("message", isMine ? "sent" : "received");
+    // Clase según si es mío o no
+    const isMine = (user === currentUser);
+    msgDiv.classList.add("message", isMine ? "sent" : "received");
 
-        // Si la imagen viene en base64 puro, añadimos el prefijo MIME
-        const photoSrc = photoBase64?.startsWith("data:image")
-            ? photoBase64
-            : `data:image/jpeg;base64,${photoBase64}`;
-
-        msgDiv.innerHTML = `
-            <img src="${photoSrc}" alt="${user}">
-            <div class="message-content">
-                <strong>${user}</strong>
-                ${text}
-            </div>
-        `;
-        document.getElementById("messages").appendChild(msgDiv);
-        scrollToBottom();
+    let photoSrc;
+    if (photoBase64 && photoBase64.trim() !== "") {
+        // Si ya empieza por data:image no tocamos
+        if (photoBase64.startsWith("data:image")) {
+            photoSrc = photoBase64;
+        } else {
+            photoSrc = `data:image/jpeg;base64,${photoBase64}`;
+        }
+    } else {
+        // Avatar por defecto si no hay imagen
+        photoSrc = "/static/images/default-avatar.png";
     }
 
-    function scrollToBottom() {
-        const msgBox = document.getElementById("messages");
-        msgBox.scrollTop = msgBox.scrollHeight;
-    }
+    msgDiv.innerHTML = `
+        <img src="${photoSrc}" alt="${user}">
+        <div class="message-content">
+            <strong>${user}</strong>
+            ${text}
+        </div>
+    `;
+    document.getElementById("messages").appendChild(msgDiv);
+    scrollToBottom();
+}
 </script>
 {% endblock %}
