@@ -28,7 +28,6 @@
                 </button>
             </div>
 
-            <!-- Info de usuario a la derecha si la hay -->
             {% if session.user %}
             <div class="nav-user">
                 <span class="user-info">{{ session.user }}</span>
@@ -46,12 +45,10 @@
             <li><a href="/menus"><i class="fa-solid fa-utensils"></i> Menús</a></li>
             <li><a href="/lista_compra"><i class="fa-solid fa-cart-shopping"></i> Lista Compra</a></li>
             <li><a href="/chat"><i class="fa-solid fa-comments"></i> Chat</a></li>
-            {% if session.user and session.user == 'admin' %}
-            <li><a href="/configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
-            <li class="nav-item">
-                <a href="/mapa"><i class="fa-solid fa-map"></i> Mapa</a>
+            <li><a href="/mapa"><i class="fa-solid fa-map"></i> Mapa</a></li>
         </ul>
     </header>
+
     <main>
         {% block content %}{% endblock %}
     </main>
@@ -80,12 +77,10 @@
                     const reg = await navigator.serviceWorker.register('/static/sw.js');
                     const existingSub = await reg.pushManager.getSubscription();
 
-                    // Mostrar estado
                     if (Notification.permission === "granted" && existingSub) {
                         notifBtn.style.display = "none";
                         notifStatus.textContent = "Estado notificaciones: Aceptadas ✅";
 
-                        // 🔁 Guardar subscripción si no está ya guardada
                         await fetch('/api/save_subscription', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -130,7 +125,6 @@
                 notifStatus.textContent = "Estado notificaciones: No soportado 🚫";
             }
 
-            // Navbar toggle
             const toggleBtn = document.getElementById('menuToggle');
             const nav = document.getElementById('navLinks');
             toggleBtn.addEventListener('click', () => {
