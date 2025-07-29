@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block title %}💬 Chat{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/chat.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1 class="title">💬 Chat de la Casa</h1>
+<div class="chat-container">
+    <div id="messages" class="messages"></div>
+    <div id="chat-input">
+        <input type="text" id="message" placeholder="Escribe un mensaje..." />
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log('✅ Conectado al servidor de chat');
+    });
+
+    socket.on('chat_message', (data) => {
+        addMessage(data.user, data.photo, data.message);
+    });
+
+    function sendMessage() {
+        const message = document.getElementById("message").value.trim();
+        if (message) {
+            socket.emit("send_message", { message });
+            document.getElementById("message").value = "";
+        }
+    }
+
+    function addMessage(user, photo, text) {
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("message");
+
+        msgDiv.innerHTML = `
+            <img src="${photo}" alt="${user}">
+            <div class="message-content">
+                <strong>${user}</strong>
+                ${text}
+            </div>
+        `;
+
+        document.getElementById("messages").appendChild(msgDiv);
+        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+    }
+</script>
+{% endblock %}
