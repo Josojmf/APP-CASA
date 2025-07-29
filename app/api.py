@@ -277,20 +277,23 @@ def recibir_posicion():
 
 
 
-@api.route("/api/ubicaciones")
-def ubicaciones():
-    usuarios = list(mongo.db.users.find({}, {"nombre": 1, "last_location": 1, "imagen": 1}))
-    posiciones = []
-    for user in usuarios:
-        loc = user.get("last_location")
-        if loc and "lat" in loc and "lon" in loc:
-            posiciones.append({
-                "user": user["nombre"],
-                "lat": loc["lat"],
-                "lon": loc["lon"],
-                "time": loc.get("time"),
-                "imagen": user.get("imagen") or "/static/img/default-avatar.png"
-            })
-    return jsonify(posiciones)
+@api.route('/api/ubicaciones')
+def obtener_ubicaciones():
+    ubicaciones = list(mongo.db.ubicaciones.find().sort("tst", -1))
+    resultado = []
+    for ubicacion in ubicaciones:
+        # Convierte a string ISO si existe
+        time_value = ubicacion.get("tst")
+        if isinstance(time_value, datetime):
+            time_value = time_value.isoformat()
+        
+        resultado.append({
+            "user": ubicacion.get("user"),
+            "lat": ubicacion.get("lat"),
+            "lon": ubicacion.get("lon"),
+            "time": time_value
+        })
+    print("📤 Enviando ubicaciones al mapa:", resultado)
+    return jsonify(resultado)
 
 

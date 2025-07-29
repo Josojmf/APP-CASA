@@ -43,46 +43,51 @@
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    fetch("/api/ubicaciones")
-        .then(res => res.json())
-        .then(posiciones => {
-            posiciones.forEach(pos => {
-                if (pos.lat && pos.lon && pos.user) {
-                    const initial = pos.user.charAt(0).toUpperCase();
+fetch("/api/ubicaciones")
+    .then(res => res.json())
+    .then(posiciones => {
+        console.log("📥 Ubicaciones recibidas:", posiciones);  // ✅ LOG
 
-                    const icon = L.divIcon({
-                        className: '',
-                        html: `<div class="custom-marker-text">${initial}</div>`,
-                        iconSize: [60, 60],
-                        iconAnchor: [30, 30],
-                        popupAnchor: [0, -30]
-                    });
+        posiciones.forEach(pos => {
+            if (pos.lat && pos.lon && pos.user) {
+                const initial = pos.user.charAt(0).toUpperCase();
 
-                    // Validar y formatear fecha
-                    let horaFormateada = '';
-                    if (pos.time) {
-                        const fecha = new Date(pos.time);
-                        if (!isNaN(fecha.getTime())) {
-                            horaFormateada = fecha.toLocaleString('es-ES', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                            });
-                        } else {
-                            horaFormateada = 'Hora no disponible';
-                        }
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div class="custom-marker-text">${initial}</div>`,
+                    iconSize: [60, 60],
+                    iconAnchor: [30, 30],
+                    popupAnchor: [0, -30]
+                });
+
+                // Validar y formatear fecha
+                let horaFormateada = '';
+                if (pos.time) {
+                    console.log(`⏰ Parsing time for ${pos.user}:`, pos.time);  // ✅ LOG
+                    const fecha = new Date(pos.time);
+                    if (!isNaN(fecha.getTime())) {
+                        horaFormateada = fecha.toLocaleString('es-ES', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        });
+                    } else {
+                        horaFormateada = 'Hora no disponible';
+                        console.warn("⚠️ Fecha inválida:", pos.time);  // ✅ LOG
                     }
-
-                    const marker = L.marker([pos.lat, pos.lon], { icon }).addTo(map);
-                    marker.bindPopup(`<strong>${pos.user}</strong><br>${horaFormateada}`);
                 }
-            });
-        })
-        .catch(err => {
-            console.error("Error al cargar las ubicaciones:", err);
+
+                const marker = L.marker([pos.lat, pos.lon], { icon }).addTo(map);
+                marker.bindPopup(`<strong>${pos.user}</strong><br>${horaFormateada}`);
+            }
         });
+    })
+    .catch(err => {
+        console.error("❌ Error al cargar las ubicaciones:", err);
+    });
+
 </script>
 {% endblock %}
