@@ -87,13 +87,26 @@ def register_chat_events():
 
     @socketio.on("send_message")
     def handle_send_message(data):
-        # Preferir el usuario enviado por el cliente si existe, si no, el de la sesión
+        # Usuario actual (preferir el que viene del cliente)
         user = data.get("user") or session.get("username", "Anónimo")
-        photo = session.get("photo", "/static/images/default-avatar.png")
+        
+        # Foto que viene del cliente o de la sesión
+        photo = (data.get("photo") or "").strip() or (session.get("photo") or "").strip()
+        
         message = data.get("message", "").strip()
-
         if not message:
             return  # Evitar mensajes vacíos
+
+        # 🔹 Si no tenemos foto, buscarla en Mongo
+        if not photo or photo == "/static/images/default-avatar.png":
+            user_doc = mongo.db.users.find_one({"nombre": user})
+            if user_doc and user_doc.get("imagen"):
+                if str(user_doc["imagen"]).startswith("data:image"):
+                    photo = user_doc["imagen"]
+                else:
+                    photo = f"data:image/jpeg;base64,{user_doc['imagen']}"
+            else:
+                photo = "/static/images/default-avatar.png"
 
         # Guardar mensaje en MongoDB
         msg_doc = {
@@ -104,7 +117,7 @@ def register_chat_events():
         }
         mongo.db.messages.insert_one(msg_doc)
 
-        # Emitir mensaje a todos (broadcast)
+        # Emitir mensaje a todos
         socketio.emit("chat_message", {
             "user": msg_doc["user"],
             "photo": msg_doc["photo"],
@@ -112,7 +125,7 @@ def register_chat_events():
             "timestamp": msg_doc["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
         })
 
-        # Notificación push a todos
+        # Notificación push
         send_push_to_all(
             title=f"💬 Mensaje nuevo de {user}",
             body=message,

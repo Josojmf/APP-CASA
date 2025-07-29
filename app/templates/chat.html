@@ -20,7 +20,7 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     const socket = io();
-    const currentUser = "{{ session['username'] }}"; // Usuario actual
+    const currentUser = "{{ session['user'] }}"; // Usuario actual
 
     document.addEventListener("DOMContentLoaded", () => {
         fetch("/chat/messages")
@@ -34,6 +34,15 @@
                 scrollToBottom();
             });
     });
+    fetch(`/user/profile/${localStorage.getItem("user") || currentUser}`)
+        .then(res => res.json())
+        .then(userData => {
+            if (userData.imagen) {
+                window.currentUserPhoto = userData.imagen.startsWith("data:image")
+                    ? userData.imagen
+                    : `data:image/jpeg;base64,${userData.imagen}`;
+            }
+        });
 
     socket.on('chat_message', (data) => {
         addMessage(data.user, data.photo, data.message);
@@ -43,12 +52,14 @@
         const message = document.getElementById("message").value.trim();
         if (message) {
             socket.emit("send_message", {
-                user: localStorage.getItem("usuario") || currentUser,
+                user: localStorage.getItem("user") || currentUser,
+                photo: window.currentUserPhoto || "", // 👈 añadimos la foto
                 message
             });
             document.getElementById("message").value = "";
         }
     }
+
 
     function scrollToBottom() {
         const messagesDiv = document.getElementById("messages");
@@ -61,7 +72,8 @@
         const msgDiv = document.createElement("div");
 
         // Clase según si es mío o no
-        const isMine = (user === currentUser);
+        const storedUser = localStorage.getItem("user") || currentUser;
+        const isMine = (user === storedUser);
         msgDiv.classList.add("message", isMine ? "sent" : "received");
 
         let photoSrc;
