@@ -617,7 +617,7 @@ def delete_user(user_id):
         logger.info(f"Intento de eliminación por: {current_user}, ID objetivo: {user_id}")
         
         # Verificar permisos (solo Joso puede eliminar usuarios)
-        if current_user != 'Joso':
+        if current_user != 'Joso' || current_user != 'joso':
             logger.warning(f"Intento no autorizado de eliminación por: {current_user}")
             return jsonify({
                 "error": "Permisos insuficientes",
