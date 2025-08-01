@@ -1,158 +1,634 @@
-h1 {
-    text-align: center;
-    margin-top: 20px;
-    font-size: 2.2rem;
+/* =======================
+   TAREAS MODERNAS Y ORGÁNICAS
+   ======================= */
+
+:root {
+    --tareas-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    --card-bg-light: rgba(255, 255, 255, 0.95);
+    --card-bg-dark: rgba(30, 30, 30, 0.95);
+    --task-completed: linear-gradient(135deg, #10b981, #059669);
+    --task-pending: linear-gradient(135deg, #f59e0b, #d97706);
+    --task-overdue: linear-gradient(135deg, #ef4444, #dc2626);
+    --accent-primary: #6366f1;
+    --accent-secondary: #8b5cf6;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --border-radius: 20px;
+    --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-light: 0 20px 60px rgba(0, 0, 0, 0.1);
+    --shadow-heavy: 0 30px 80px rgba(0, 0, 0, 0.15);
 }
 
+/* Título mejorado */
+.title {
+    text-align: center;
+    margin: 20px auto 40px;
+    font-size: 2.4rem;
+    font-weight: 700;
+    background: var(--tareas-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+    animation: titleSlideIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.title::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.1), transparent);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: titleGlow 3s ease-in-out infinite;
+    z-index: -1;
+}
+
+@keyframes titleSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes titleGlow {
+    0%, 100% { 
+        transform: translate(-50%, -50%) scale(0.8); 
+        opacity: 0.3; 
+    }
+    50% { 
+        transform: translate(-50%, -50%) scale(1.2); 
+        opacity: 0.1; 
+    }
+}
+
+/* Contenedor principal de tareas */
 .tareas-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 30px;
-    padding: 40px;
+    padding: 20px 40px 40px;
+    animation: containerSlideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@keyframes containerSlideUp {
+    0% {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Tarjetas mejoradas de usuarios */
 .tareas-list {
-    background: #ffffff;
-    border-radius: 15px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    padding: 20px;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    background: var(--card-bg-light);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-light);
+    padding: 25px;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    animation: cardSlideIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tareas-list::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--tareas-gradient);
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.tareas-list:hover::before {
+    opacity: 1;
+}
+
+.tareas-list::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+    background-size: 20px 20px;
+    animation: backgroundMove 25s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes backgroundMove {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(-20px, -20px) rotate(360deg); }
+}
+
+@keyframes cardSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .tareas-list:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 25px rgba(0,0,0,0.2);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-heavy);
 }
 
+/* Títulos de usuarios */
 .tareas-list h2 {
     text-align: center;
-    margin-bottom: 15px;
-    color: #333;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
+.tareas-list h2::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 25%;
+    width: 50%;
+    height: 2px;
+    background: var(--tareas-gradient);
+    border-radius: 1px;
+    transform: scaleX(0);
+    transition: var(--transition);
+}
+
+.tareas-list:hover h2::after {
+    transform: scaleX(1);
+}
+
+/* Lista de tareas */
 .tareas-list ul {
     list-style: none;
     padding: 0;
     margin: 0;
+    position: relative;
+    z-index: 2;
 }
 
+/* Items de tareas individuales */
 .tareas-list li {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    margin-bottom: 12px;
-    padding: 10px;
-    background: #f5f7fa;
-    border-radius: 8px;
+    gap: 8px;
+    margin-bottom: 15px;
+    padding: 15px;
+    background: rgba(249, 250, 252, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.tareas-list li::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent);
+    transition: all 0.6s ease;
+}
+
+.tareas-list li:hover::before {
+    left: 100%;
 }
 
 .tareas-list li:hover {
-    background: #e0f7fa;
+    background: rgba(99, 102, 241, 0.05);
+    transform: scale(1.02) translateX(5px);
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
 }
 
+/* Checkbox personalizado */
 .tarea-checkbox {
-    width: 20px;
-    height: 20px;
-    accent-color: #4CAF50;
+    width: 22px;
+    height: 22px;
+    accent-color: var(--accent-primary);
     cursor: pointer;
+    transition: var(--transition);
+    border-radius: 6px;
+    position: relative;
 }
 
+.tarea-checkbox:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+.tarea-checkbox:checked {
+    background: var(--task-completed);
+}
+
+/* Contenido de la tarea */
 .tareas-list li span {
     flex: 1;
-    font-weight: bold;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
+.tareas-list li div {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    margin-left: 30px;
+    font-style: italic;
+}
+
+/* Sin tareas */
+.tareas-list li em {
+    color: var(--text-secondary);
+    text-align: center;
+    font-style: italic;
+    opacity: 0.7;
+    padding: 20px;
+}
+
+/* Botón flotante mejorado */
 #addTaskBtn {
     position: fixed;
-    bottom: 150px;
-    right: 80px;
-    background: #28a745;
+    bottom: 100px;
+    right: 30px;
+    background: var(--tareas-gradient);
     color: white;
     border: none;
     border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    font-size: 2rem;
+    width: 65px;
+    height: 65px;
+    font-size: 1.8rem;
     cursor: pointer;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-    transition: transform 0.3s, background 0.3s;
+    box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+    transition: var(--transition);
     display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 997;
+    animation: floatPulse 3s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+#addTaskBtn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: all 0.6s ease;
+}
+
+#addTaskBtn:hover::before {
+    left: 100%;
+}
+
+@keyframes floatPulse {
+    0%, 100% { 
+        transform: translateY(0) scale(1); 
+        box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+    }
+    50% { 
+        transform: translateY(-3px) scale(1.05); 
+        box-shadow: 0 20px 50px rgba(99, 102, 241, 0.5);
+    }
 }
 
 #addTaskBtn:hover {
-    transform: scale(1.1);
-    background: #218838;
+    transform: translateY(-5px) scale(1.1);
+    box-shadow: 0 25px 60px rgba(99, 102, 241, 0.6);
+    animation: none;
 }
 
+#addTaskBtn:active {
+    transform: translateY(-2px) scale(1.05);
+}
+
+/* Overlay mejorado */
 .overlay {
     display: none;
     position: fixed;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    animation: overlayFadeIn 0.3s ease;
 }
 
+@keyframes overlayFadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+/* Contenido del overlay */
 .overlay-content {
-    background: #fff;
-    padding: 30px;
-    border-radius: 15px;
+    background: var(--card-bg-light);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 35px;
+    border-radius: var(--border-radius);
     width: 90%;
-    max-width: 400px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    max-width: 450px;
+    box-shadow: var(--shadow-heavy);
+    position: relative;
+    overflow: hidden;
+    animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.overlay-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--tareas-gradient);
+    animation: shimmerModal 3s ease-in-out infinite;
+}
+
+@keyframes shimmerModal {
+    0%, 100% { opacity: 0.3; transform: translateX(-100%); }
+    50% { opacity: 1; transform: translateX(100%); }
+}
+
+@keyframes modalSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .overlay-content h2 {
     margin-top: 0;
+    margin-bottom: 25px;
     text-align: center;
+    color: var(--text-primary);
+    font-size: 1.6rem;
+    font-weight: 700;
+    background: var(--tareas-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
+/* Formulario mejorado */
 .overlay-content form {
     display: flex;
     flex-direction: column;
+    gap: 20px;
+}
+
+.overlay-content label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+    font-size: 0.95rem;
 }
 
 .overlay-content input,
 .overlay-content textarea,
 .overlay-content select {
-    margin-bottom: 15px;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    padding: 12px 16px;
+    border: 2px solid rgba(99, 102, 241, 0.2);
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: var(--transition);
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    color: var(--text-primary);
 }
 
+.overlay-content input:focus,
+.overlay-content textarea:focus,
+.overlay-content select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-2px);
+}
+
+/* Botones del formulario */
 .form-buttons {
     display: flex;
-    justify-content: space-between;
+    gap: 15px;
+    margin-top: 10px;
 }
 
 .form-buttons button {
     flex: 1;
-    margin: 0 5px;
-    padding: 10px;
+    padding: 12px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     cursor: pointer;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.form-buttons button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: all 0.6s ease;
+}
+
+.form-buttons button:hover::before {
+    left: 100%;
 }
 
 .form-buttons button[type="submit"] {
-    background: #4CAF50;
+    background: var(--task-completed);
     color: white;
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
 }
 
 .form-buttons button[type="submit"]:hover {
-    background: #45a049;
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
 }
 
 .form-buttons button[type="button"] {
-    background: #ccc;
+    background: rgba(107, 114, 128, 0.1);
+    color: var(--text-secondary);
+    border: 2px solid rgba(107, 114, 128, 0.2);
 }
 
 .form-buttons button[type="button"]:hover {
-    background: #bbb;
+    background: rgba(107, 114, 128, 0.2);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(107, 114, 128, 0.2);
+}
+
+/* Tema oscuro */
+body.dark .tareas-list {
+    background: var(--card-bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .tareas-list h2 {
+    color: #f3f4f6;
+}
+
+body.dark .tareas-list li {
+    background: rgba(42, 42, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .tareas-list li span {
+    color: #f3f4f6;
+}
+
+body.dark .tareas-list li div {
+    color: #9ca3af;
+}
+
+body.dark .overlay-content {
+    background: var(--card-bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .overlay-content h2 {
+    color: #f3f4f6;
+}
+
+body.dark .overlay-content label {
+    color: #f3f4f6;
+}
+
+body.dark .overlay-content input,
+body.dark .overlay-content textarea,
+body.dark .overlay-content select {
+    background: rgba(42, 42, 42, 0.8);
+    border: 2px solid rgba(139, 92, 246, 0.3);
+    color: #f3f4f6;
+}
+
+body.dark .overlay-content input:focus,
+body.dark .overlay-content textarea:focus,
+body.dark .overlay-content select:focus {
+    background: rgba(42, 42, 42, 0.95);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+/* Responsive mejorado */
+@media (max-width: 768px) {
+    .title {
+        font-size: 2rem;
+        margin: 15px auto 30px;
+    }
+    
+    .tareas-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 15px 20px 30px;
+    }
+    
+    .tareas-list {
+        padding: 20px;
+    }
+    
+    .tareas-list h2 {
+        font-size: 1.2rem;
+    }
+    
+    #addTaskBtn {
+        bottom: 80px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        font-size: 1.6rem;
+    }
+    
+    .overlay-content {
+        padding: 25px;
+        width: 95%;
+        max-width: 400px;
+    }
+    
+    .overlay-content h2 {
+        font-size: 1.4rem;
+    }
+    
+    .form-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .title {
+        font-size: 1.7rem;
+    }
+    
+    .tareas-container {
+        padding: 10px 15px 25px;
+    }
+    
+    .tareas-list {
+        padding: 15px;
+    }
+    
+    .tareas-list li {
+        padding: 12px;
+    }
+    
+    .overlay-content {
+        padding: 20px;
+    }
 }

@@ -10,76 +10,355 @@
 
 <div class="tareas-container">
     {% for user in users %}
-    <div class="tareas-list">
+    <div class="tareas-list" data-user="{{ user['_id'] }}">
         <h2>{{ user['nombre'] }}</h2>
         <ul>
             {% if user.tareas %}
                 {% for tarea in user.tareas %}
-                <li>
-                    <input type="checkbox" class="tarea-checkbox"
-                           data-user="{{ user['_id'] }}"
-                           data-titulo="{{ tarea['titulo'] }}"
-                           data-due-date="{{ tarea['due_date'] }}">
-                    <span>{{ tarea['titulo'] }} 🕒 {{ tarea['due_date'] }}</span>
-                    <div>{{ tarea['pasos'] }}</div>
+                <li class="task-item" data-priority="{{ tarea.get('prioridad', 'normal') }}">
+                    <div class="task-header">
+                        <input type="checkbox" class="tarea-checkbox"
+                               data-user="{{ user['_id'] }}"
+                               data-titulo="{{ tarea['titulo'] }}"
+                               data-due-date="{{ tarea['due_date'] }}"
+                               id="task-{{ loop.index0 }}-{{ user['_id'] }}">
+                        <label for="task-{{ loop.index0 }}-{{ user['_id'] }}" class="task-title">
+                            {{ tarea['titulo'] }}
+                        </label>
+                    </div>
+                    <div class="task-meta">
+                        <span class="task-date">
+                            <i class="fas fa-clock"></i> {{ tarea['due_date'] }}
+                        </span>
+                        {% if tarea.get('prioridad') %}
+                        <span class="task-priority priority-{{ tarea['prioridad'] }}">
+                            <i class="fas fa-flag"></i> {{ tarea['prioridad'].title() }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% if tarea['pasos'] %}
+                    <div class="task-steps">
+                        <i class="fas fa-list-ul"></i> {{ tarea['pasos'] }}
+                    </div>
+                    {% endif %}
                 </li>
                 {% endfor %}
             {% else %}
-                <li><em>Sin tareas</em></li>
+                <li class="no-tasks">
+                    <i class="fas fa-check-circle"></i>
+                    <em>¡Sin tareas pendientes!</em>
+                </li>
             {% endif %}
         </ul>
     </div>
     {% endfor %}
 </div>
 
-<button id="addTaskBtn" class="floating-btn btn-tareas" title="Añadir tarea">➕</button>
+<button id="addTaskBtn" class="floating-btn btn-tareas" title="Añadir nueva tarea">
+    <i class="fas fa-plus"></i>
+</button>
 
 <div id="overlay" class="overlay">
     <div class="overlay-content">
-        <h2>Añadir nueva tarea</h2>
+        <h2><i class="fas fa-plus-circle"></i> Añadir nueva tarea</h2>
         <form id="taskForm">
-            <label for="titulo">Título:</label>
-            <input type="text" id="titulo" name="titulo" required>
+            <div class="form-group">
+                <label for="titulo">
+                    <i class="fas fa-heading"></i> Título de la tarea:
+                </label>
+                <input type="text" id="titulo" name="titulo" required 
+                       placeholder="Ej: Limpiar la cocina">
+            </div>
 
-            <label for="asignee">Asignado a:</label>
-            <select id="asignee" name="asignee" required>
-                <option value="">Seleccionar usuario</option>
-                {% for user in users %}
-                <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
-                {% endfor %}
-            </select>
+            <div class="form-group">
+                <label for="asignee">
+                    <i class="fas fa-user"></i> Asignado a:
+                </label>
+                <select id="asignee" name="asignee" required>
+                    <option value="">Seleccionar usuario</option>
+                    {% for user in users %}
+                    <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-            <label for="due_date">Fecha límite:</label>
-            <input type="date" id="due_date" name="due_date" required>
+            <div class="form-group">
+                <label for="due_date">
+                    <i class="fas fa-calendar-alt"></i> Fecha límite:
+                </label>
+                <input type="date" id="due_date" name="due_date" required>
+            </div>
 
-            <label for="pasos">Pasos (opcional):</label>
-            <textarea id="pasos" name="pasos" rows="3"></textarea>
+            <div class="form-group">
+                <label for="prioridad">
+                    <i class="fas fa-flag"></i> Prioridad:
+                </label>
+                <select id="prioridad" name="prioridad">
+                    <option value="baja">🟢 Baja</option>
+                    <option value="normal" selected>🟡 Normal</option>
+                    <option value="alta">🟠 Alta</option>
+                    <option value="urgente">🔴 Urgente</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="pasos">
+                    <i class="fas fa-list-ul"></i> Pasos o descripción:
+                </label>
+                <textarea id="pasos" name="pasos" rows="3" 
+                          placeholder="Describe los pasos o detalles de la tarea..."></textarea>
+            </div>
 
             <div class="form-buttons">
-                <button type="submit">Guardar</button>
-                <button type="button" id="cancelBtn">Cancelar</button>
+                <button type="submit">
+                    <i class="fas fa-save"></i> Guardar Tarea
+                </button>
+                <button type="button" id="cancelBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
             </div>
         </form>
     </div>
 </div>
 
+<style>
+/* Estilos adicionales específicos para el HTML */
+.task-item {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.task-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex: 1;
+    transition: all 0.3s ease;
+}
+
+.task-title:hover {
+    color: var(--accent-primary);
+}
+
+.task-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.task-date {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-secondary);
+}
+
+.task-priority {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.priority-baja {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.priority-normal {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.priority-alta {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+}
+
+.priority-urgente {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.task-steps {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    font-style: italic;
+    margin-top: 8px;
+    padding-left: 34px;
+}
+
+.no-tasks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 30px 20px !important;
+    color: var(--text-secondary);
+    background: rgba(34, 197, 94, 0.05) !important;
+    border: 1px dashed rgba(34, 197, 94, 0.3) !important;
+}
+
+.no-tasks i {
+    font-size: 2rem;
+    color: #22c55e;
+    opacity: 0.7;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-group label i {
+    color: var(--accent-primary);
+    width: 16px;
+}
+
+/* Animaciones para tareas completadas */
+.task-item.completing {
+    animation: taskComplete 0.6s ease forwards;
+}
+
+@keyframes taskComplete {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        background: rgba(34, 197, 94, 0.1);
+    }
+    100% {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+}
+
+/* Tema oscuro para elementos específicos */
+body.dark .task-title {
+    color: #f3f4f6;
+}
+
+body.dark .task-title:hover {
+    color: #8b5cf6;
+}
+
+body.dark .task-date {
+    color: #9ca3af;
+}
+
+body.dark .task-steps {
+    color: #9ca3af;
+}
+
+body.dark .no-tasks {
+    background: rgba(34, 197, 94, 0.1) !important;
+    border: 1px dashed rgba(34, 197, 94, 0.4) !important;
+    color: #9ca3af;
+}
+</style>
+
 <script>
+    // Variables globales
+    let taskAnimationDelay = 0;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animar las tarjetas al cargar
+        const taskCards = document.querySelectorAll('.tareas-list');
+        taskCards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
+        });
+
+        // Configurar fecha mínima para hoy
+        const dateInput = document.getElementById('due_date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = today;
+    });
+
+    // Abrir modal de nueva tarea
     document.getElementById('addTaskBtn').addEventListener('click', () => {
         document.getElementById('overlay').style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevenir scroll del body
+        
+        // Focus en el primer input
+        setTimeout(() => {
+            document.getElementById('titulo').focus();
+        }, 100);
     });
 
-    document.getElementById('cancelBtn').addEventListener('click', () => {
-        document.getElementById('overlay').style.display = 'none';
+    // Cerrar modal
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
+    
+    function closeModal() {
+        const overlay = document.getElementById('overlay');
+        overlay.style.animation = 'overlayFadeOut 0.3s ease forwards';
+        document.body.style.overflow = 'auto';
+        
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.style.animation = '';
+            document.getElementById('taskForm').reset();
+        }, 300);
+    }
+
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('overlay').style.display === 'flex') {
+            closeModal();
+        }
     });
 
+    // Cerrar modal al hacer click fuera
+    document.getElementById('overlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            closeModal();
+        }
+    });
+
+    // Enviar formulario
     document.getElementById('taskForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Mostrar loading
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        submitBtn.disabled = true;
 
         const data = {
-            titulo: document.getElementById('titulo').value,
+            titulo: document.getElementById('titulo').value.trim(),
             asignee: document.getElementById('asignee').value,
             due_date: document.getElementById('due_date').value,
-            pasos: document.getElementById('pasos').value,
+            prioridad: document.getElementById('prioridad').value,
+            pasos: document.getElementById('pasos').value.trim(),
         };
 
         try {
@@ -90,25 +369,48 @@
             });
 
             if (!res.ok) {
-                console.error("Error al añadir tarea");
-                return;
+                throw new Error('Error al añadir tarea');
             }
 
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('taskForm').reset();
-            window.location.reload();
+            // Mostrar éxito
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Guardado!';
+            submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+            
+            setTimeout(() => {
+                closeModal();
+                window.location.reload();
+            }, 800);
+
         } catch (error) {
             console.error("Error:", error);
+            
+            // Mostrar error
+            submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.style.background = '';
+                submitBtn.disabled = false;
+            }, 2000);
         }
     });
 
+    // Manejar checkboxes de tareas
     document.querySelectorAll('.tarea-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', async function () {
             if (!this.checked) return;
 
+            const taskItem = this.closest('.task-item');
             const user = this.getAttribute('data-user');
             const titulo = this.getAttribute('data-titulo');
             const due_date = this.getAttribute('data-due-date');
+
+            // Animación de completado
+            taskItem.classList.add('completing');
+            
+            // Deshabilitar el checkbox
+            this.disabled = true;
 
             try {
                 const res = await fetch('/api/completar_tarea', {
@@ -124,14 +426,170 @@
                 });
 
                 if (res.ok) {
-                    this.closest('li').remove();
+                    // Esperar a que termine la animación antes de remover
+                    setTimeout(() => {
+                        taskItem.remove();
+                        
+                        // Verificar si quedan tareas en este usuario
+                        const userCard = taskItem.closest('.tareas-list');
+                        const remainingTasks = userCard.querySelectorAll('.task-item').length;
+                        
+                        if (remainingTasks === 0) {
+                            const ul = userCard.querySelector('ul');
+                            ul.innerHTML = `
+                                <li class="no-tasks">
+                                    <i class="fas fa-check-circle"></i>
+                                    <em>¡Sin tareas pendientes!</em>
+                                </li>
+                            `;
+                        }
+                    }, 600);
+                    
+                    // Mostrar notificación de éxito
+                    showNotification('¡Tarea completada! 🎉', 'success');
+                    
                 } else {
-                    console.error("No se pudo completar la tarea.");
+                    throw new Error('Error del servidor');
                 }
             } catch (err) {
                 console.error("Error al completar tarea:", err);
+                
+                // Revertir el estado
+                this.checked = false;
+                this.disabled = false;
+                taskItem.classList.remove('completing');
+                
+                showNotification('Error al completar la tarea', 'error');
             }
         });
     });
+
+    // Función para mostrar notificaciones
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            ${message}
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
+    }
+
+    // Validación en tiempo real del formulario
+    document.getElementById('titulo').addEventListener('input', function() {
+        const value = this.value.trim();
+        if (value.length > 0 && value.length < 3) {
+            this.style.borderColor = '#ef4444';
+        } else {
+            this.style.borderColor = '';
+        }
+    });
+
+    // Auto-resize para textarea
+    document.getElementById('pasos').addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
 </script>
+
+<style>
+/* Animación de fade out para el overlay */
+@keyframes overlayFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Estilos para notificaciones */
+.notification {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    max-width: 300px;
+}
+
+.notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-success {
+    border-left: 4px solid #22c55e;
+    color: #15803d;
+}
+
+.notification-success i {
+    color: #22c55e;
+}
+
+.notification-error {
+    border-left: 4px solid #ef4444;
+    color: #dc2626;
+}
+
+.notification-error i {
+    color: #ef4444;
+}
+
+/* Tema oscuro para notificaciones */
+body.dark .notification {
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .notification-success {
+    color: #4ade80;
+}
+
+body.dark .notification-error {
+    color: #f87171;
+}
+
+/* Mejoras responsivas adicionales */
+@media (max-width: 480px) {
+    .notification {
+        top: 90px;
+        right: 15px;
+        left: 15px;
+        max-width: none;
+        font-size: 0.9rem;
+    }
+    
+    .task-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .task-steps {
+        padding-left: 0;
+        margin-top: 10px;
+    }
+}
+</style>
 {% endblock %}
