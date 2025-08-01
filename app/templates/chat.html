@@ -3,10 +3,99 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/chat.css') }}">
+<style>
+/* Solución específica para el input en móviles */
+#chat-input {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 100;
+    padding: 10px 0;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* Mejorar visibilidad del placeholder */
+#chat-input input::placeholder {
+    font-size: 0.9rem;
+}
+
+/* Aumentar tamaño del input en móviles */
+@media (max-width: 480px) {
+    #chat-input input {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+    
+    #chat-input button {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+    
+    .message-content {
+        font-size: 1.05rem;
+    }
+}
+
+/* Prevenir zoom automático en iOS */
+@media (max-width: 480px) {
+    #chat-input input {
+        font-size: 16px; /* Tamaño mínimo para evitar zoom en iOS */
+    }
+}
+
+/* Ajustes para el teclado virtual */
+@media (max-height: 600px) {
+    .chat-container {
+        height: calc(100vh - 50px) !important;
+    }
+    
+    .messages {
+        max-height: calc(100vh - 120px);
+    }
+}
+
+/* Mejoras adicionales para móvil */
+@media (max-width: 768px) {
+    .chat-container {
+        height: 85vh;
+        padding: 10px;
+        margin: 0;
+        border-radius: 0;
+        max-width: 100%;
+    }
+    
+    #chat-input {
+        flex-direction: column;
+    }
+    
+    #chat-input input {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    #chat-input button {
+        width: 100%;
+    }
+    
+    .message-content {
+        max-width: 85%;
+    }
+    
+    .message img {
+        width: 35px;
+        height: 35px;
+    }
+}
+
+/* Asegurar que el botón de enviar sea accesible en móviles */
+#chat-input button {
+    min-height: 50px; /* Tamaño mínimo para fácil toque */
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<h1 class="titleChat">💬 Chat de la Casa</h1>
 <div class="chat-container">
     <div id="messages" class="messages"></div>
     <div id="chat-input">
@@ -40,6 +129,31 @@
     // Indicador de escritura
     let typingTimer;
     let isTyping = false;
+
+    // Nueva función para manejar la visibilidad del teclado
+    function handleKeyboardVisibility() {
+        const chatContainer = document.querySelector('.chat-container');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('message');
+        
+        // Solo en móviles
+        if (window.innerWidth < 768) {
+            // Cuando el input recibe foco
+            messageInput.addEventListener('focus', () => {
+                chatContainer.style.height = '100vh';
+                messagesDiv.style.maxHeight = 'calc(100vh - 120px)';
+                setTimeout(() => {
+                    scrollToBottom();
+                }, 300);
+            });
+            
+            // Cuando el input pierde foco
+            messageInput.addEventListener('blur', () => {
+                chatContainer.style.height = '';
+                messagesDiv.style.maxHeight = '';
+            });
+        }
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
         // Cargar mensajes anteriores con animación escalonada
@@ -88,6 +202,15 @@
                 sendMessage();
             }
         });
+        
+        // Inicializar manejo de teclado
+        handleKeyboardVisibility();
+        
+        // Ajustar altura del chat en carga inicial
+        if (window.innerWidth < 768) {
+            const chatContainer = document.querySelector('.chat-container');
+            chatContainer.style.height = 'calc(100vh - 50px)';
+        }
     });
 
     // Socket events
@@ -226,6 +349,12 @@
 /* Animación suave para nuevos mensajes */
 .message {
     transition: transform 0.2s ease;
+}
+
+/* Asegurar que el input sea accesible en móviles */
+#chat-input input {
+    min-height: 50px; /* Tamaño mínimo para fácil toque */
+    font-size: 16px; /* Tamaño mínimo para evitar zoom en iOS */
 }
 </style>
 {% endblock %}

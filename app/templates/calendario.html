@@ -1,20 +1,336 @@
 {% extends "layout.html" %}
-{% block title %}Calendario{% endblock %}
+{% block title %}💬 Chat{% endblock %}
 
 {% block extra_css %}
-<!-- ... (estilos anteriores se mantienen igual) ... -->
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/chat.css') }}">
+<style>
+/* Solución específica para el input en móviles */
+#chat-input {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 100;
+    padding: 10px;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+}
+
+/* Ajustes para el teclado virtual */
+@media (max-height: 600px) {
+    .chat-container {
+        height: calc(100vh - 50px) !important;
+    }
+    
+    .messages {
+        max-height: calc(100vh - 120px);
+    }
+}
+
+/* Mejoras adicionales para móvil */
+@media (max-width: 768px) {
+    .chat-container {
+        height: 85vh;
+        padding: 10px;
+        margin: 0;
+        border-radius: 0;
+        max-width: 100%;
+    }
+    
+    #chat-input {
+        flex-direction: column;
+    }
+    
+    #chat-input input {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    #chat-input button {
+        width: 100%;
+    }
+    
+    .message-content {
+        max-width: 85%;
+    }
+    
+    .message img {
+        width: 35px;
+        height: 35px;
+    }
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<!-- ... (contenido HTML anterior se mantiene igual) ... -->
+<div class="chat-container">
+    <div id="messages" class="messages"></div>
+    <div id="chat-input">
+        <input type="text" id="message" placeholder="Escribe tu mensaje..." />
+        <button onclick="sendMessage()">
+            <i class="fas fa-paper-plane"></i> Enviar
+        </button>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-    // ... (código anterior se mantiene igual hasta la función de envío) ...
+    let calendar;
+    let currentType = "task"; // Por defecto: tarea
+    
+    // Funciones para abrir y cerrar el modal
+    function openModal() {
+        const overlay = document.getElementById('overlay');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        // Establecer fecha mínima como hoy
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('due_date').value = today;
+        document.getElementById('eventStart').value = today;
+        
+        setTimeout(() => {
+            document.getElementById('titulo').focus();
+        }, 100);
+    }
+    
+    function closeModal() {
+        const overlay = document.getElementById('overlay');
+        overlay.classList.remove('active');
+        document.body.style.overflow = 'auto';
+        document.getElementById('itemForm').reset();
+        
+        // Resetear fecha a hoy
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('due_date').value = today;
+        document.getElementById('eventStart').value = today;
+        
+        // Restablecer tipo a tarea
+        document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
+        document.querySelector('.type-option[data-type="task"]').classList.add('active');
+        document.querySelectorAll('.specific-fields').forEach(field => field.classList.remove('active'));
+        document.querySelector('.task-fields').classList.add('active');
+        currentType = "task";
+    }
+    
+    // Función para mostrar notificaciones
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            ${message}
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
+    }
+    
+    // Función para obtener color basado en prioridad
+    function getPriorityColor(prioridad) {
+        const colors = {
+            'baja': '#22c55e',
+            'normal': '#f59e0b',
+            'alta': '#f97316',
+            'urgente': '#ef4444'
+        };
+        return colors[prioridad] || '#10b981';
+    }
+    
+    // Función para mostrar detalles del evento
+    function showEventDetails(event) {
+        const isEvent = event.extendedProps.type === "event";
+        
+        const modal = document.createElement('div');
+        modal.className = 'event-detail-modal';
+        modal.innerHTML = `
+            <div class="event-detail-content">
+                <div class="event-detail-header">
+                    <h3><i class="${isEvent ? 'fas fa-calendar-star' : 'fas fa-calendar-check'}"></i> 
+                        ${event.title}
+                        <span class="event-type">${isEvent ? 'EVENTO' : 'TAREA'}</span>
+                    </h3>
+                    <button class="close-detail-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="event-detail-body">
+                    ${isEvent ? `
+                        <div class="event-detail-item">
+                            <i class="fas fa-user-edit"></i>
+                            <span>Reportado por: ${event.extendedProps.reported_by || '{{ session.get("user") }}'}</span>
+                        </div>
+                    ` : `
+                        <div class="event-detail-item">
+                            <i class="fas fa-user"></i>
+                            <span>Asignado a: ${event.extendedProps.asignee || 'No asignado'}</span>
+                        </div>
+                    `}
+                    
+                    <div class="event-detail-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>Fecha: ${event.start.toLocaleDateString('es-ES', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}</span>
+                    </div>
+                    
+                    ${isEvent && event.extendedProps.description ? `
+                        <div class="event-detail-item">
+                            <i class="fas fa-align-left"></i>
+                            <span>Descripción: ${event.extendedProps.description}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${!isEvent && event.extendedProps.prioridad ? `
+                        <div class="event-detail-item">
+                            <i class="fas fa-flag"></i>
+                            <span>Prioridad: ${event.extendedProps.prioridad}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${!isEvent && event.extendedProps.pasos ? `
+                        <div class="event-detail-item">
+                            <i class="fas fa-list-ul"></i>
+                            <span>Descripción: ${event.extendedProps.pasos}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="event-detail-actions">
+                    ${!isEvent ? `
+                        <button class="complete-event-btn" onclick="completeEvent('${event.id}')">
+                            <i class="fas fa-check"></i> Completar
+                        </button>
+                    ` : `
+                        <button class="delete-event-btn" onclick="deleteEvent('${event.id}')">
+                            <i class="fas fa-trash"></i> Eliminar Evento
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+        
+        // Cerrar modal
+        modal.querySelector('.close-detail-btn').onclick = () => {
+            closeEventDetail(modal);
+        };
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeEventDetail(modal);
+            }
+        };
+        
+        // Animación de entrada
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.querySelector('.event-detail-content').style.transform = 'translateY(0) scale(1)';
+        }, 10);
+    }
+    
+    function closeEventDetail(modal) {
+        modal.style.opacity = '0';
+        modal.querySelector('.event-detail-content').style.transform = 'translateY(-20px) scale(0.95)';
+        document.body.style.overflow = 'auto';
+        
+        setTimeout(() => {
+            modal.remove();
+        }, 300);
+    }
 
-    // Enviar formulario unificado - VERSIÓN CORREGIDA
-    document.getElementById('itemForm').addEventListener('submit', async (e) => {
+    // Completar evento (tarea)
+    async function completeEvent(eventId) {
+        try {
+            const event = calendar.getEventById(eventId);
+            if (!event) return;
+            
+            const res = await fetch('/api/completar_tarea', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: event.extendedProps.user_id,
+                    tarea: {
+                        titulo: event.title,
+                        due_date: event.start.toISOString().split('T')[0]
+                    }
+                }),
+            });
+
+            if (res.ok) {
+                // Animación de completado
+                const eventEl = event.el;
+                eventEl.style.animation = 'eventComplete 0.6s ease forwards';
+                
+                setTimeout(() => {
+                    event.remove();
+                    showNotification('¡Tarea completada! 🎉', 'success');
+                }, 600);
+                
+                // Cerrar modal de detalles
+                const modal = document.querySelector('.event-detail-modal');
+                if (modal) {
+                    closeEventDetail(modal);
+                }
+            } else {
+                showNotification('Error al completar la tarea', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Error al completar la tarea', 'error');
+        }
+    }
+
+    // Eliminar evento
+    async function deleteEvent(eventId) {
+        try {
+            const res = await fetch(`/api/events/${eventId}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                const event = calendar.getEventById(eventId);
+                if (event) {
+                    // Animación de eliminación
+                    const eventEl = event.el;
+                    eventEl.style.animation = 'eventComplete 0.6s ease forwards';
+                    
+                    setTimeout(() => {
+                        event.remove();
+                        showNotification('Evento eliminado 🗑️', 'success');
+                    }, 600);
+                }
+                
+                // Cerrar modal de detalles
+                const modal = document.querySelector('.event-detail-modal');
+                if (modal) {
+                    closeEventDetail(modal);
+                }
+            } else {
+                showNotification('Error al eliminar el evento', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Error al eliminar el evento', 'error');
+        }
+    }
+    
+    // Función para manejar el envío del formulario
+    async function handleFormSubmit(e) {
         e.preventDefault();
         
         const submitBtn = document.getElementById('saveBtn');
@@ -29,13 +345,13 @@
             let res, result;
             
             if (currentType === "task") {
-                // CORRECCIÓN: Usar los nombres de campo que espera el backend
+                // Datos específicos de tarea
                 const taskData = {
                     titulo: document.getElementById('titulo').value.trim(),
                     asignee: document.getElementById('asignee').value,
                     due_date: document.getElementById('due_date').value,
                     prioridad: document.getElementById('prioridad').value,
-                    pasos: document.getElementById('descripcion').value.trim()  // Cambiado a 'pasos'
+                    pasos: document.getElementById('descripcion').value.trim()
                 };
                 
                 res = await fetch('/api/add_task', {
@@ -76,12 +392,12 @@
                 }, 800);
                 
             } else {
-                // CORRECCIÓN: Usar los nombres de campo que espera el backend
+                // Datos específicos de evento
                 const eventData = {
-                    title: document.getElementById('titulo').value.trim(),  // Cambiado a 'title'
+                    title: document.getElementById('titulo').value.trim(),
                     start_date: document.getElementById('eventStart').value,
                     end_date: document.getElementById('eventEnd').value || document.getElementById('eventStart').value,
-                    description: document.getElementById('descripcion').value.trim(),  // Cambiado a 'description'
+                    description: document.getElementById('descripcion').value.trim(),
                     color: document.getElementById('eventColor').value
                 };
                 
@@ -138,8 +454,179 @@
                 submitBtn.disabled = false;
             }, 2000);
         }
-    });
+    }
 
-    // ... (resto del código se mantiene igual) ...
+    // Inicialización cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        const calendarEl = document.getElementById('calendar');
+        
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'es',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            buttonText: {
+                today: 'Hoy',
+                month: 'Mes',
+                week: 'Semana',
+                list: 'Lista'
+            },
+            events: {{ events | tojson }},
+            eventColor: '#10b981',
+            eventTextColor: '#fff',
+            height: 'auto',
+            aspectRatio: 1.8,
+            
+            // Configuración de eventos
+            eventDidMount: function(info) {
+                // Añadir clases CSS basadas en prioridad
+                if (info.event.extendedProps.prioridad) {
+                    info.el.classList.add(`priority-${info.event.extendedProps.prioridad}`);
+                }
+                
+                // Tooltip con información adicional
+                let tooltipContent = `${info.event.title}\n`;
+                
+                if (info.event.extendedProps.asignee) {
+                    tooltipContent += `Asignado a: ${info.event.extendedProps.asignee || 'No asignado'}\n`;
+                }
+                
+                if (info.event.extendedProps.reported_by) {
+                    tooltipContent += `Reportado por: ${info.event.extendedProps.reported_by}\n`;
+                }
+                
+                tooltipContent += `Fecha: ${info.event.start.toLocaleDateString()}`;
+                
+                info.el.setAttribute('title', tooltipContent);
+                
+                // Animación de entrada
+                info.el.style.animation = 'eventSlideIn 0.3s ease forwards';
+            },
+            
+            // Click en evento
+            eventClick: function(info) {
+                showEventDetails(info.event);
+            },
+            
+            // Click en día
+            dateClick: function(info) {
+                openModal();
+                document.getElementById('due_date').value = info.dateStr;
+                document.getElementById('eventStart').value = info.dateStr;
+            },
+            
+            // Configuración responsiva
+            windowResize: function() {
+                calendar.updateSize();
+            }
+        });
+        
+        calendar.render();
+        
+        // Configurar fecha mínima para hoy
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('due_date').min = today;
+        document.getElementById('due_date').value = today;
+        document.getElementById('eventStart').min = today;
+        document.getElementById('eventStart').value = today;
+        
+        // Selector de tipo
+        document.querySelectorAll('.type-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.type-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                currentType = this.dataset.type;
+                
+                // Mostrar campos específicos según el tipo seleccionado
+                document.querySelectorAll('.specific-fields').forEach(field => {
+                    field.classList.remove('active');
+                });
+                document.querySelector(`.${currentType}-fields`).classList.add('active');
+            });
+        });
+        
+        // Inicializar event listeners después de que el DOM esté listo
+        document.getElementById('addItemBtn').addEventListener('click', openModal);
+        document.getElementById('cancelBtn').addEventListener('click', closeModal);
+        document.getElementById('itemForm').addEventListener('submit', handleFormSubmit);
+        
+        // Auto-resize para textarea
+        const descTextarea = document.getElementById('descripcion');
+        descTextarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        
+        // Cerrar modal con Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('overlay');
+                const eventModal = document.querySelector('.event-detail-modal');
+                
+                if (overlay.classList.contains('active')) {
+                    closeModal();
+                } else if (eventModal) {
+                    closeEventDetail(eventModal);
+                }
+            }
+        });
+
+        // Cerrar modal al hacer click fuera
+        document.getElementById('overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeModal();
+            }
+        });
+    });
 </script>
+
+<style>
+/* Mantener todos los estilos existentes y añadir los siguientes: */
+
+/* Asegurar que el input sea siempre visible */
+#chat-input {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 100;
+    padding: 10px 0;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* Mejorar visibilidad del placeholder */
+#chat-input input::placeholder {
+    font-size: 0.9rem;
+}
+
+/* Aumentar tamaño del input en móviles */
+@media (max-width: 480px) {
+    #chat-input input {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+    
+    #chat-input button {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+    
+    .message-content {
+        font-size: 1.05rem;
+    }
+}
+
+/* Prevenir zoom automático en iOS */
+@media (max-width: 480px) {
+    #chat-input input {
+        font-size: 16px; /* Tamaño mínimo para evitar zoom en iOS */
+    }
+}
+</style>
 {% endblock %}
