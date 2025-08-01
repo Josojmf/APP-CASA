@@ -278,6 +278,21 @@ h2:hover::after {
   width: 150px;
 }
 
+.user-list-title {
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-list-title::before {
+  content: '👥';
+  font-size: 1.2rem;
+}
+
 /* Toggle switch ultra mejorado */
 .switch {
   position: relative;
@@ -360,6 +375,17 @@ input:checked + .slider::after {
   transform: scale(0.98);
 }
 
+.theme-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.theme-status {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 /* Botón de limpiar tareas mejorado */
 #clearTasksBtn {
   background: var(--gradient-danger);
@@ -377,6 +403,8 @@ input:checked + .slider::after {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   min-width: 200px;
+  display: block;
+  margin: 0 auto;
 }
 
 #clearTasksBtn:hover {
@@ -420,6 +448,10 @@ input:checked + .slider::after {
   height: 300px;
 }
 
+.task-actions {
+  text-align: center;
+}
+
 /* Formulario de añadir usuario MEJORADO */
 form#addUserForm {
   width: 100%;
@@ -429,6 +461,11 @@ form#addUserForm {
   margin-bottom: 3rem;
   animation: slideInLeft 0.8s ease-out;
   align-items: end;
+}
+
+#addUserForm .form-group {
+  display: flex;
+  flex-direction: column;
 }
 
 #addUserForm input {
@@ -442,6 +479,7 @@ form#addUserForm {
   position: relative;
   font-family: inherit;
   box-shadow: var(--shadow-sm);
+  width: 100%;
 }
 
 #addUserForm input:focus {
@@ -476,6 +514,7 @@ form#addUserForm {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 1rem;
 }
 
 #addUserForm input[type="file"]:hover {
@@ -486,7 +525,7 @@ form#addUserForm {
 }
 
 /* Botón de añadir MEJORADO */
-#addUserForm button {
+.add-user-btn {
   background: var(--gradient-success);
   color: white;
   border: none;
@@ -507,29 +546,30 @@ form#addUserForm {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 
-#addUserForm button:hover {
+.add-user-btn:hover {
   transform: translateY(-3px) scale(1.05);
   box-shadow: var(--shadow-xl);
   background: var(--gradient-primary);
 }
 
-#addUserForm button:active {
+.add-user-btn:active {
   transform: translateY(0) scale(1);
 }
 
-#addUserForm button::before {
+.add-user-btn::before {
   content: '➕';
   font-size: 1.2rem;
   transition: transform var(--transition-normal);
 }
 
-#addUserForm button:hover::before {
+.add-user-btn:hover::before {
   transform: rotate(90deg) scale(1.2);
 }
 
-#addUserForm button::after {
+.add-user-btn::after {
   content: '';
   position: absolute;
   top: 0;
@@ -545,7 +585,7 @@ form#addUserForm {
   transition: left var(--transition-normal);
 }
 
-#addUserForm button:hover::after {
+.add-user-btn:hover::after {
   left: 100%;
 }
 
@@ -629,10 +669,10 @@ form#addUserForm {
   gap: 1rem;
   z-index: 1;
   position: relative;
+  flex: 1;
 }
 
-.user-info::before {
-  content: '👤';
+.user-info .user-avatar {
   font-size: 1.5rem;
   background: var(--gradient-primary);
   padding: 0.5rem;
@@ -642,19 +682,36 @@ form#addUserForm {
   justify-content: center;
   box-shadow: var(--shadow-md);
   transition: transform var(--transition-normal);
+  width: 50px;
+  height: 50px;
 }
 
-.user-list li:hover .user-info::before {
+.user-list li:hover .user-info .user-avatar {
   transform: scale(1.2) rotate(10deg);
 }
 
+.user-info > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.user-status {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
 /* Estados de usuario con animaciones */
-.user-info .status-online {
+.user-info .status-home {
   color: var(--success-color);
   animation: pulse 2s infinite;
 }
 
-.user-info .status-offline {
+.user-info .status-away {
   color: var(--danger-color);
 }
 
@@ -675,6 +732,7 @@ form#addUserForm {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-size: 0.9rem;
+  min-width: 120px;
 }
 
 .delete-btn:hover {
@@ -786,7 +844,7 @@ form#addUserForm {
   .user-management {
     max-width: 100%;
     margin: 1.5rem auto;
-    padding: 2rem;
+    padding: 1.5rem;
   }
   
   form#addUserForm {
@@ -794,8 +852,9 @@ form#addUserForm {
     gap: 1rem;
   }
   
-  #addUserForm button {
+  .add-user-btn {
     justify-self: stretch;
+    width: 100%;
   }
   
   .title {
@@ -807,7 +866,7 @@ form#addUserForm {
     flex-direction: column;
     gap: 1.5rem;
     text-align: center;
-    padding: 2rem 1.5rem;
+    padding: 1.5rem;
   }
   
   .user-list li:hover {
@@ -817,6 +876,25 @@ form#addUserForm {
   .user-info {
     flex-direction: column;
     gap: 0.75rem;
+    text-align: center;
+  }
+  
+  .delete-btn {
+    width: 100%;
+  }
+  
+  .theme-control {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .theme-status {
+    margin-top: 0.5rem;
+  }
+  
+  .switch {
+    margin: 0;
   }
 }
 
@@ -837,6 +915,16 @@ form#addUserForm {
   
   h2 {
     font-size: 1.5rem;
+  }
+  
+  .user-list-title {
+    font-size: 1.3rem;
+  }
+  
+  #clearTasksBtn {
+    padding: 1rem 1.5rem;
+    min-width: auto;
+    width: 100%;
   }
 }
 
@@ -873,7 +961,7 @@ input:focus-visible {
     transform: none;
   }
   
-  #addUserForm button:hover,
+  .add-user-btn:hover,
   .delete-btn:hover,
   #clearTasksBtn:hover {
     transform: none;
