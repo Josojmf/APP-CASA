@@ -10,8 +10,10 @@
 <div class="chat-container">
     <div id="messages" class="messages"></div>
     <div id="chat-input">
-        <input type="text" id="message" placeholder="Escribe un mensaje..." />
-        <button onclick="sendMessage()">Enviar</button>
+        <input type="text" id="message" placeholder="Escribe tu mensaje..." />
+        <button onclick="sendMessage()">
+            <i class="fas fa-paper-plane"></i> Enviar
+        </button>
     </div>
 </div>
 {% endblock %}
@@ -31,24 +33,28 @@
     }
 
     const socket = io();
-    const currentUser = "{{ session['user'] }}"; // Usuario actual
+    const currentUser = "{{ session['user'] }}";
     const storedUser = localStorage.getItem("user") || currentUser;
     const normalizedUser = normalizeUserName(storedUser);
 
+    // Indicador de escritura
+    let typingTimer;
+    let isTyping = false;
+
     document.addEventListener("DOMContentLoaded", () => {
-        // Cargar mensajes anteriores
+        // Cargar mensajes anteriores con animación escalonada
         fetch("/chat/messages")
             .then(res => res.json())
             .then(data => {
                 data.forEach((msg, i) => {
                     setTimeout(() => {
-                        addMessage(msg.user, msg.photo, msg.message);
-                    }, i * 80);
+                        addMessage(msg.user, msg.photo, msg.message, false);
+                    }, i * 100);
                 });
                 scrollToBottom();
             });
 
-        // Obtener foto del usuario actual desde la API con nombre normalizado
+        // Obtener foto del usuario actual
         fetch(`/api/user/profile/${normalizedUser}`)
             .then(res => res.json())
             .then(userData => {
@@ -58,15 +64,52 @@
                     window.currentUserPhoto = "/static/images/default-avatar.png";
                 }
             });
+
+        // Event listeners para el input
+        const messageInput = document.getElementById("message");
+        
+        messageInput.addEventListener("input", () => {
+            if (!isTyping && messageInput.value.trim()) {
+                isTyping = true;
+                socket.emit("typing", { user: normalizedUser, typing: true });
+            }
+            
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                if (isTyping) {
+                    isTyping = false;
+                    socket.emit("typing", { user: normalizedUser, typing: false });
+                }
+            }, 1000);
+        });
+
+        messageInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                sendMessage();
+            }
+        });
     });
 
+    // Socket events
     socket.on('chat_message', (data) => {
-        addMessage(data.user, data.photo, data.message);
+        addMessage(data.user, data.photo, data.message, true);
+    });
+
+    socket.on('user_typing', (data) => {
+        if (data.user !== normalizedUser) {
+            showTypingIndicator(data.user, data.typing);
+        }
     });
 
     function sendMessage() {
         const message = document.getElementById("message").value.trim();
         if (message) {
+            // Limpiar indicador de escritura
+            if (isTyping) {
+                isTyping = false;
+                socket.emit("typing", { user: normalizedUser, typing: false });
+            }
+
             socket.emit("send_message", {
                 user: normalizedUser,
                 photo: window.currentUserPhoto || "/static/images/default-avatar.png",
@@ -83,29 +126,106 @@
         }
     }
 
-    function addMessage(user, photo, text) {
+    function addMessage(user, photo, text, animate = true) {
         const msgDiv = document.createElement("div");
         const isMine = (user === normalizedUser);
         msgDiv.classList.add("message", isMine ? "sent" : "received");
+        
+        if (animate) {
+            msgDiv.style.animationDelay = "0.1s";
+        }
 
         const photoSrc = (photo && photo.trim() !== "")
             ? photo
             : "/static/images/default-avatar.png";
 
         msgDiv.innerHTML = `
-            <img src="${photoSrc}" alt="${user}">
+            <img src="${photoSrc}" alt="${user}" loading="lazy">
             <div class="message-content">
                 <strong>${escapeHTML(user)}</strong>
                 ${escapeHTML(text)}
             </div>
         `;
+        
         document.getElementById("messages").appendChild(msgDiv);
         scrollToBottom();
     }
 
-    // Enviar con Enter
-    document.getElementById("message").addEventListener("keypress", (e) => {
-        if (e.key === "Enter") sendMessage();
+    function showTypingIndicator(user, isTyping) {
+        const existingIndicator = document.getElementById(`typing-${user}`);
+        
+        if (isTyping && !existingIndicator) {
+            const typingDiv = document.createElement("div");
+            typingDiv.id = `typing-${user}`;
+            typingDiv.classList.add("message", "received");
+            
+            typingDiv.innerHTML = `
+                <img src="/static/images/default-avatar.png" alt="${user}" loading="lazy">
+                <div class="typing-indicator">
+                    <strong>${escapeHTML(user)} está escribiendo</strong>
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById("messages").appendChild(typingDiv);
+            scrollToBottom();
+        } else if (!isTyping && existingIndicator) {
+            existingIndicator.style.animation = "messageSlideOut 0.3s ease forwards";
+            setTimeout(() => {
+                existingIndicator.remove();
+            }, 300);
+        }
+    }
+
+    // Detectar cuando el usuario está en línea/fuera de línea
+    window.addEventListener('online', () => {
+        console.log('💚 Conectado al chat');
+    });
+
+    window.addEventListener('offline', () => {
+        console.log('❌ Desconectado del chat');
     });
 </script>
+
+<style>
+@keyframes messageSlideOut {
+    0% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+}
+
+/* Efectos adicionales de hover para mejor UX */
+.message:hover {
+    transform: translateX(5px);
+}
+
+.message.sent:hover {
+    transform: translateX(-5px);
+}
+
+/* Mejora visual para mensajes largos */
+.message-content {
+    line-height: 1.4;
+    letter-spacing: 0.3px;
+}
+
+/* Efecto de focus mejorado para el input */
+#chat-input input:focus {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Animación suave para nuevos mensajes */
+.message {
+    transition: transform 0.2s ease;
+}
+</style>
 {% endblock %}
