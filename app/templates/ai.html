@@ -1,14 +1,122 @@
 {% extends "layout.html" %}
-{% block title %}💬 Asistente Familiar{% endblock %}
+{% block title %}🤖 Asistente Familiar Inteligente{% endblock %}
 
 {% block extra_css %}
 <style>
-.chat-container {
-    max-width: 800px;
+.main-container {
+    max-width: 1200px;
     margin: 0 auto;
-    height: calc(100vh - 200px);
+    padding: 20px;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.sidebar {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    height: fit-content;
+}
+
+.chat-section {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
+    height: 600px;
+}
+
+.ai-status-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.ai-status-card.unavailable {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.stat-item {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    border-left: 4px solid #007bff;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #007bff;
+    display: block;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+.insights-section {
+    margin-bottom: 20px;
+}
+
+.insight-item {
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.insight-item.warning {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    color: #856404;
+}
+
+.insight-item.urgent {
+    background: #f8d7da;
+    border-left: 4px solid #dc3545;
+    color: #721c24;
+}
+
+.insight-item.info {
+    background: #d1ecf1;
+    border-left: 4px solid #17a2b8;
+    color: #0c5460;
+}
+
+.insight-item.motivation {
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+    color: #155724;
+}
+
+.chat-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 15px 15px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .chat-messages {
@@ -16,19 +124,18 @@
     overflow-y: auto;
     padding: 20px;
     background: #f8f9fa;
-    border-radius: 10px;
-    margin-bottom: 20px;
 }
 
 .message {
     margin-bottom: 15px;
     padding: 12px 16px;
     border-radius: 15px;
-    max-width: 80%;
+    max-width: 85%;
+    animation: fadeInUp 0.3s ease;
 }
 
 .message.user {
-    background: #007bff;
+    background: linear-gradient(135deg, #007bff, #0056b3);
     color: white;
     margin-left: auto;
     text-align: right;
@@ -38,6 +145,18 @@
     background: white;
     border: 1px solid #dee2e6;
     margin-right: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.message.assistant strong {
+    color: #667eea;
+}
+
+.chat-input-section {
+    background: white;
+    padding: 20px;
+    border-radius: 0 0 15px 15px;
+    border-top: 1px solid #dee2e6;
 }
 
 .chat-input-container {
@@ -54,15 +173,18 @@
     border-radius: 20px;
     border: 2px solid #dee2e6;
     padding: 12px 16px;
+    font-family: inherit;
+    transition: border-color 0.3s;
 }
 
 .chat-input:focus {
-    border-color: #007bff;
+    border-color: #667eea;
     outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .send-btn {
-    background: #007bff;
+    background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
     border: none;
     border-radius: 50%;
@@ -72,23 +194,27 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.3s;
+    font-size: 1.2rem;
 }
 
 .send-btn:hover:not(:disabled) {
-    background: #0056b3;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .send-btn:disabled {
     background: #6c757d;
     cursor: not-allowed;
+    transform: none;
 }
 
 .loading {
     display: none;
     text-align: center;
     padding: 20px;
-    color: #6c757d;
+    color: #667eea;
+    font-style: italic;
 }
 
 .error-message {
@@ -100,25 +226,6 @@
     border: 1px solid #f5c6cb;
 }
 
-.ai-status {
-    text-align: center;
-    padding: 10px;
-    margin-bottom: 20px;
-    border-radius: 8px;
-}
-
-.ai-status.available {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.ai-status.unavailable {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
 .clear-btn {
     background: #6c757d;
     color: white;
@@ -127,61 +234,180 @@
     border-radius: 20px;
     cursor: pointer;
     font-size: 0.9em;
+    transition: background 0.3s;
 }
 
 .clear-btn:hover {
     background: #545b62;
 }
 
+.quick-actions {
+    margin-top: 15px;
+}
+
+.quick-action-btn {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: 2px solid #dee2e6;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: left;
+    font-size: 0.9rem;
+}
+
+.quick-action-btn:hover {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.data-timestamp {
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-align: center;
+    margin-top: 10px;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
 @media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .chat-section {
+        height: 500px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
     .message {
         max-width: 95%;
-    }
-    .chat-container {
-        height: calc(100vh - 180px);
     }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="mb-0">🤖 Asistente Familiar</h2>
-                <button class="clear-btn" onclick="clearChat()">🗑️ Limpiar Chat</button>
+<div class="main-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">🤖 Asistente Familiar Inteligente</h2>
+        <button class="clear-btn" onclick="clearChat()">🗑️ Limpiar Chat</button>
+    </div>
+    
+    <div class="dashboard-grid">
+        <!-- Sidebar con información y controles -->
+        <div class="sidebar">
+            <!-- Estado de la IA -->
+            <div id="ai-status" class="ai-status-card">
+                <div id="status-text">🔄 Verificando estado...</div>
+                <div id="status-details" style="font-size: 0.9rem; margin-top: 8px;"></div>
             </div>
             
-            <!-- AI Status Indicator -->
-            <div id="ai-status" class="ai-status">
-                <span id="status-text">Verificando estado del asistente...</span>
+            <!-- Estadísticas rápidas -->
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number" id="active-tasks">-</span>
+                    <div class="stat-label">Tareas activas</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="users-home">-</span>
+                    <div class="stat-label">Usuarios en casa</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="pending-shopping">-</span>
+                    <div class="stat-label">Lista compra</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="completed-today">-</span>
+                    <div class="stat-label">Completadas hoy</div>
+                </div>
             </div>
             
-            <div class="chat-container">
-                <div id="chat-messages" class="chat-messages">
-                    <div class="message assistant">
-                        <strong>Casa AI:</strong> ¡Hola! 👋 Soy tu asistente familiar. Puedo ayudarte con:
-                        <ul style="margin: 10px 0;">
-                            <li>📝 Organización de tareas familiares</li>
-                            <li>🍳 Recetas y planificación de menús</li>
-                            <li>🏠 Consejos para el hogar</li>
-                            <li>📅 Gestión del tiempo familiar</li>
-                            <li>🛒 Organización de compras</li>
-                        </ul>
-                        ¿En qué puedo ayudarte hoy?
+            <!-- Insights automáticos -->
+            <div class="insights-section">
+                <h6 style="margin-bottom: 10px; color: #6c757d;">📊 Insights Familiares</h6>
+                <div id="insights-container">
+                    <div class="insight-item info">
+                        <small>Cargando análisis...</small>
                     </div>
                 </div>
-                
-                <div class="loading" id="loading">
-                    <span>🤔 Casa AI está pensando...</span>
+            </div>
+            
+            <!-- Acciones rápidas -->
+            <div class="quick-actions">
+                <h6 style="margin-bottom: 10px; color: #6c757d;">⚡ Consultas Rápidas</h6>
+                <button class="quick-action-btn" onclick="quickQuery('¿Cómo están distribuidas las tareas?')">
+                    📊 Análisis de tareas
+                </button>
+                <button class="quick-action-btn" onclick="quickQuery('¿Qué productos necesitamos comprar?')">
+                    🛒 Lista de compra
+                </button>
+                <button class="quick-action-btn" onclick="quickQuery('¿Hay tareas vencidas o urgentes?')">
+                    ⚠️ Tareas urgentes
+                </button>
+                <button class="quick-action-btn" onclick="quickQuery('Sugiere cómo optimizar el trabajo familiar')">
+                    💡 Optimizar familia
+                </button>
+            </div>
+            
+            <div class="data-timestamp" id="data-timestamp">
+                Datos actualizados: --:--
+            </div>
+        </div>
+        
+        <!-- Sección de chat -->
+        <div class="chat-section">
+            <div class="chat-header">
+                <div>
+                    <h4 style="margin: 0;">🤖 Casa AI</h4>
+                    <small>Tu asistente familiar inteligente</small>
                 </div>
-                
+                <div id="chat-status" style="font-size: 0.9rem;">
+                    ●●● Conectado
+                </div>
+            </div>
+            
+            <div id="chat-messages" class="chat-messages">
+                <div class="message assistant">
+                    <strong>Casa AI:</strong> ¡Hola! 👋 Soy tu asistente familiar inteligente con acceso completo a los datos de la casa. Puedo ayudarte con:
+                    <ul style="margin: 10px 0;">
+                        <li>📊 <strong>Análisis de tareas:</strong> Ver distribución, vencidas, optimizar</li>
+                        <li>🛒 <strong>Lista de compra:</strong> Gestionar productos, sugerir organización</li>
+                        <li>👥 <strong>Estado familiar:</strong> Quién está en casa, disponibilidad</li>
+                        <li>📈 <strong>Insights:</strong> Patrones, desequilibrios, sugerencias</li>
+                        <li>💡 <strong>Optimización:</strong> Redistribuir tareas, mejorar eficiencia</li>
+                    </ul>
+                    ¿En qué puedo ayudarte hoy? Tengo acceso a todos los datos actualizados de la familia.
+                </div>
+            </div>
+            
+            <div class="loading" id="loading">
+                <span>🧠 Casa AI está analizando los datos...</span>
+            </div>
+            
+            <div class="chat-input-section">
                 <div class="chat-input-container">
                     <textarea 
                         id="chat-input" 
                         class="chat-input" 
-                        placeholder="Escribe tu pregunta aquí... (Ejemplo: ¿Cómo organizo las tareas de la casa?)"
+                        placeholder="Pregúntame sobre tareas, usuarios, compras, optimizaciones..."
                         rows="1"
                         maxlength="500"
                     ></textarea>
@@ -197,6 +423,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     checkAIStatus();
+    loadFamilyInsights();
     
     // Auto-resize textarea
     const chatInput = document.getElementById('chat-input');
@@ -212,6 +439,9 @@ document.addEventListener('DOMContentLoaded', function() {
             sendMessage();
         }
     });
+    
+    // Actualizar datos cada 30 segundos
+    setInterval(updateStats, 30000);
 });
 
 async function checkAIStatus() {
@@ -221,30 +451,97 @@ async function checkAIStatus() {
         
         const statusDiv = document.getElementById('ai-status');
         const statusText = document.getElementById('status-text');
+        const statusDetails = document.getElementById('status-details');
+        const chatStatus = document.getElementById('chat-status');
         
         if (data.available) {
-            statusDiv.className = 'ai-status available';
-            statusText.textContent = `✅ Asistente activo (${data.model || 'AI'})`;
+            statusDiv.className = 'ai-status-card';
+            statusText.textContent = `✅ Casa AI Activo`;
+            statusDetails.textContent = `${data.model || 'IA'} • BD: ${data.database_connected ? 'Conectada' : 'Error'}`;
+            chatStatus.textContent = '●●● Conectado';
+            
+            // Mostrar estadísticas si están disponibles
+            if (data.data_stats && !data.data_stats.error) {
+                updateStatsDisplay(data.data_stats);
+            }
         } else {
-            statusDiv.className = 'ai-status unavailable';
-            statusText.textContent = '❌ Servicio de IA no disponible - Contacta al administrador';
+            statusDiv.className = 'ai-status-card unavailable';
+            statusText.textContent = '❌ IA No Disponible';
+            statusDetails.textContent = 'Contacta al administrador';
+            chatStatus.textContent = '○○○ Desconectado';
             document.getElementById('send-btn').disabled = true;
             document.getElementById('chat-input').disabled = true;
+            document.getElementById('chat-input').placeholder = 'Servicio de IA no disponible';
         }
     } catch (error) {
         console.error('Error checking AI status:', error);
         const statusDiv = document.getElementById('ai-status');
         const statusText = document.getElementById('status-text');
-        statusDiv.className = 'ai-status unavailable';
-        statusText.textContent = '⚠️ No se pudo verificar el estado del asistente';
+        statusDiv.className = 'ai-status-card unavailable';
+        statusText.textContent = '⚠️ Error de conexión';
     }
+}
+
+async function loadFamilyInsights() {
+    try {
+        const response = await fetch('/api/family_insights');
+        const data = await response.json();
+        
+        const container = document.getElementById('insights-container');
+        
+        if (data.insights && data.insights.length > 0) {
+            container.innerHTML = data.insights.map(insight => `
+                <div class="insight-item ${insight.type}">
+                    <strong>${insight.title}</strong><br>
+                    <small>${insight.message}</small>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="insight-item motivation"><small>✅ Todo parece estar en orden</small></div>';
+        }
+        
+        if (data.stats_summary) {
+            updateStatsDisplay(data.stats_summary);
+        }
+        
+    } catch (error) {
+        console.error('Error loading insights:', error);
+        document.getElementById('insights-container').innerHTML = 
+            '<div class="insight-item warning"><small>⚠️ Error al cargar insights</small></div>';
+    }
+}
+
+function updateStatsDisplay(stats) {
+    document.getElementById('active-tasks').textContent = stats.active_tasks || stats.total_tasks || '-';
+    document.getElementById('users-home').textContent = stats.users_home || '-';
+    document.getElementById('pending-shopping').textContent = stats.shopping_pending || stats.pending_shopping || '-';
+    document.getElementById('completed-today').textContent = stats.completed_today || '-';
+    
+    const timestamp = new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
+    document.getElementById('data-timestamp').textContent = `Datos actualizados: ${timestamp}`;
+}
+
+async function updateStats() {
+    try {
+        const response = await fetch('/api/ai_status');
+        const data = await response.json();
+        if (data.data_stats && !data.data_stats.error) {
+            updateStatsDisplay(data.data_stats);
+        }
+    } catch (error) {
+        console.error('Error updating stats:', error);
+    }
+}
+
+function quickQuery(query) {
+    document.getElementById('chat-input').value = query;
+    sendMessage();
 }
 
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
     const loading = document.getElementById('loading');
-    const messagesContainer = document.getElementById('chat-messages');
     
     const message = input.value.trim();
     if (!message) return;
@@ -277,13 +574,18 @@ async function sendMessage() {
         
         if (data.answer) {
             addMessage('assistant', data.answer);
+            
+            // Actualizar estadísticas si están disponibles
+            if (data.context_data) {
+                updateStatsDisplay(data.context_data);
+            }
         } else {
             throw new Error('Respuesta vacía del asistente');
         }
         
     } catch (error) {
         console.error('Chat error:', error);
-        addErrorMessage(error.message || 'Error al comunicarse con el asistente');
+        addErrorMessage(error.message || 'Error al comunicarse con Casa AI');
     } finally {
         // Re-enable input and hide loading
         input.disabled = false;
@@ -318,11 +620,13 @@ function addErrorMessage(error) {
 }
 
 function formatAIResponse(content) {
-    // Basic markdown-like formatting
+    // Enhanced markdown-like formatting
     return escapeHtml(content)
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br>');
+        .replace(/\n/g, '<br>')
+        .replace(/###\s(.*?)(<br>|$)/g, '<h6 style="color: #667eea; margin: 10px 0 5px 0;">$1</h6>')
+        .replace(/##\s(.*?)(<br>|$)/g, '<h5 style="color: #667eea; margin: 15px 0 8px 0;">$1</h5>');
 }
 
 function escapeHtml(text) {
@@ -348,9 +652,11 @@ async function clearChat() {
             const messagesContainer = document.getElementById('chat-messages');
             messagesContainer.innerHTML = `
                 <div class="message assistant">
-                    <strong>Casa AI:</strong> ¡Historial limpiado! 🧹 ¿En qué puedo ayudarte ahora?
+                    <strong>Casa AI:</strong> ¡Historial limpiado! 🧹 Tengo acceso actualizado a todos los datos familiares. ¿En qué puedo ayudarte?
                 </div>
             `;
+            // Recargar insights después de limpiar
+            loadFamilyInsights();
         } else {
             throw new Error('Error al limpiar el chat');
         }

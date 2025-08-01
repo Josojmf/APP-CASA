@@ -8,6 +8,7 @@ import traceback
 import requests
 from ddgs import DDGS
 import logging
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +26,159 @@ def login_required(f):
             return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
     return decorated_function
+
+# ==========================================
+# Funciones para el servicio de IA mejorado
+# ==========================================
+def get_comprehensive_family_data():
+    """Obtener todos los datos familiares de la base de datos"""
+    try:
+        # 1. Usuarios y su estado
+        users = list(mongo.db.users.find())
+        users_info = []
+        total_tasks = 0
+        
+        for user in users:
+            user_tasks = user.get("tareas", [])
+            task_count = len(user_tasks)
+            total_tasks += task_count
+            
+            # Clasificar tareas por prioridad y fecha
+            urgent_tasks = [t for t in user_tasks if t.get("prioridad") == "alta"]
+            overdue_tasks = []
+            upcoming_tasks = []
+            
+            for task in user_tasks:
+                try:
+                    due_date = datetime.strptime(task.get("due_date", ""), "%Y-%m-%d")
+                    if due_date < datetime.now():
+                        overdue_tasks.append(task)
+                    elif due_date <= datetime.now() + timedelta(days=3):
+                        upcoming_tasks.append(task)
+                except:
+                    pass
+            
+            users_info.append({
+                "nombre": user.get("nombre"),
+                "encasa": user.get("encasa", False),
+                "total_tareas": task_count,
+                "tareas_urgentes": len(urgent_tasks),
+                "tareas_vencidas": len(overdue_tasks),
+                "tareas_proximas": len(upcoming_tasks),
+                "tareas_detalle": user_tasks,
+                "last_status_change": user.get("last_status_change")
+            })
+        
+        # 2. Lista de compra
+        shopping_items = list(mongo.db.lista_compra.find().sort("created_at", -1))
+        shopping_stats = {
+            "total_items": len(shopping_items),
+            "items_comprados": len([item for item in shopping_items if item.get("comprado", False)]),
+            "items_pendientes": len([item for item in shopping_items if not item.get("comprado", False)]),
+            "items_detalle": shopping_items
+        }
+        
+        # 3. Tareas completadas recientes
+        recent_completed = list(mongo.db.completed_tasks.find().sort("completed_at", -1).limit(10))
+        
+        # 4. Estadísticas generales
+        stats = {
+            "usuarios_en_casa": len([u for u in users_info if u["encasa"]]),
+            "usuarios_fuera": len([u for u in users_info if not u["encasa"]]),
+            "total_usuarios": len(users_info),
+            "total_tareas_activas": total_tasks,
+            "tareas_completadas_hoy": mongo.db.completed_tasks.count_documents({
+                "completed_at": {
+                    "$gte": datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                }
+            })
+        }
+        
+        return {
+            "usuarios": users_info,
+            "lista_compra": shopping_stats,
+            "tareas_completadas_recientes": recent_completed,
+            "estadisticas": stats,
+            "fecha_consulta": datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error get_comprehensive_family_data: {e}")
+        return {"error": "No se pudieron obtener los datos familiares"}
+
+def generate_ai_context(family_data, user_query):
+    """Generar contexto inteligente para la IA basado en la consulta"""
+    
+    if not family_data or "error" in family_data:
+        return "No hay datos familiares disponibles en este momento."
+    
+    # Análisis de la consulta para determinar qué información es relevante
+    query_lower = user_query.lower()
+    
+    context_parts = []
+    
+    # Información básica siempre incluida
+    stats = family_data["estadisticas"]
+    context_parts.append(f"""=== ESTADO ACTUAL DE LA FAMILIA ({family_data['fecha_consulta']}) ===
+• {stats['usuarios_en_casa']} usuarios en casa, {stats['usuarios_fuera']} fuera
+• {stats['total_tareas_activas']} tareas activas en total
+• {stats['tareas_completadas_hoy']} tareas completadas hoy
+• {family_data['lista_compra']['items_pendientes']} productos pendientes en lista de compra""")
+    
+    # Información específica según la consulta
+    if any(word in query_lower for word in ["tarea", "task", "trabajo", "hacer", "pendiente", "vencid", "urgent"]):
+        context_parts.append("\n=== INFORMACIÓN DE TAREAS ===")
+        for user in family_data["usuarios"]:
+            if user["total_tareas"] > 0:
+                context_parts.append(f"""
+• {user['nombre']}: {user['total_tareas']} tareas totales
+  - {user['tareas_urgentes']} urgentes
+  - {user['tareas_vencidas']} vencidas  
+  - {user['tareas_proximas']} próximas a vencer
+  
+  Tareas detalladas:""")
+                
+                for task in user["tareas_detalle"][:3]:  # Máximo 3 tareas por usuario
+                    prioridad = task.get("prioridad", "normal")
+                    fecha = task.get("due_date", "Sin fecha")
+                    context_parts.append(f"    - {task.get('titulo', 'Sin título')} (Prioridad: {prioridad}, Fecha: {fecha})")
+    
+    if any(word in query_lower for word in ["compra", "shopping", "mercado", "supermercado", "producto", "necesit"]):
+        context_parts.append(f"\n=== LISTA DE COMPRA ===")
+        context_parts.append(f"• {family_data['lista_compra']['items_pendientes']} productos pendientes")
+        context_parts.append(f"• {family_data['lista_compra']['items_comprados']} productos ya comprados")
+        
+        if family_data['lista_compra']['items_detalle']:
+            context_parts.append("\nProductos pendientes:")
+            for item in family_data['lista_compra']['items_detalle'][:8]:  # Máximo 8 items
+                if not item.get("comprado", False):
+                    cantidad = item.get("cantidad", "1")
+                    unidad = item.get("unidad", "")
+                    context_parts.append(f"  - {item.get('nombre', 'Sin nombre')} ({cantidad} {unidad})".strip())
+    
+    if any(word in query_lower for word in ["quien", "quién", "usuario", "persona", "casa", "fuera", "estado"]):
+        context_parts.append(f"\n=== ESTADO DE USUARIOS ===")
+        for user in family_data["usuarios"]:
+            estado = "🏠 En casa" if user["encasa"] else "🚶 Fuera"
+            context_parts.append(f"• {user['nombre']}: {estado} ({user['total_tareas']} tareas)")
+    
+    if any(word in query_lower for word in ["optimiz", "mejor", "eficien", "distribu", "balanc", "reparto"]):
+        context_parts.append(f"\n=== ANÁLISIS PARA OPTIMIZACIÓN ===")
+        # Usuario con más tareas
+        if family_data["usuarios"]:
+            max_tasks_user = max(family_data["usuarios"], key=lambda u: u["total_tareas"])
+            min_tasks_user = min(family_data["usuarios"], key=lambda u: u["total_tareas"])
+            
+            context_parts.append(f"• Usuario con más tareas: {max_tasks_user['nombre']} ({max_tasks_user['total_tareas']} tareas)")
+            context_parts.append(f"• Usuario con menos tareas: {min_tasks_user['nombre']} ({min_tasks_user['total_tareas']} tareas)")
+            
+            # Tareas vencidas y urgentes
+            total_overdue = sum(u["tareas_vencidas"] for u in family_data["usuarios"])
+            total_urgent = sum(u["tareas_urgentes"] for u in family_data["usuarios"])
+            context_parts.append(f"• Total tareas vencidas: {total_overdue}")
+            context_parts.append(f"• Total tareas urgentes: {total_urgent}")
+    
+    return "\n".join(context_parts)
 
 # ==========================================
 # Utilidades
@@ -75,7 +229,6 @@ def health_check():
         "timestamp": datetime.now().isoformat(),
         "version": "1.0.0"
     }), 200
-
 
 @main.route("/sw.js")
 def service_worker():
@@ -194,13 +347,6 @@ def add_event():
 
         result = mongo.db.events.insert_one(new_event)
         
-        # Notificar a todos los usuarios sobre el nuevo evento
-        send_push_to_all(
-            title="Nuevo evento en el calendario 🗓️",
-            body=f"{session.get('user')} añadió: {title}",
-            url="/calendario"
-        )
-
         return jsonify({
             "success": True, 
             "event_id": str(result.inserted_id)
@@ -208,9 +354,8 @@ def add_event():
     except Exception as e:
         logger.error(f"Error add_event: {e}")
         return jsonify({"error": "Error al añadir evento"}), 500
-    
 
-@main.route('/api/add_task', methods=['POST'])  # <-- Añade esta nueva ruta para tareas
+@main.route('/api/add_task', methods=['POST'])
 @login_required
 def add_task():
     try:
@@ -255,7 +400,6 @@ def add_task():
         logger.error(f"Error add_task: {e}")
         return jsonify({"error": "Error al añadir tarea"}), 500
 
-# Actualizar la ruta del calendario
 @main.route("/calendario")
 @login_required
 def calendario():
@@ -731,14 +875,18 @@ def get_chat_messages():
 @main.route("/asistente-familiar")
 @login_required
 def asistente_familiar_page():
-    """Página del asistente familiar con IA"""
+    """Página del asistente familiar con IA mejorada"""
     try:
         # Estadísticas del asistente
         chat_count = len(session.get("chat_history", []))
         
+        # Obtener datos familiares para mostrar en el dashboard
+        family_data = get_comprehensive_family_data()
+        
         stats = {
             "messages_in_session": chat_count,
-            "ai_available": bool(os.getenv("GROQ_API_KEY"))
+            "ai_available": bool(os.getenv("GROQ_API_KEY")),
+            "family_data": family_data if "error" not in family_data else None
         }
         
         return render_template("ai.html", stats=stats)
@@ -816,10 +964,301 @@ def test_push(username):
     except Exception as e:
         logger.error(f"Error test_push: {e}")
         return jsonify({"error": "Error interno"}), 500
-    
-    
-    
 
+# ==========================================
+# Rutas del servicio de IA mejorado
+# ==========================================
+
+@main.route("/api/chatfd", methods=["POST"])
+@login_required
+def chat_familiar():
+    """Chat con asistente familiar usando Groq con acceso completo a la base de datos"""
+    try:
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+
+        data = request.get_json()
+        q = data.get("prompt", "").strip()
+        if not q:
+            return jsonify({"error": "Prompt vacío"}), 400
+
+        API_KEY = os.getenv("GROQ_API_KEY")
+        if not API_KEY:
+            return jsonify({"error": "Servicio de IA no configurado"}), 500
+
+        # 📊 Obtener datos completos de la familia
+        family_data = get_comprehensive_family_data()
+        
+        # 🧠 Generar contexto inteligente basado en la consulta
+        smart_context = generate_ai_context(family_data, q)
+        
+        # --- Inicializar historial si no existe ---
+        if "chat_history" not in session:
+            session["chat_history"] = [
+                {
+                    "role": "system",
+                    "content": f"""Eres 'Casa AI', un asistente familiar inteligente que ayuda a optimizar la vida doméstica.
+
+CAPACIDADES PRINCIPALES:
+• Análisis y optimización de tareas familiares
+• Redistribución inteligente de responsabilidades  
+• Planificación de menús y gestión de compras
+• Consejos personalizados para el hogar
+• Análisis de patrones familiares y sugerencias de mejora
+
+INSTRUCCIONES IMPORTANTES:
+1. Usa SIEMPRE los datos actualizados de la base de datos para tus respuestas
+2. Proporciona insights específicos basados en los datos reales
+3. Sugiere optimizaciones concretas y actionables
+4. Sé proactivo identificando problemas y oportunidades
+5. Personaliza las respuestas según el contexto familiar actual
+6. Usa emojis para hacer las respuestas más amigables
+7. Si hay tareas vencidas o desequilibrios, menciónalos proactivamente
+
+DATOS ACTUALES DE LA FAMILIA:
+{smart_context}
+
+Responde de manera práctica, específica y útil usando esta información."""
+                }
+            ]
+        else:
+            # Actualizar el contexto del sistema con datos frescos
+            session["chat_history"][0]["content"] = f"""Eres 'Casa AI', un asistente familiar inteligente que ayuda a optimizar la vida doméstica.
+
+CAPACIDADES PRINCIPALES:
+• Análisis y optimización de tareas familiares
+• Redistribución inteligente de responsabilidades  
+• Planificación de menús y gestión de compras
+• Consejos personalizados para el hogar
+• Análisis de patrones familiares y sugerencias de mejora
+
+INSTRUCCIONES IMPORTANTES:
+1. Usa SIEMPRE los datos actualizados de la base de datos para tus respuestas
+2. Proporciona insights específicos basados en los datos reales
+3. Sugiere optimizaciones concretas y actionables
+4. Sé proactivo identificando problemas y oportunidades
+5. Personaliza las respuestas según el contexto familiar actual
+6. Usa emojis para hacer las respuestas más amigables
+7. Si hay tareas vencidas o desequilibrios, menciónalos proactivamente
+
+DATOS ACTUALIZADOS DE LA FAMILIA:
+{smart_context}
+
+Responde de manera práctica, específica y útil usando esta información."""
+
+        # Limitar historial
+        MAX_HISTORY = 15
+        if len(session["chat_history"]) > MAX_HISTORY:
+            session["chat_history"] = (
+                session["chat_history"][:1]
+                + session["chat_history"][-(MAX_HISTORY - 1):]
+            )
+
+        # Añadir mensaje del usuario
+        session["chat_history"].append({"role": "user", "content": q})
+
+        # --- Petición a Groq ---
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": session["chat_history"],
+            "max_tokens": 1000,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "stream": False,
+        }
+
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=45,
+        )
+
+        if resp.status_code != 200:
+            return jsonify({"error": f"Error del servicio de IA ({resp.status_code})"}), 500
+
+        response_data = resp.json()
+        answer = response_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        if not answer:
+            return jsonify({"error": "Respuesta vacía del servicio de IA"}), 500
+
+        # Añadir respuesta al historial
+        session["chat_history"].append({"role": "assistant", "content": answer})
+
+        # 📈 Datos adicionales para el frontend
+        additional_data = {
+            "data_timestamp": family_data.get("fecha_consulta"),
+            "active_tasks": family_data.get("estadisticas", {}).get("total_tareas_activas", 0),
+            "users_home": family_data.get("estadisticas", {}).get("usuarios_en_casa", 0),
+            "pending_shopping": family_data.get("lista_compra", {}).get("items_pendientes", 0),
+            "completed_today": family_data.get("estadisticas", {}).get("tareas_completadas_hoy", 0)
+        }
+
+        return jsonify({
+            "answer": answer, 
+            "status": "success", 
+            "model": "llama-3.1-8b-instant",
+            "context_data": additional_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error en chat_familiar: {traceback.format_exc()}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@main.route("/api/ai_status", methods=["GET"])
+@login_required
+def ai_status():
+    """Verificar estado del servicio de IA con información de datos"""
+    try:
+        API_KEY = os.getenv("GROQ_API_KEY")
+        has_api_key = bool(API_KEY)
+        
+        # Obtener estadísticas rápidas de la base de datos
+        db_stats = {}
+        if has_api_key:
+            try:
+                db_stats = {
+                    "total_users": mongo.db.users.count_documents({}),
+                    "active_tasks": sum(len(user.get("tareas", [])) for user in mongo.db.users.find()),
+                    "shopping_items": mongo.db.lista_compra.count_documents({}),
+                    "shopping_pending": mongo.db.lista_compra.count_documents({"comprado": {"$ne": True}}),
+                    "users_home": mongo.db.users.count_documents({"encasa": True}),
+                    "completed_today": mongo.db.completed_tasks.count_documents({
+                        "completed_at": {
+                            "$gte": datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                        }
+                    }),
+                    "last_data_update": datetime.now().strftime("%H:%M")
+                }
+            except Exception as e:
+                logger.warning(f"No se pudieron obtener estadísticas de BD: {e}")
+                db_stats = {"error": "Datos no disponibles"}
+
+        status = {
+            "available": has_api_key,
+            "model": "llama-3.1-8b-instant" if has_api_key else None,
+            "chat_history_length": len(session.get("chat_history", [])),
+            "provider": "Groq" if has_api_key else None,
+            "database_connected": "error" not in db_stats,
+            "data_stats": db_stats,
+            "capabilities": [
+                "📊 Análisis de tareas familiares",
+                "🔄 Optimización y redistribución",
+                "🛒 Gestión de lista de compra", 
+                "📈 Estadísticas familiares",
+                "💡 Sugerencias personalizadas"
+            ] if has_api_key else []
+        }
+
+        return jsonify(status)
+    except Exception as e:
+        logger.error(f"Error getting AI status: {e}")
+        return jsonify({"error": "Error al verificar estado de IA"}), 500
+
+@main.route("/api/family_insights", methods=["GET"])
+@login_required
+def get_family_insights():
+    """Obtener insights automáticos sobre la situación familiar"""
+    try:
+        family_data = get_comprehensive_family_data()
+        
+        if "error" in family_data:
+            return jsonify({"error": "No se pudieron obtener datos"}), 500
+        
+        insights = []
+        stats = family_data["estadisticas"]
+        
+        # Análisis de tareas
+        users = family_data["usuarios"]
+        if users:
+            max_tasks_user = max(users, key=lambda u: u["total_tareas"])
+            min_tasks_user = min(users, key=lambda u: u["total_tareas"])
+            
+            # Desequilibrio de tareas
+            if max_tasks_user["total_tareas"] - min_tasks_user["total_tareas"] >= 3:
+                insights.append({
+                    "type": "warning",
+                    "title": "⚖️ Desequilibrio de tareas detectado",
+                    "message": f"{max_tasks_user['nombre']} tiene {max_tasks_user['total_tareas']} tareas mientras que {min_tasks_user['nombre']} tiene {min_tasks_user['total_tareas']}",
+                    "suggestion": "Considera redistribuir algunas tareas para balancear la carga de trabajo"
+                })
+            
+            # Tareas vencidas
+            total_overdue = sum(u["tareas_vencidas"] for u in users)
+            if total_overdue > 0:
+                insights.append({
+                    "type": "urgent",
+                    "title": "🚨 Tareas vencidas",
+                    "message": f"Hay {total_overdue} tareas vencidas que requieren atención inmediata",
+                    "suggestion": "Prioriza completar las tareas vencidas o reprogramar las fechas"
+                })
+        
+        # Lista de compra
+        shopping = family_data["lista_compra"]
+        if shopping["items_pendientes"] > 10:
+            insights.append({
+                "type": "info",
+                "title": "🛒 Lista de compra larga",
+                "message": f"Tienes {shopping['items_pendientes']} productos pendientes en la lista",
+                "suggestion": "Considera organizar una ida al supermercado pronto"
+            })
+        
+        # Productividad diaria
+        if stats["tareas_completadas_hoy"] == 0 and stats["total_tareas_activas"] > 0:
+            insights.append({
+                "type": "motivation",
+                "title": "💪 ¡A por el día!",
+                "message": "Aún no se han completado tareas hoy",
+                "suggestion": "¿Qué tal empezar con una tarea pequeña para coger impulso?"
+            })
+        
+        return jsonify({
+            "insights": insights,
+            "stats_summary": {
+                "total_users": stats["total_usuarios"],
+                "users_home": stats["usuarios_en_casa"],
+                "active_tasks": stats["total_tareas_activas"],
+                "completed_today": stats["tareas_completadas_hoy"],
+                "shopping_pending": shopping["items_pendientes"]
+            },
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        })
+        
+    except Exception as e:
+        logger.error(f"Error get_family_insights: {e}")
+        return jsonify({"error": "Error al generar insights"}), 500
+
+@main.route("/api/clear_chat", methods=["POST"])
+@login_required
+def clear_chat_history():
+    """Limpiar el historial de chat del usuario"""
+    try:
+        session.pop("chat_history", None)
+        logger.info(f"Chat history cleared for user: {session.get('user')}")
+        return jsonify({"success": True, "message": "Historial de chat limpiado"})
+    except Exception as e:
+        logger.error(f"Error clearing chat history: {e}")
+        return jsonify({"error": "Error al limpiar historial"}), 500
+
+@main.route("/api/debug/family_data")
+@login_required  
+def debug_family_data():
+    """Endpoint de debug para ver los datos familiares"""
+    try:
+        # Solo permitir a usuarios autorizados
+        if session.get('user') not in ['Joso', 'Admin']:
+            return jsonify({"error": "No autorizado"}), 403
+            
+        family_data = get_comprehensive_family_data()
+        return jsonify(family_data)
+    except Exception as e:
+        logger.error(f"Error debug_family_data: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # ==========================================
 # Manejo de errores mejorado
