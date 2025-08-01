@@ -965,14 +965,296 @@ def test_push(username):
         logger.error(f"Error test_push: {e}")
         return jsonify({"error": "Error interno"}), 500
 
+def get_menu_data():
+    """Obtener datos completos de los menús de la semana"""
+    try:
+        menus = list(mongo.db.menus.find())
+        menu_data = {}
+        
+        dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+        
+        for dia in dias:
+            menu_data[dia] = {'comida': None, 'cena': None}
+        
+        for menu in menus:
+            dia = menu.get('dia')
+            momento = menu.get('momento')
+            titulo = menu.get('titulo')
+            
+            if dia in menu_data and momento in ['comida', 'cena'] and titulo:
+                menu_data[dia][momento] = {
+                    'titulo': titulo,
+                    'asignado': menu.get('asignaciones', {}).get(momento)
+                }
+        
+        return menu_data
+    except Exception as e:
+        logger.error(f"Error get_menu_data: {e}")
+        return {}
+
+def analyze_shopping_needs(menu_data, existing_shopping_items):
+    """Analizar necesidades de compra basado en menús y lista existente"""
+    try:
+        # Base de datos de ingredientes comunes por plato/tipo de comida
+        ingredient_database = {
+            # Carnes y proteínas
+            'pollo': ['pollo', 'aceite', 'sal', 'pimienta', 'ajo', 'cebolla'],
+            'pescado': ['pescado', 'limón', 'aceite', 'sal', 'ajo'],
+            'ternera': ['ternera', 'aceite', 'sal', 'pimienta', 'cebolla'],
+            'cerdo': ['cerdo', 'aceite', 'sal', 'pimienta'],
+            'hamburguesa': ['carne picada', 'pan hamburguesa', 'lechuga', 'tomate', 'cebolla', 'queso'],
+            
+            # Pasta y arroces
+            'pasta': ['pasta', 'tomate frito', 'aceite', 'ajo', 'queso parmesano'],
+            'espaguetis': ['espaguetis', 'tomate frito', 'aceite', 'ajo', 'albahaca'],
+            'macarrones': ['macarrones', 'tomate frito', 'queso', 'aceite'],
+            'arroz': ['arroz', 'aceite', 'sal', 'cebolla', 'ajo'],
+            'paella': ['arroz', 'azafrán', 'pollo', 'gambas', 'judías verdes', 'tomate', 'aceite'],
+            'risotto': ['arroz arborio', 'cebolla', 'vino blanco', 'queso parmesano', 'mantequilla'],
+            
+            # Verduras y ensaladas
+            'ensalada': ['lechuga', 'tomate', 'cebolla', 'aceite', 'vinagre'],
+            'gazpacho': ['tomate', 'pepino', 'pimiento', 'cebolla', 'ajo', 'aceite', 'vinagre', 'pan'],
+            'verduras': ['brócoli', 'zanahoria', 'calabacín', 'aceite', 'sal'],
+            
+            # Legumbres
+            'lentejas': ['lentejas', 'cebolla', 'zanahoria', 'ajo', 'laurel', 'aceite'],
+            'garbanzos': ['garbanzos', 'cebolla', 'tomate', 'pimiento', 'aceite', 'pimentón'],
+            'judías': ['judías blancas', 'cebolla', 'tomate', 'aceite', 'ajo'],
+            
+            # Huevos
+            'tortilla': ['huevos', 'patatas', 'cebolla', 'aceite', 'sal'],
+            'huevos': ['huevos', 'aceite', 'sal'],
+            
+            # Sopas
+            'sopa': ['caldo', 'verduras', 'fideos', 'aceite'],
+            'crema': ['calabaza', 'cebolla', 'nata', 'aceite', 'sal'],
+            
+            # Básicos siempre necesarios
+            'básicos': ['pan', 'leche', 'huevos', 'aceite', 'sal', 'azúcar', 'harina']
+        }
+        
+        # Obtener lista de productos ya existentes (en lowercase para comparación)
+        existing_items = set()
+        for item in existing_shopping_items:
+            if not item.get('comprado', False):  # Solo productos no comprados
+                existing_items.add(item.get('nombre', '').lower().strip())
+        
+        # Analizar menús y generar lista de ingredientes necesarios
+        needed_ingredients = set()
+        menu_analysis = []
+        
+        for dia, comidas in menu_data.items():
+            for momento, menu_info in comidas.items():
+                if menu_info and menu_info.get('titulo'):
+                    titulo = menu_info['titulo'].lower()
+                    menu_analysis.append(f"{dia} {momento}: {menu_info['titulo']}")
+                    
+                    # Buscar ingredientes basándose en palabras clave
+                    for key, ingredients in ingredient_database.items():
+                        if key in titulo:
+                            needed_ingredients.update(ingredients)
+                            break
+                    else:
+                        # Si no encuentra coincidencias específicas, añadir ingredientes básicos
+                        needed_ingredients.update(['aceite', 'sal', 'ajo', 'cebolla'])
+        
+        # Añadir básicos siempre necesarios
+        needed_ingredients.update(ingredient_database['básicos'])
+        
+        # Filtrar ingredientes que ya están en la lista
+        missing_ingredients = []
+        for ingredient in needed_ingredients:
+            if ingredient not in existing_items:
+                missing_ingredients.append(ingredient.title())
+        
+        return {
+            'menu_analysis': menu_analysis,
+            'needed_ingredients': sorted(list(needed_ingredients)),
+            'missing_ingredients': sorted(missing_ingredients),
+            'existing_items': sorted(list(existing_items))
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyze_shopping_needs: {e}")
+        return {
+            'menu_analysis': [],
+            'needed_ingredients': [],
+            'missing_ingredients': [],
+            'existing_items': []
+        }
+
+def generate_enhanced_ai_context(family_data, user_query):
+    """Generar contexto mejorado incluyendo análisis de menús y compras"""
+    
+    if not family_data or "error" in family_data:
+        return "No hay datos familiares disponibles en este momento."
+    
+    # Obtener contexto básico
+    basic_context = generate_ai_context(family_data, user_query)
+    
+    # Análisis de consulta para contenido de menús/compras
+    query_lower = user_query.lower()
+    
+    # Si la consulta incluye palabras relacionadas con compras/menús
+    if any(word in query_lower for word in ["compra", "menu", "menú", "ingrediente", "cocin", "receta", "product", "necesit", "falta", "añadir", "agregar"]):
+        try:
+            # Obtener datos de menús
+            menu_data = get_menu_data()
+            existing_shopping = family_data.get('lista_compra', {}).get('items_detalle', [])
+            
+            # Analizar necesidades de compra
+            shopping_analysis = analyze_shopping_needs(menu_data, existing_shopping)
+            
+            enhanced_context = basic_context + f"""
+
+=== ANÁLISIS DE MENÚS Y COMPRAS ===
+
+MENÚS DE LA SEMANA:
+{chr(10).join(['• ' + menu for menu in shopping_analysis['menu_analysis']])}
+
+ANÁLISIS DE INGREDIENTES:
+• Ingredientes necesarios para los menús: {len(shopping_analysis['needed_ingredients'])} productos
+• Productos que faltan en la lista: {len(shopping_analysis['missing_ingredients'])} productos
+• Productos ya en lista pendiente: {len(shopping_analysis['existing_items'])} productos
+
+PRODUCTOS QUE FALTAN Y DEBERÍAN AÑADIRSE:
+{chr(10).join(['• ' + item for item in shopping_analysis['missing_ingredients'][:15]])}
+
+INSTRUCCIONES ESPECIALES PARA COMPRAS:
+1. Si el usuario pregunta sobre qué comprar o qué falta, usa esta información
+2. Si el usuario confirma añadir productos, utiliza la función add_shopping_items_bulk
+3. Sugiere productos específicos basados en los menús planificados
+4. Prioriza ingredientes que faltan para menús próximos
+"""
+            return enhanced_context
+            
+        except Exception as e:
+            logger.error(f"Error generating enhanced context: {e}")
+    
+    return basic_context
+
 # ==========================================
-# Rutas del servicio de IA mejorado
+# FUNCIÓN PARA AÑADIR PRODUCTOS EN LOTE
 # ==========================================
+
+@main.route('/api/add_shopping_items_bulk', methods=['POST'])
+@login_required
+def add_shopping_items_bulk():
+    """Añadir múltiples productos a la lista de compra de una vez"""
+    try:
+        data = request.get_json()
+        products = data.get('products', [])
+        
+        if not products or not isinstance(products, list):
+            return jsonify({"error": "Lista de productos vacía o inválida"}), 400
+        
+        added_count = 0
+        skipped_count = 0
+        added_products = []
+        
+        for product_name in products:
+            product_name = product_name.strip().title()
+            
+            if not product_name:
+                continue
+                
+            # Verificar si ya existe
+            existing = mongo.db.lista_compra.find_one(
+                {"nombre": {"$regex": f"^{product_name}$", "$options": "i"}}
+            )
+            
+            if existing:
+                skipped_count += 1
+                continue
+            
+            # Añadir producto
+            new_item = {
+                "nombre": product_name,
+                "cantidad": "1",
+                "unidad": "",
+                "comprado": False,
+                "created_by": session.get("user"),
+                "created_at": datetime.now(),
+                "added_by_ai": True  # Marcar como añadido por IA
+            }
+            
+            mongo.db.lista_compra.insert_one(new_item)
+            added_count += 1
+            added_products.append(product_name)
+        
+        # Notificar si se añadieron productos
+        if added_count > 0:
+            products_text = ", ".join(added_products[:5])
+            if len(added_products) > 5:
+                products_text += f" y {len(added_products) - 5} más"
+                
+            # Notificación push (si existe la función)
+            try:
+                # Importar función de notificaciones si existe
+                from app.api import send_push_to_all
+                send_push_to_all(
+                    title="🛒 Productos añadidos por Casa AI",
+                    body=f"Se añadieron {added_count} productos: {products_text}",
+                    url="/lista_compra"
+                )
+            except ImportError:
+                pass  # Si no existe la función de push, continuar sin error
+        
+        return jsonify({
+            "success": True,
+            "added_count": added_count,
+            "skipped_count": skipped_count,
+            "added_products": added_products,
+            "message": f"Se añadieron {added_count} productos a la lista de compra"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error add_shopping_items_bulk: {e}")
+        return jsonify({"error": "Error al añadir productos"}), 500
+
+# ==========================================
+# RUTA PARA ANÁLISIS DE COMPRAS
+# ==========================================
+
+@main.route('/api/shopping_analysis', methods=['GET'])
+@login_required
+def get_shopping_analysis():
+    """Obtener análisis detallado de necesidades de compra"""
+    try:
+        # Obtener datos
+        menu_data = get_menu_data()
+        shopping_items = list(mongo.db.lista_compra.find().sort("created_at", -1))
+        
+        # Realizar análisis
+        analysis = analyze_shopping_needs(menu_data, shopping_items)
+        
+        return jsonify({
+            "success": True,
+            "analysis": analysis,
+            "summary": {
+                "total_menus": sum(1 for dia in menu_data.values() 
+                                 for comida in dia.values() if comida),
+                "missing_ingredients": len(analysis['missing_ingredients']),
+                "existing_items": len(analysis['existing_items'])
+            },
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        })
+        
+    except Exception as e:
+        logger.error(f"Error get_shopping_analysis: {e}")
+        return jsonify({"error": "Error al generar análisis"}), 500
+
+# ==========================================
+# MODIFICAR LA FUNCIÓN CHAT_FAMILIAR EXISTENTE
+# ==========================================
+
+# REEMPLAZAR la función chat_familiar() existente con esta versión mejorada:
 
 @main.route("/api/chatfd", methods=["POST"])
 @login_required
 def chat_familiar():
-    """Chat con asistente familiar usando Groq con acceso completo a la base de datos"""
+    """Chat con asistente familiar con capacidades de gestión de compras"""
     try:
         if not request.is_json:
             return jsonify({"error": "Content-Type debe ser application/json"}), 400
@@ -989,75 +1271,90 @@ def chat_familiar():
         # 📊 Obtener datos completos de la familia
         family_data = get_comprehensive_family_data()
         
-        # 🧠 Generar contexto inteligente basado en la consulta
-        smart_context = generate_ai_context(family_data, q)
+        # 🧠 Generar contexto inteligente mejorado (incluye menús y compras)
+        smart_context = generate_enhanced_ai_context(family_data, q)
         
-        # --- Inicializar historial si no existe ---
+        # Detectar si es una confirmación para añadir productos
+        is_confirmation = any(word in q.lower() for word in ["sí", "si", "vale", "ok", "añade", "agrega", "confirmo", "acepto"])
+        
+        # Inicializar historial si no existe
         if "chat_history" not in session:
             session["chat_history"] = [
                 {
                     "role": "system",
-                    "content": f"""Eres 'Casa AI', un asistente familiar inteligente que ayuda a optimizar la vida doméstica.
+                    "content": f"""Eres 'Casa AI', un asistente familiar inteligente especializado en optimización doméstica.
 
 CAPACIDADES PRINCIPALES:
 • Análisis y optimización de tareas familiares
-• Redistribución inteligente de responsabilidades  
-• Planificación de menús y gestión de compras
-• Consejos personalizados para el hogar
-• Análisis de patrones familiares y sugerencias de mejora
+• Gestión inteligente de lista de compra basada en menús
+• Análisis de ingredientes necesarios vs disponibles
+• Recomendaciones automáticas de productos a comprar
+• Planificación de menús y consejos de cocina
+• Sugerencias personalizadas para el hogar
 
 INSTRUCCIONES IMPORTANTES:
-1. Usa SIEMPRE los datos actualizados de la base de datos para tus respuestas
-2. Proporciona insights específicos basados en los datos reales
-3. Sugiere optimizaciones concretas y actionables
-4. Sé proactivo identificando problemas y oportunidades
-5. Personaliza las respuestas según el contexto familiar actual
-6. Usa emojis para hacer las respuestas más amigables
-7. Si hay tareas vencidas o desequilibrios, menciónalos proactivamente
+1. Usa SIEMPRE los datos actualizados para tus respuestas
+2. Cuando analices necesidades de compra, sé específico con productos faltantes
+3. Si recomiendas añadir productos, pregunta SIEMPRE al usuario si quiere que los añadas automáticamente
+4. Si el usuario confirma añadir productos, responde con un JSON especial (ver formato abajo)
+5. Prioriza ingredientes para menús de los próximos días
+6. Sugiere cantidades aproximadas cuando sea relevante
 
-DATOS ACTUALES DE LA FAMILIA:
+FORMATO ESPECIAL PARA AÑADIR PRODUCTOS:
+Si el usuario confirma que quiere añadir productos, responde con:
+```json
+{{"action": "add_products", "products": ["Producto 1", "Producto 2", "etc"], "message": "Tu mensaje explicativo"}}
+```
+
+DATOS ACTUALES:
 {smart_context}
 
-Responde de manera práctica, específica y útil usando esta información."""
+Responde de manera práctica y específica."""
                 }
             ]
         else:
-            # Actualizar el contexto del sistema con datos frescos
-            session["chat_history"][0]["content"] = f"""Eres 'Casa AI', un asistente familiar inteligente que ayuda a optimizar la vida doméstica.
+            # Actualizar contexto con datos frescos
+            session["chat_history"][0]["content"] = f"""Eres 'Casa AI', un asistente familiar inteligente especializado en optimización doméstica.
 
 CAPACIDADES PRINCIPALES:
 • Análisis y optimización de tareas familiares
-• Redistribución inteligente de responsabilidades  
-• Planificación de menús y gestión de compras
-• Consejos personalizados para el hogar
-• Análisis de patrones familiares y sugerencias de mejora
+• Gestión inteligente de lista de compra basada en menús
+• Análisis de ingredientes necesarios vs disponibles
+• Recomendaciones automáticas de productos a comprar
+• Planificación de menús y consejos de cocina
+• Sugerencias personalizadas para el hogar
 
 INSTRUCCIONES IMPORTANTES:
-1. Usa SIEMPRE los datos actualizados de la base de datos para tus respuestas
-2. Proporciona insights específicos basados en los datos reales
-3. Sugiere optimizaciones concretas y actionables
-4. Sé proactivo identificando problemas y oportunidades
-5. Personaliza las respuestas según el contexto familiar actual
-6. Usa emojis para hacer las respuestas más amigables
-7. Si hay tareas vencidas o desequilibrios, menciónalos proactivamente
+1. Usa SIEMPRE los datos actualizados para tus respuestas
+2. Cuando analices necesidades de compra, sé específico con productos faltantes
+3. Si recomiendas añadir productos, pregunta SIEMPRE al usuario si quiere que los añadas automáticamente
+4. Si el usuario confirma añadir productos, responde con un JSON especial (ver formato abajo)
+5. Prioriza ingredientes para menús de los próximos días
+6. Sugiere cantidades aproximadas cuando sea relevante
 
-DATOS ACTUALIZADOS DE LA FAMILIA:
+FORMATO ESPECIAL PARA AÑADIR PRODUCTOS:
+Si el usuario confirma que quiere añadir productos, responde con:
+```json
+{{"action": "add_products", "products": ["Producto 1", "Producto 2", "etc"], "message": "Tu mensaje explicativo"}}
+```
+
+DATOS ACTUALIZADOS:
 {smart_context}
 
-Responde de manera práctica, específica y útil usando esta información."""
+Responde de manera práctica y específica."""
 
         # Limitar historial
         MAX_HISTORY = 15
         if len(session["chat_history"]) > MAX_HISTORY:
             session["chat_history"] = (
-                session["chat_history"][:1]
-                + session["chat_history"][-(MAX_HISTORY - 1):]
+                session["chat_history"][:1] + 
+                session["chat_history"][-(MAX_HISTORY - 1):]
             )
 
         # Añadir mensaje del usuario
         session["chat_history"].append({"role": "user", "content": q})
 
-        # --- Petición a Groq ---
+        # Petición a Groq
         headers = {
             "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json",
@@ -1066,7 +1363,7 @@ Responde de manera práctica, específica y útil usando esta información."""
         payload = {
             "model": "llama-3.1-8b-instant",
             "messages": session["chat_history"],
-            "max_tokens": 1000,
+            "max_tokens": 1200,
             "temperature": 0.7,
             "top_p": 0.9,
             "stream": False,
@@ -1084,13 +1381,52 @@ Responde de manera práctica, específica y útil usando esta información."""
 
         response_data = resp.json()
         answer = response_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        
         if not answer:
             return jsonify({"error": "Respuesta vacía del servicio de IA"}), 500
+
+        # Procesar respuesta especial para añadir productos
+        action_performed = None
+        if "```json" in answer and '"action": "add_products"' in answer:
+            try:
+                # Extraer JSON de la respuesta
+                json_start = answer.find("```json") + 7
+                json_end = answer.find("```", json_start)
+                json_str = answer[json_start:json_end].strip()
+                
+                action_data = json.loads(json_str)
+                
+                if action_data.get("action") == "add_products":
+                    products = action_data.get("products", [])
+                    
+                    if products:
+                        # Añadir productos automáticamente
+                        bulk_response = requests.post(
+                            request.url_root + 'api/add_shopping_items_bulk',
+                            json={"products": products},
+                            headers={"Content-Type": "application/json"},
+                            cookies=request.cookies
+                        )
+                        
+                        if bulk_response.status_code == 200:
+                            bulk_data = bulk_response.json()
+                            action_performed = {
+                                "type": "products_added",
+                                "added_count": bulk_data.get("added_count", 0),
+                                "added_products": bulk_data.get("added_products", []),
+                                "skipped_count": bulk_data.get("skipped_count", 0)
+                            }
+                            
+                            # Limpiar el JSON de la respuesta para mostrar solo el mensaje
+                            answer = action_data.get("message", "Productos añadidos correctamente")
+                            
+            except Exception as e:
+                logger.error(f"Error procesando acción de productos: {e}")
 
         # Añadir respuesta al historial
         session["chat_history"].append({"role": "assistant", "content": answer})
 
-        # 📈 Datos adicionales para el frontend
+        # Datos adicionales para el frontend
         additional_data = {
             "data_timestamp": family_data.get("fecha_consulta"),
             "active_tasks": family_data.get("estadisticas", {}).get("total_tareas_activas", 0),
@@ -1099,166 +1435,22 @@ Responde de manera práctica, específica y útil usando esta información."""
             "completed_today": family_data.get("estadisticas", {}).get("tareas_completadas_hoy", 0)
         }
 
-        return jsonify({
-            "answer": answer, 
-            "status": "success", 
+        response = {
+            "answer": answer,
+            "status": "success",
             "model": "llama-3.1-8b-instant",
             "context_data": additional_data
-        })
+        }
+        
+        # Añadir información de acción si se realizó
+        if action_performed:
+            response["action_performed"] = action_performed
+
+        return jsonify(response)
 
     except Exception as e:
         logger.error(f"Error en chat_familiar: {traceback.format_exc()}")
         return jsonify({"error": "Error interno del servidor"}), 500
-
-@main.route("/api/ai_status", methods=["GET"])
-@login_required
-def ai_status():
-    """Verificar estado del servicio de IA con información de datos"""
-    try:
-        API_KEY = os.getenv("GROQ_API_KEY")
-        has_api_key = bool(API_KEY)
-        
-        # Obtener estadísticas rápidas de la base de datos
-        db_stats = {}
-        if has_api_key:
-            try:
-                db_stats = {
-                    "total_users": mongo.db.users.count_documents({}),
-                    "active_tasks": sum(len(user.get("tareas", [])) for user in mongo.db.users.find()),
-                    "shopping_items": mongo.db.lista_compra.count_documents({}),
-                    "shopping_pending": mongo.db.lista_compra.count_documents({"comprado": {"$ne": True}}),
-                    "users_home": mongo.db.users.count_documents({"encasa": True}),
-                    "completed_today": mongo.db.completed_tasks.count_documents({
-                        "completed_at": {
-                            "$gte": datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                        }
-                    }),
-                    "last_data_update": datetime.now().strftime("%H:%M")
-                }
-            except Exception as e:
-                logger.warning(f"No se pudieron obtener estadísticas de BD: {e}")
-                db_stats = {"error": "Datos no disponibles"}
-
-        status = {
-            "available": has_api_key,
-            "model": "llama-3.1-8b-instant" if has_api_key else None,
-            "chat_history_length": len(session.get("chat_history", [])),
-            "provider": "Groq" if has_api_key else None,
-            "database_connected": "error" not in db_stats,
-            "data_stats": db_stats,
-            "capabilities": [
-                "📊 Análisis de tareas familiares",
-                "🔄 Optimización y redistribución",
-                "🛒 Gestión de lista de compra", 
-                "📈 Estadísticas familiares",
-                "💡 Sugerencias personalizadas"
-            ] if has_api_key else []
-        }
-
-        return jsonify(status)
-    except Exception as e:
-        logger.error(f"Error getting AI status: {e}")
-        return jsonify({"error": "Error al verificar estado de IA"}), 500
-
-@main.route("/api/family_insights", methods=["GET"])
-@login_required
-def get_family_insights():
-    """Obtener insights automáticos sobre la situación familiar"""
-    try:
-        family_data = get_comprehensive_family_data()
-        
-        if "error" in family_data:
-            return jsonify({"error": "No se pudieron obtener datos"}), 500
-        
-        insights = []
-        stats = family_data["estadisticas"]
-        
-        # Análisis de tareas
-        users = family_data["usuarios"]
-        if users:
-            max_tasks_user = max(users, key=lambda u: u["total_tareas"])
-            min_tasks_user = min(users, key=lambda u: u["total_tareas"])
-            
-            # Desequilibrio de tareas
-            if max_tasks_user["total_tareas"] - min_tasks_user["total_tareas"] >= 3:
-                insights.append({
-                    "type": "warning",
-                    "title": "⚖️ Desequilibrio de tareas detectado",
-                    "message": f"{max_tasks_user['nombre']} tiene {max_tasks_user['total_tareas']} tareas mientras que {min_tasks_user['nombre']} tiene {min_tasks_user['total_tareas']}",
-                    "suggestion": "Considera redistribuir algunas tareas para balancear la carga de trabajo"
-                })
-            
-            # Tareas vencidas
-            total_overdue = sum(u["tareas_vencidas"] for u in users)
-            if total_overdue > 0:
-                insights.append({
-                    "type": "urgent",
-                    "title": "🚨 Tareas vencidas",
-                    "message": f"Hay {total_overdue} tareas vencidas que requieren atención inmediata",
-                    "suggestion": "Prioriza completar las tareas vencidas o reprogramar las fechas"
-                })
-        
-        # Lista de compra
-        shopping = family_data["lista_compra"]
-        if shopping["items_pendientes"] > 10:
-            insights.append({
-                "type": "info",
-                "title": "🛒 Lista de compra larga",
-                "message": f"Tienes {shopping['items_pendientes']} productos pendientes en la lista",
-                "suggestion": "Considera organizar una ida al supermercado pronto"
-            })
-        
-        # Productividad diaria
-        if stats["tareas_completadas_hoy"] == 0 and stats["total_tareas_activas"] > 0:
-            insights.append({
-                "type": "motivation",
-                "title": "💪 ¡A por el día!",
-                "message": "Aún no se han completado tareas hoy",
-                "suggestion": "¿Qué tal empezar con una tarea pequeña para coger impulso?"
-            })
-        
-        return jsonify({
-            "insights": insights,
-            "stats_summary": {
-                "total_users": stats["total_usuarios"],
-                "users_home": stats["usuarios_en_casa"],
-                "active_tasks": stats["total_tareas_activas"],
-                "completed_today": stats["tareas_completadas_hoy"],
-                "shopping_pending": shopping["items_pendientes"]
-            },
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-        })
-        
-    except Exception as e:
-        logger.error(f"Error get_family_insights: {e}")
-        return jsonify({"error": "Error al generar insights"}), 500
-
-@main.route("/api/clear_chat", methods=["POST"])
-@login_required
-def clear_chat_history():
-    """Limpiar el historial de chat del usuario"""
-    try:
-        session.pop("chat_history", None)
-        logger.info(f"Chat history cleared for user: {session.get('user')}")
-        return jsonify({"success": True, "message": "Historial de chat limpiado"})
-    except Exception as e:
-        logger.error(f"Error clearing chat history: {e}")
-        return jsonify({"error": "Error al limpiar historial"}), 500
-
-@main.route("/api/debug/family_data")
-@login_required  
-def debug_family_data():
-    """Endpoint de debug para ver los datos familiares"""
-    try:
-        # Solo permitir a usuarios autorizados
-        if session.get('user') not in ['Joso', 'Admin']:
-            return jsonify({"error": "No autorizado"}), 403
-            
-        family_data = get_comprehensive_family_data()
-        return jsonify(family_data)
-    except Exception as e:
-        logger.error(f"Error debug_family_data: {e}")
-        return jsonify({"error": str(e)}), 500
 
 # ==========================================
 # Manejo de errores mejorado
