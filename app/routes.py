@@ -284,22 +284,6 @@ def toggle_theme():
     session["theme"] = new_theme
     return jsonify({"success": True})
 
-@main.route("/mapa")
-def mapa():
-    usuarios = list(mongo.db.users.find({}, {"nombre": 1, "last_location": 1, "imagen": 1}))
-    posiciones = []
-    for user in usuarios:
-        loc = user.get("last_location")
-        if loc and "lat" in loc and "lon" in loc:
-            posiciones.append({
-                "user": user["nombre"],
-                "lat": loc["lat"],
-                "lon": loc["lon"],
-                "time": loc.get("time"),
-                "imagen": user.get("imagen") or "/static/img/default-avatar.png"
-            })
-    return render_template("mapa.html", posiciones=posiciones)
-
 @main.route("/chat")
 def chat():
     if "user" not in session:
