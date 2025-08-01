@@ -615,17 +615,7 @@ def delete_user(user_id):
     try:
         current_user = session.get('user')
         logger.info(f"Intento de eliminación por: {current_user}, ID objetivo: {user_id}")
-        
-        # Verificar permisos (solo Joso puede eliminar usuarios)
-        if current_user != 'Joso' or current_user != 'joso':
-            logger.warning(f"Intento no autorizado de eliminación por: {current_user}")
-            return jsonify({
-                "error": "Permisos insuficientes",
-                "message": "Solo el administrador puede eliminar usuarios"
-            }), 403
-
         obj_id = ObjectId(user_id)
-        
         # Obtener información del usuario antes de eliminar
         user = mongo.db.users.find_one({"_id": obj_id})
         if not user:
