@@ -2,55 +2,134 @@
 :root {
   --primary-color: #6366f1;
   --primary-hover: #5855eb;
+  --primary-light: #8b5cf6;
   --success-color: #10b981;
+  --success-hover: #059669;
   --danger-color: #ef4444;
   --danger-hover: #dc2626;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+  
   --bg-color: #f8fafc;
+  --bg-secondary: #f1f5f9;
   --card-bg: #ffffff;
   --text-primary: #1f2937;
   --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
   --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
+  
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --gradient-success: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
   --gradient-danger: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  --gradient-warning: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 20px;
+  --border-radius-2xl: 24px;
+  
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --transition-bounce: 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 /* Tema oscuro */
 .dark {
   --bg-color: #0f172a;
+  --bg-secondary: #1e293b;
   --card-bg: #1e293b;
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   --border-color: #334155;
+  --border-light: #475569;
 }
 
 /* Estilos base mejorados */
-body {
-  background: var(--bg-color);
-  transition: background-color 0.3s ease, color 0.3s ease;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+* {
+  box-sizing: border-box;
 }
 
+body {
+  background: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  margin: 0;
+  padding: 20px;
+  transition: all var(--transition-normal);
+  overflow-x: hidden;
+}
+
+/* Contenedor principal */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Título principal */
 .title {
   text-align: center;
-  font-size: 2.5rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
   background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 3rem;
-  animation: fadeInUp 0.8s ease-out;
+  margin: 0 0 4rem 0;
+  position: relative;
+  animation: titleSlideIn 1s var(--transition-bounce);
 }
 
-/* Animaciones base */
+.title::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  background: var(--gradient-primary);
+  border-radius: 2px;
+  animation: titleUnderlineGrow 1.2s ease-out 0.5s both;
+}
+
+/* Animaciones principales */
+@keyframes titleSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes titleUnderlineGrow {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100px;
+  }
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(40px);
   }
   to {
     opacity: 1;
@@ -61,7 +140,7 @@ body {
 @keyframes slideInLeft {
   from {
     opacity: 0;
-    transform: translateX(-30px);
+    transform: translateX(-50px);
   }
   to {
     opacity: 1;
@@ -87,21 +166,40 @@ body {
   }
 }
 
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(20px);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-10px);
+  }
+  70% {
+    transform: scale(0.95) translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Secciones principales */
 .theme-toggle, 
 .task-management,
 .user-management {
   background: var(--card-bg);
   margin: 2rem auto;
-  padding: 2rem;
-  border-radius: 24px;
+  padding: 2.5rem;
+  border-radius: var(--border-radius-2xl);
   box-shadow: var(--shadow-lg);
-  max-width: 600px;
+  max-width: 700px;
   border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: fadeInUp 0.6s ease-out;
+  transition: all var(--transition-normal);
+  animation: fadeInUp 0.8s ease-out;
+  backdrop-filter: blur(10px);
 }
 
 .theme-toggle:nth-child(2) { animation-delay: 0.1s; }
@@ -111,28 +209,28 @@ body {
 .theme-toggle:hover,
 .task-management:hover,
 .user-management:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--shadow-xl);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-2xl);
   border-color: var(--primary-color);
 }
 
-/* Efecto de brillo en hover */
+/* Efecto de brillo mejorado */
 .theme-toggle::before,
 .task-management::before,
 .user-management::before {
   content: '';
   position: absolute;
   top: 0;
-  left: -200px;
-  width: 200px;
+  left: -100%;
+  width: 100%;
   height: 100%;
   background: linear-gradient(
-    90deg,
+    120deg,
     transparent,
     rgba(255, 255, 255, 0.1),
     transparent
   );
-  transition: left 0.5s;
+  transition: left var(--transition-slow);
 }
 
 .theme-toggle:hover::before,
@@ -141,14 +239,27 @@ body {
   left: 100%;
 }
 
-/* Títulos de sección */
+/* Títulos de sección mejorados */
 h2 {
-  margin-bottom: 1.5rem;
-  font-size: 1.8rem;
+  margin-bottom: 2rem;
+  font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
   position: relative;
-  padding-bottom: 0.5rem;
+  padding-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+h2::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 30px;
+  background: var(--gradient-primary);
+  border-radius: 3px;
+  animation: bounceIn 0.6s ease-out;
 }
 
 h2::after {
@@ -156,23 +267,24 @@ h2::after {
   position: absolute;
   bottom: 0;
   left: 0;
-  width: 60px;
+  width: 80px;
   height: 3px;
   background: var(--gradient-primary);
   border-radius: 2px;
-  transition: width 0.3s ease;
+  transition: width var(--transition-normal);
 }
 
 h2:hover::after {
-  width: 120px;
+  width: 150px;
 }
 
-/* Toggle switch mejorado */
+/* Toggle switch ultra mejorado */
 .switch {
   position: relative;
   display: inline-block;
-  width: 80px;
-  height: 44px;
+  width: 90px;
+  height: 50px;
+  margin: 10px 0;
 }
 
 .switch input { 
@@ -187,85 +299,110 @@ h2:hover::after {
   right: 0; 
   bottom: 0;
   background: linear-gradient(145deg, #e2e8f0, #cbd5e1);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 44px;
+  transition: all var(--transition-bounce);
+  border-radius: 50px;
   box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.1),
-    0 2px 8px rgba(0, 0, 0, 0.1);
+    inset 0 2px 8px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
 }
 
-.slider:before {
-  position: absolute;
+.slider::before {
   content: "";
-  height: 36px;
-  width: 36px;
+  position: absolute;
+  height: 42px;
+  width: 42px;
   left: 4px;
   bottom: 4px;
-  background: linear-gradient(145deg, #ffffff, #f1f5f9);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  transition: all var(--transition-bounce);
   border-radius: 50%;
   box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.15),
+    0 6px 12px rgba(0, 0, 0, 0.2),
     0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
 }
 
-.slider:after {
+.slider::after {
   content: '☀️';
   position: absolute;
   top: 50%;
-  left: 12px;
+  left: 15px;
   transform: translateY(-50%);
-  font-size: 1.2rem;
-  transition: all 0.4s ease;
+  font-size: 1.4rem;
+  transition: all var(--transition-normal);
+  z-index: 1;
 }
 
 input:checked + .slider {
   background: var(--gradient-primary);
   box-shadow: 
-    inset 0 2px 4px rgba(99, 102, 241, 0.3),
-    0 0 20px rgba(99, 102, 241, 0.3);
+    inset 0 2px 8px rgba(99, 102, 241, 0.3),
+    0 0 25px rgba(99, 102, 241, 0.4);
 }
 
-input:checked + .slider:before {
-  transform: translateX(36px);
+input:checked + .slider::before {
+  transform: translateX(40px) scale(1.1);
   background: linear-gradient(145deg, #f8fafc, #e2e8f0);
 }
 
-input:checked + .slider:after {
+input:checked + .slider::after {
   content: '🌙';
-  left: 20px;
+  left: 25px;
+  transform: translateY(-50%) rotate(360deg);
 }
 
 .slider:hover {
   transform: scale(1.05);
 }
 
-/* Botón de limpiar tareas */
+.slider:active {
+  transform: scale(0.98);
+}
+
+/* Botón de limpiar tareas mejorado */
 #clearTasksBtn {
   background: var(--gradient-danger);
   color: white;
   border: none;
-  padding: 1rem 2rem;
-  border-radius: 16px;
+  padding: 1.25rem 2.5rem;
+  border-radius: var(--border-radius-xl);
   cursor: pointer;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.1rem;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow-md);
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-lg);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 200px;
 }
 
 #clearTasksBtn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: var(--shadow-xl);
 }
 
 #clearTasksBtn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 #clearTasksBtn::before {
+  content: '🗑️';
+  position: absolute;
+  top: 50%;
+  left: -40px;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  transition: left var(--transition-normal);
+}
+
+#clearTasksBtn:hover::before {
+  left: 15px;
+}
+
+#clearTasksBtn::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -278,107 +415,167 @@ input:checked + .slider:after {
   transition: width 0.6s, height 0.6s;
 }
 
-#clearTasksBtn:active::before {
+#clearTasksBtn:active::after {
   width: 300px;
   height: 300px;
 }
 
-/* Formulario de añadir usuario */
+/* Formulario de añadir usuario MEJORADO */
 form#addUserForm {
   width: 100%;
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  animation: slideInLeft 0.6s ease-out;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  animation: slideInLeft 0.8s ease-out;
+  align-items: end;
 }
 
 #addUserForm input {
-  flex: 1;
-  padding: 1rem 1.2rem;
-  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--border-radius-lg);
   border: 2px solid var(--border-color);
   font-size: 1rem;
   background: var(--card-bg);
   color: var(--text-primary);
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
   position: relative;
+  font-family: inherit;
+  box-shadow: var(--shadow-sm);
 }
 
 #addUserForm input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1), var(--shadow-md);
   transform: translateY(-2px);
+}
+
+#addUserForm input:hover {
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-md);
+}
+
+#addUserForm input[type="text"]::placeholder {
+  color: var(--text-muted);
+  transition: color var(--transition-normal);
+}
+
+#addUserForm input[type="text"]:focus::placeholder {
+  color: transparent;
 }
 
 #addUserForm input[type="file"] {
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  border-style: dashed;
+  background: var(--bg-secondary);
+  text-align: center;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #addUserForm input[type="file"]:hover {
-  background: var(--bg-color);
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
 }
 
+/* Botón de añadir MEJORADO */
 #addUserForm button {
-  background: var(--gradient-primary);
+  background: var(--gradient-success);
   color: white;
   border: none;
-  padding: 1rem 1.5rem;
-  border-radius: 16px;
+  padding: 1.25rem 2rem;
+  border-radius: var(--border-radius-lg);
   cursor: pointer;
   font-weight: 600;
-  font-size: 1rem;
-  transition: all 0.3s ease;
+  font-size: 1.1rem;
+  transition: all var(--transition-bounce);
   box-shadow: var(--shadow-md);
   position: relative;
   overflow: hidden;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 140px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 #addUserForm button:hover {
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: var(--shadow-xl);
+  background: var(--gradient-primary);
+}
+
+#addUserForm button:active {
+  transform: translateY(0) scale(1);
+}
+
+#addUserForm button::before {
+  content: '➕';
+  font-size: 1.2rem;
+  transition: transform var(--transition-normal);
+}
+
+#addUserForm button:hover::before {
+  transform: rotate(90deg) scale(1.2);
 }
 
 #addUserForm button::after {
-  content: '✨';
+  content: '';
   position: absolute;
-  top: 50%;
-  right: -30px;
-  transform: translateY(-50%);
-  transition: right 0.3s ease;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left var(--transition-normal);
 }
 
 #addUserForm button:hover::after {
-  right: 1rem;
+  left: 100%;
 }
 
-/* Lista de usuarios */
+/* Lista de usuarios mejorada */
 .user-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: grid;
+  gap: 1.25rem;
 }
 
 .user-list li {
-  background: linear-gradient(135deg, var(--card-bg) 0%, var(--bg-color) 100%);
-  padding: 1.2rem;
-  border-radius: 18px;
-  margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--card-bg) 0%, var(--bg-secondary) 100%);
+  padding: 1.5rem;
+  border-radius: var(--border-radius-xl);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid var(--border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid var(--border-color);
+  transition: all var(--transition-bounce);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .user-list li:hover {
-  transform: translateX(8px);
+  transform: translateX(10px) scale(1.02);
   background: var(--card-bg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   border-color: var(--primary-color);
 }
 
@@ -388,51 +585,118 @@ form#addUserForm {
   left: 0;
   top: 0;
   height: 100%;
-  width: 4px;
+  width: 6px;
   background: var(--gradient-primary);
   transform: scaleY(0);
-  transition: transform 0.3s ease;
+  transition: transform var(--transition-bounce);
+  border-radius: 0 3px 3px 0;
 }
 
 .user-list li:hover::before {
   transform: scaleY(1);
 }
 
-.user-info {
-  font-weight: 500;
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.user-list li::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 100%;
+  height: 200%;
+  background: conic-gradient(from 0deg, transparent, var(--primary-color), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  z-index: 0;
 }
 
-/* Indicadores de estado animados */
-.user-info:has-text("🟢") {
+.user-list li:hover::after {
+  opacity: 0.1;
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.user-info {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1;
+  position: relative;
+}
+
+.user-info::before {
+  content: '👤';
+  font-size: 1.5rem;
+  background: var(--gradient-primary);
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-normal);
+}
+
+.user-list li:hover .user-info::before {
+  transform: scale(1.2) rotate(10deg);
+}
+
+/* Estados de usuario con animaciones */
+.user-info .status-online {
+  color: var(--success-color);
   animation: pulse 2s infinite;
 }
 
-/* Botón de eliminar */
+.user-info .status-offline {
+  color: var(--danger-color);
+}
+
+/* Botón de eliminar mejorado */
 .delete-btn {
   background: var(--gradient-danger);
   color: white;
   border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition: all var(--transition-bounce);
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
+  z-index: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.9rem;
 }
 
 .delete-btn:hover {
-  transform: scale(1.1);
-  box-shadow: var(--shadow-md);
+  transform: scale(1.1) rotate(-2deg);
+  box-shadow: var(--shadow-lg);
+  background: var(--danger-hover);
 }
 
 .delete-btn::before {
+  content: '🗑️';
+  position: absolute;
+  top: 50%;
+  left: -30px;
+  transform: translateY(-50%);
+  transition: left var(--transition-normal);
+}
+
+.delete-btn:hover::before {
+  left: 8px;
+}
+
+.delete-btn::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -445,50 +709,26 @@ form#addUserForm {
   transition: width 0.4s, height 0.4s;
 }
 
-.delete-btn:active::before {
+.delete-btn:active::after {
   width: 100px;
   height: 100px;
 }
 
-/* Efectos adicionales */
+/* Animaciones de entrada para usuarios */
 .user-list li:nth-child(odd) {
-  animation: slideInLeft 0.6s ease-out;
+  animation: slideInLeft 0.8s ease-out;
 }
 
 .user-list li:nth-child(even) {
-  animation: slideInLeft 0.6s ease-out;
+  animation: slideInLeft 0.8s ease-out;
   animation-delay: 0.1s;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .theme-toggle, 
-  .task-management,
-  .user-management {
-    max-width: 95%;
-    margin: 1rem auto;
-    padding: 1.5rem;
-  }
-  
-  form#addUserForm {
-    flex-direction: column;
-  }
-  
-  .title {
-    font-size: 2rem;
-  }
-  
-  .user-list li {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
-  }
-}
-
-/* Efectos de carga */
+/* Estados de carga mejorados */
 .loading {
   position: relative;
   pointer-events: none;
+  opacity: 0.7;
 }
 
 .loading::after {
@@ -501,18 +741,106 @@ form#addUserForm {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.6),
     transparent
   );
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 2s infinite;
+  border-radius: inherit;
 }
 
-/* Transiciones de tema */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* Mensajes de feedback */
+.feedback-message {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 1rem 1.5rem;
+  border-radius: var(--border-radius-lg);
+  color: white;
+  font-weight: 600;
+  box-shadow: var(--shadow-xl);
+  transform: translateX(400px);
+  transition: transform var(--transition-bounce);
+  z-index: 1000;
 }
 
-/* Mejoras adicionales de accesibilidad */
+.feedback-message.success {
+  background: var(--gradient-success);
+}
+
+.feedback-message.error {
+  background: var(--gradient-danger);
+}
+
+.feedback-message.show {
+  transform: translateX(0);
+}
+
+/* Responsive mejorado */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+  
+  .theme-toggle, 
+  .task-management,
+  .user-management {
+    max-width: 100%;
+    margin: 1.5rem auto;
+    padding: 2rem;
+  }
+  
+  form#addUserForm {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  #addUserForm button {
+    justify-self: stretch;
+  }
+  
+  .title {
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .user-list li {
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: center;
+    padding: 2rem 1.5rem;
+  }
+  
+  .user-list li:hover {
+    transform: translateY(-5px) scale(1.02);
+  }
+  
+  .user-info {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .switch {
+    width: 70px;
+    height: 40px;
+  }
+  
+  .switch .slider::before {
+    width: 32px;
+    height: 32px;
+  }
+  
+  input:checked + .slider::before {
+    transform: translateX(30px) scale(1.1);
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Mejoras de accesibilidad */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -526,19 +854,37 @@ form#addUserForm {
 /* Estados de focus mejorados */
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--primary-color);
+  outline: 3px solid var(--primary-color);
   outline-offset: 2px;
+  border-radius: var(--border-radius-sm);
 }
 
 /* Efectos de hover para móviles */
 @media (hover: none) {
   .theme-toggle:hover,
   .task-management:hover,
-  .user-management:hover {
+  .user-management:hover,
+  .user-list li:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+  }
+  
+  .slider:hover {
     transform: none;
   }
   
-  .user-list li:hover {
+  #addUserForm button:hover,
+  .delete-btn:hover,
+  #clearTasksBtn:hover {
     transform: none;
   }
+}
+
+/* Transiciones globales */
+* {
+  transition: 
+    background-color var(--transition-normal),
+    color var(--transition-normal),
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal);
 }

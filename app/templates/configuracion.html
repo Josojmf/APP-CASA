@@ -6,65 +6,131 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="title">⚙️ Panel de Configuración</h1>
+<div class="container">
+    <h1 class="title">⚙️ Panel de Configuración</h1>
 
-<section class="theme-toggle">
-    <h2>Cambiar tema</h2>
-    <label class="switch">
-        <input type="checkbox" id="themeSwitch">
-        <span class="slider round"></span>
-    </label>
-</section>
-<section class="task-management">
-    <h2>Gestión de tareas</h2>
-    <button id="clearTasksBtn">Eliminar todas las tareas</button>
-    <script>
-        document.getElementById("clearTasksBtn").addEventListener("click", async () => {
-            if (confirm("¿Estás seguro de que quieres eliminar todas las tareas?")) {
-                const res = await fetch("/api/clear_all_tasks", { method: "POST" });
-                if (res.ok) {
-                    alert("✅ Todas las tareas han sido eliminadas");
-                    location.reload();
-                } else {
-                    alert("⚠️ Error al eliminar las tareas");
-                }
-            }
-        });
-    </script>
-</section>
-<section class="user-management">
-    <h2>Usuarios</h2>
-    <form id="addUserForm">
-        <input type="text" id="nuevoUsuario" placeholder="Nombre del nuevo usuario" required>
-        <input type="file" id="imagenUsuario" accept="image/png, image/jpeg" required>
-        <button type="submit">Añadir</button>
-    </form>
-
-    <ul class="user-list">
-        {% for user in users %}
-        <li>
-            <span class="user-info">
-                👤 {{ user.nombre }} {% if user.encasa %}🟢 En casa{% else %}🔴 Fuera{% endif %}
+    <!-- Sección de tema -->
+    <section class="theme-toggle" aria-labelledby="theme-heading">
+        <h2 id="theme-heading">🎨 Cambiar tema</h2>
+        <div class="theme-control">
+            <label class="switch" for="themeSwitch" aria-label="Alternar entre tema claro y oscuro">
+                <input type="checkbox" id="themeSwitch" role="switch">
+                <span class="slider round"></span>
+            </label>
+            <span class="theme-status" id="theme-status">
+                {% if session.get('theme') == 'dark' %}Tema oscuro activo{% else %}Tema claro activo{% endif %}
             </span>
-            <button class="delete-btn" onclick="eliminarUsuario('{{ user._id }}')">Eliminar</button>
-        </li>
-        {% endfor %}
-    </ul>
-</section>
+        </div>
+    </section>
+
+    <!-- Sección de gestión de tareas -->
+    <section class="task-management" aria-labelledby="tasks-heading">
+        <h2 id="tasks-heading">🗂️ Gestión de tareas</h2>
+        <div class="task-actions">
+            <button id="clearTasksBtn" class="danger-action" aria-describedby="clear-tasks-help">
+                Eliminar todas las tareas
+            </button>
+            <small id="clear-tasks-help" class="help-text">
+                Esta acción eliminará permanentemente todas las tareas de todos los usuarios
+            </small>
+        </div>
+    </section>
+
+    <!-- Sección de gestión de usuarios -->
+    <section class="user-management" aria-labelledby="users-heading">
+        <h2 id="users-heading">👥 Gestión de usuarios</h2>
+        
+        <!-- Formulario para añadir usuario -->
+        <form id="addUserForm" class="add-user-form" aria-labelledby="add-user-heading">
+            <h3 id="add-user-heading" class="sr-only">Añadir nuevo usuario</h3>
+            
+            <div class="form-group">
+                <label for="nuevoUsuario" class="sr-only">Nombre del usuario</label>
+                <input 
+                    type="text" 
+                    id="nuevoUsuario" 
+                    placeholder="Nombre del nuevo usuario" 
+                    required 
+                    aria-describedby="name-help"
+                    autocomplete="name"
+                >
+                <small id="name-help" class="help-text">Introduce el nombre completo del usuario</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="imagenUsuario" class="sr-only">Imagen de perfil</label>
+                <input 
+                    type="file" 
+                    id="imagenUsuario" 
+                    accept="image/png, image/jpeg" 
+                    required 
+                    aria-describedby="image-help"
+                >
+                <small id="image-help" class="help-text">Sube una imagen JPG o PNG (max 5MB)</small>
+            </div>
+            
+            <button type="submit" class="add-user-btn">
+                <span>➕ Añadir usuario</span>
+            </button>
+        </form>
+
+        <h3 class="user-list-title">Usuarios existentes</h3>
+        <ul class="user-list">
+            {% for user in users %}
+            <li>
+                <span class="user-info">
+                    <div class="user-avatar">👤</div>
+                    <div>
+                        <div class="user-name">{{ user.nombre }}</div>
+                        <div class="user-status">{% if user.encasa %}🟢 En casa{% else %}🔴 Fuera{% endif %}</div>
+                    </div>
+                </span>
+                <button class="delete-btn" onclick="eliminarUsuario('{{ user._id }}')">Eliminar</button>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // Función para mostrar mensajes de feedback
+    function showFeedback(message, type) {
+        // Crear elemento si no existe
+        let feedbackEl = document.querySelector('.feedback-message');
+        if (!feedbackEl) {
+            feedbackEl = document.createElement('div');
+            feedbackEl.className = 'feedback-message';
+            document.body.appendChild(feedbackEl);
+        }
+        
+        feedbackEl.textContent = message;
+        feedbackEl.className = `feedback-message show ${type}`;
+        
+        // Ocultar después de 3 segundos
+        setTimeout(() => {
+            feedbackEl.classList.remove('show');
+        }, 3000);
+    }
+
+    // Función para eliminar usuario
     function eliminarUsuario(userId) {
         if (confirm("¿Estás seguro de que quieres eliminar este usuario?")) {
             fetch(`/api/delete_user/${userId}`, { method: "DELETE" })
                 .then(res => {
-                    if (res.ok) location.reload();
-                    else alert("⚠️ Error al eliminar usuario");
+                    if (res.ok) {
+                        showFeedback("✅ Usuario eliminado correctamente", "success");
+                        // Recargar después de 1 segundo para mostrar feedback
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showFeedback("⚠️ Error al eliminar usuario", "error");
+                    }
                 });
         }
     }
 
+    // Formulario para añadir usuario
     document.getElementById("addUserForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const nombre = document.getElementById("nuevoUsuario").value.trim();
@@ -72,12 +138,12 @@
         const archivo = imagenInput.files[0];
 
         if (!nombre || !archivo) {
-            alert("Debes rellenar el nombre y subir una imagen.");
+            showFeedback("Debes rellenar el nombre y subir una imagen.", "error");
             return;
         }
 
         if (!["image/jpeg", "image/png"].includes(archivo.type)) {
-            alert("Solo se permiten imágenes JPG o PNG.");
+            showFeedback("Solo se permiten imágenes JPG o PNG.", "error");
             return;
         }
 
@@ -91,36 +157,65 @@
                 body: JSON.stringify({ nombre, imagen: base64Img })
             });
 
-            if (res.ok) location.reload();
-            else alert("⚠️ Error al añadir usuario");
+            if (res.ok) {
+                showFeedback(`✅ Usuario "${nombre}" añadido correctamente`, "success");
+                // Recargar después de 1 segundo para mostrar feedback
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showFeedback("⚠️ Error al añadir usuario", "error");
+            }
         };
         reader.readAsDataURL(archivo);
     });
 
+    // Botón para eliminar todas las tareas
+    document.getElementById("clearTasksBtn").addEventListener("click", async () => {
+        if (confirm("¿Estás seguro de que quieres eliminar todas las tareas?")) {
+            const res = await fetch("/api/clear_all_tasks", { method: "POST" });
+            if (res.ok) {
+                showFeedback("✅ Todas las tareas han sido eliminadas", "success");
+                // Recargar después de 1 segundo para mostrar feedback
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showFeedback("⚠️ Error al eliminar las tareas", "error");
+            }
+        }
+    });
+
+    // Cambio de tema
     document.addEventListener("DOMContentLoaded", () => {
         const switchElement = document.getElementById("themeSwitch");
-        const currentTheme = document.body.classList.contains("dark") ? "dark" : "light";
+        const themeStatus = document.getElementById("theme-status");
+        const body = document.body;
+        
+        // Establecer estado inicial del interruptor
+        const currentTheme = "{{ session.get('theme', 'light') }}";
         switchElement.checked = currentTheme === "dark";
-
+        
         switchElement.addEventListener("change", async () => {
             const newTheme = switchElement.checked ? "dark" : "light";
-
+            
+            // Cambio visual inmediato
+            body.classList.remove("light", "dark");
+            body.classList.add(newTheme);
+            themeStatus.textContent = newTheme === "dark" ? "Tema oscuro activo" : "Tema claro activo";
+            
+            // Guardar preferencia en el servidor
             const res = await fetch("/api/toggle_theme", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ theme: newTheme })
             });
-
-            if (res.ok) {
-                // Opción 1: cambiar la clase directamente (cambio visual inmediato sin recarga)
-                document.body.classList.remove("light", "dark");
-                document.body.classList.add(newTheme);
-
-                // Opción 2 (RECOMENDADA): forzar recarga para aplicar desde backend/session
-                location.reload();
+            
+            if (!res.ok) {
+                showFeedback("⚠️ Error al cambiar el tema", "error");
+                // Revertir cambios si hay error
+                body.classList.remove(newTheme);
+                body.classList.add(currentTheme);
+                switchElement.checked = currentTheme === "dark";
+                themeStatus.textContent = currentTheme === "dark" ? "Tema oscuro activo" : "Tema claro activo";
             }
         });
     });
 </script>
-
 {% endblock %}
