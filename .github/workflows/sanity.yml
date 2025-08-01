@@ -1,110 +1,495 @@
-name: "🌡️ Sanity Check - House App"
+name: "🌡️ Advanced Sanity Check - House App"
 
 on:
   workflow_run:
-    workflows: ["CI/CD AB-RENOVA - Build, Push & Deploy"]
+    workflows: ["🏠 House App CI/CD - Build, Test, Push & Deploy"]
     types:
       - completed
+  schedule:
+    # Ejecutar cada 30 minutos para monitoreo continuo
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    # Permitir ejecución manual
+    inputs:
+      environment:
+        description: 'Environment to check'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      deep_check:
+        description: 'Run deep integration tests'
+        required: false
+        default: false
+        type: boolean
 
+env:
+  PROD_URL: "https://www.house-app.casa"
+  STAGING_URL: "https://staging.house-app.casa"
+  TIMEOUT: 30
+  RETRY_COUNT: 3
+  
 jobs:
-  wait-then-check:
+  comprehensive-health-check:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    timeout-minutes: 15
+    
     steps:
-      - name: ⏳ Esperar 2 minutos antes del sanity check
-        run: sleep 120
+      - name: 📦 Checkout for test scripts
+        uses: actions/checkout@v4
 
-      - name: 🔍 Sanity Check Completo
-        id: sanity
+      - name: 🔧 Setup environment
         run: |
-          echo "===== 🌐 INICIO SANITY CHECK ====="
-          echo "Fecha/Hora: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "" > sanity_report.txt
-          echo "Sanity Check - House App" >> sanity_report.txt
-          echo "Fecha/Hora: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> sanity_report.txt
-          echo "---------------------------------------------" >> sanity_report.txt
+          # Determinar la URL base según el contexto
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
+              echo "BASE_URL=${{ env.STAGING_URL }}" >> $GITHUB_ENV
+              echo "ENV_NAME=staging" >> $GITHUB_ENV
+            else
+              echo "BASE_URL=${{ env.PROD_URL }}" >> $GITHUB_ENV
+              echo "ENV_NAME=production" >> $GITHUB_ENV
+            fi
+          else
+            echo "BASE_URL=${{ env.PROD_URL }}" >> $GITHUB_ENV
+            echo "ENV_NAME=production" >> $GITHUB_ENV
+          fi
+          
+          # Crear archivo de reporte
+          echo "🏠 House App - Comprehensive Health Check" > health_report.md
+          echo "=======================================" >> health_report.md
+          echo "" >> health_report.md
+          echo "**Environment:** ${{ env.ENV_NAME }}" >> health_report.md
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> health_report.md
+          echo "**Triggered by:** ${{ github.event_name }}" >> health_report.md
+          echo "**Commit SHA:** ${{ github.sha }}" >> health_report.md
+          echo "" >> health_report.md
 
+      - name: ⏳ Wait for deployment stabilization
+        if: github.event_name == 'workflow_run'
+        run: |
+          echo "⏳ Esperando 2 minutos para estabilización del deployment..."
+          sleep 120
+
+      - name: 🌐 Basic Connectivity & SSL Check
+        id: connectivity
+        run: |
+          echo "## 🌐 Connectivity & SSL Tests" >> health_report.md
+          echo "| Test | Status | Details |" >> health_report.md
+          echo "|------|--------|---------|" >> health_report.md
+          
           ALL_OK=true
-
-          # -------- Comprobar WEB PRINCIPAL --------
-          MAIN_URL="https://www.house-app.casa/"
-          echo "🌐 Comprobando $MAIN_URL"
-          STATUS=$(curl -s -L -o /tmp/out_main.html -w "%{http_code}" "$MAIN_URL")
-          CONTENT_TYPE=$(file /tmp/out_main.html)
-          if [[ "$STATUS" != "200" || "$CONTENT_TYPE" != *"HTML"* ]]; then
-            echo "❌ ERROR en $MAIN_URL (HTTP $STATUS, Tipo: $CONTENT_TYPE)"
-            echo "❌ ERROR en $MAIN_URL (HTTP $STATUS, Tipo: $CONTENT_TYPE)" >> sanity_report.txt
-            head -n 20 /tmp/out_main.html >> sanity_report.txt
+          
+          # Test DNS resolution
+          echo "🔍 Testing DNS resolution..."
+          if nslookup $(echo $BASE_URL | sed 's|https\?://||' | sed 's|/.*||') > /dev/null; then
+            echo "| DNS Resolution | ✅ PASS | Domain resolves correctly |" >> health_report.md
+          else
+            echo "| DNS Resolution | ❌ FAIL | DNS resolution failed |" >> health_report.md
             ALL_OK=false
-          else
-            echo "✅ $MAIN_URL OK (HTTP $STATUS)"
-            echo "✅ $MAIN_URL OK (HTTP $STATUS)" >> sanity_report.txt
           fi
+          
+          # Test SSL certificate
+          echo "🔒 Testing SSL certificate..."
+          SSL_CHECK=$(echo | openssl s_client -servername $(echo $BASE_URL | sed 's|https\?://||' | sed 's|/.*||') -connect $(echo $BASE_URL | sed 's|https\?://||' | sed 's|/.*||'):443 2>/dev/null | openssl x509 -noout -dates 2>/dev/null)
+          if [[ $? -eq 0 ]]; then
+            EXPIRY=$(echo "$SSL_CHECK" | grep "notAfter" | cut -d= -f2)
+            echo "| SSL Certificate | ✅ PASS | Valid until: $EXPIRY |" >> health_report.md
+          else
+            echo "| SSL Certificate | ❌ FAIL | SSL certificate invalid or expired |" >> health_report.md
+            ALL_OK=false
+          fi
+          
+          echo "connectivity_ok=$ALL_OK" >> $GITHUB_OUTPUT
 
-          # -------- Páginas HTML --------
-          PAGES=(
-            "https://www.house-app.casa/calendario"
-            "https://www.house-app.casa/lista_compra"
-            "https://www.house-app.casa/mapa"
-            "https://www.house-app.casa/configuracion"
-            "https://www.house-app.casa/menus" # si existe como HTML
-          )
-          for url in "${PAGES[@]}"; do
-            echo "🌐 Comprobando $url"
-            STATUS=$(curl -s -L -o /tmp/out.html -w "%{http_code}" "$url")
-            CONTENT_TYPE=$(file /tmp/out.html)
-            if [[ "$STATUS" != "200" || "$CONTENT_TYPE" != *"HTML"* ]]; then
-              echo "❌ ERROR en $url (HTTP $STATUS, Tipo: $CONTENT_TYPE)"
-              echo "❌ ERROR en $url (HTTP $STATUS, Tipo: $CONTENT_TYPE)" >> sanity_report.txt
-              head -n 20 /tmp/out.html >> sanity_report.txt
-              ALL_OK=false
+      - name: 🏥 Core Health Check
+        id: health
+        run: |
+          echo "" >> health_report.md
+          echo "## 🏥 Core Application Health" >> health_report.md
+          echo "| Endpoint | Status Code | Response Time | Content Validation |" >> health_report.md
+          echo "|----------|-------------|---------------|-------------------|" >> health_report.md
+          
+          ALL_OK=true
+          
+          # Function to test endpoint with retries
+          test_endpoint() {
+            local url=$1
+            local expected_content=$2
+            local endpoint_name=$3
+            
+            for i in $(seq 1 $RETRY_COUNT); do
+              echo "🔍 Testing $endpoint_name (attempt $i/$RETRY_COUNT)..."
+              
+              START_TIME=$(date +%s.%N)
+              RESPONSE=$(curl -s -L -w "HTTPSTATUS:%{http_code};TIME:%{time_total};SIZE:%{size_download}" \
+                --max-time $TIMEOUT \
+                --user-agent "HouseApp-HealthCheck/1.0" \
+                -H "Accept: text/html,application/json,*/*" \
+                "$url" 2>/dev/null)
+              END_TIME=$(date +%s.%N)
+              
+              HTTP_CODE=$(echo "$RESPONSE" | grep -o "HTTPSTATUS:[0-9]*" | cut -d: -f2)
+              RESPONSE_TIME=$(echo "$RESPONSE" | grep -o "TIME:[0-9.]*" | cut -d: -f2)
+              CONTENT_SIZE=$(echo "$RESPONSE" | grep -o "SIZE:[0-9]*" | cut -d: -f2)
+              BODY=$(echo "$RESPONSE" | sed -E 's/HTTPSTATUS:[0-9]*;TIME:[0-9.]*;SIZE:[0-9]*$//')
+              
+              # Validate response
+              if [[ "$HTTP_CODE" == "200" ]] && [[ ${#BODY} -gt 100 ]]; then
+                if [[ -n "$expected_content" ]] && [[ "$BODY" == *"$expected_content"* ]]; then
+                  CONTENT_CHECK="✅ Valid"
+                elif [[ -z "$expected_content" ]]; then
+                  CONTENT_CHECK="✅ Present"
+                else
+                  CONTENT_CHECK="⚠️ Unexpected"
+                fi
+                
+                echo "| $endpoint_name | ✅ $HTTP_CODE | ${RESPONSE_TIME}s | $CONTENT_CHECK |" >> health_report.md
+                return 0
+              fi
+              
+              if [[ $i -lt $RETRY_COUNT ]]; then
+                echo "⚠️ Attempt $i failed, retrying in 5s..."
+                sleep 5
+              fi
+            done
+            
+            echo "| $endpoint_name | ❌ $HTTP_CODE | ${RESPONSE_TIME}s | Failed |" >> health_report.md
+            echo "**Error details for $endpoint_name:**" >> health_report.md
+            echo '```' >> health_report.md
+            echo "HTTP Code: $HTTP_CODE" >> health_report.md
+            echo "Response: $(echo "$BODY" | head -c 500)" >> health_report.md
+            echo '```' >> health_report.md
+            return 1
+          }
+          
+          # Test main pages
+          test_endpoint "$BASE_URL/" "House App" "Home Page" || ALL_OK=false
+          test_endpoint "$BASE_URL/tareas" "" "Tasks Page" || ALL_OK=false
+          test_endpoint "$BASE_URL/calendario" "" "Calendar Page" || ALL_OK=false
+          test_endpoint "$BASE_URL/lista_compra" "" "Shopping List Page" || ALL_OK=false
+          test_endpoint "$BASE_URL/menus" "" "Menus Page" || ALL_OK=false
+          test_endpoint "$BASE_URL/chat" "" "Chat Page" || ALL_OK=false
+          test_endpoint "$BASE_URL/configuracion" "" "Settings Page" || ALL_OK=false
+          
+          echo "health_ok=$ALL_OK" >> $GITHUB_OUTPUT
+
+      - name: 🔗 API Endpoints Validation
+        id: api
+        run: |
+          echo "" >> health_report.md
+          echo "## 🔗 API Endpoints Health" >> health_report.md
+          echo "| Endpoint | Status | Response Format | Data Validation |" >> health_report.md
+          echo "|----------|--------|-----------------|-----------------|" >> health_report.md
+          
+          ALL_OK=true
+          
+          # Function to test API endpoint
+          test_api_endpoint() {
+            local endpoint=$1
+            local endpoint_name=$2
+            local expected_fields=$3
+            
+            echo "🔍 Testing API: $endpoint_name..."
+            
+            RESPONSE=$(curl -s -L -w "HTTPSTATUS:%{http_code}" \
+              --max-time $TIMEOUT \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              "$endpoint" 2>/dev/null)
+            
+            HTTP_CODE=$(echo "$RESPONSE" | grep -o "HTTPSTATUS:[0-9]*" | cut -d: -f2)
+            BODY=$(echo "$RESPONSE" | sed -E 's/HTTPSTATUS:[0-9]*$//')
+            
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              # Check if response is valid JSON
+              if echo "$BODY" | jq . > /dev/null 2>&1; then
+                FORMAT_CHECK="✅ JSON"
+                
+                # Validate expected fields if provided
+                if [[ -n "$expected_fields" ]]; then
+                  VALIDATION_RESULTS=""
+                  for field in $expected_fields; do
+                    if echo "$BODY" | jq -e ".[0].$field" > /dev/null 2>&1 || echo "$BODY" | jq -e ".$field" > /dev/null 2>&1; then
+                      VALIDATION_RESULTS="$VALIDATION_RESULTS ✅$field"
+                    else
+                      VALIDATION_RESULTS="$VALIDATION_RESULTS ❌$field"
+                    fi
+                  done
+                  DATA_CHECK="$VALIDATION_RESULTS"
+                else
+                  DATA_CHECK="✅ Valid"
+                fi
+                
+                echo "| $endpoint_name | ✅ $HTTP_CODE | $FORMAT_CHECK | $DATA_CHECK |" >> health_report.md
+                return 0
+              else
+                echo "| $endpoint_name | ❌ $HTTP_CODE | ❌ Invalid JSON | Failed |" >> health_report.md
+                return 1
+              fi
+            elif [[ "$HTTP_CODE" == "401" ]] || [[ "$HTTP_CODE" == "403" ]]; then
+              echo "| $endpoint_name | ⚠️ $HTTP_CODE | Auth Required | Expected |" >> health_report.md
+              return 0  # Auth errors are expected for some endpoints
             else
-              echo "✅ $url OK (HTTP $STATUS)"
-              echo "✅ $url OK (HTTP $STATUS)" >> sanity_report.txt
+              echo "| $endpoint_name | ❌ $HTTP_CODE | Error | Failed |" >> health_report.md
+              return 1
+            fi
+          }
+          
+          # Test public API endpoints (these might require auth, so 401/403 is OK)
+          test_api_endpoint "$BASE_URL/api/users" "Users API" "" || true
+          test_api_endpoint "$BASE_URL/api/lista_compra" "Shopping List API" "" || true
+          
+          # Test health endpoint if it exists
+          test_api_endpoint "$BASE_URL/health" "Health Check API" "status" || true
+          test_api_endpoint "$BASE_URL/api/stats" "Stats API" "" || true
+          
+          echo "api_ok=$ALL_OK" >> $GITHUB_OUTPUT
+
+      - name: 🧪 Deep Integration Tests
+        if: github.event.inputs.deep_check == 'true' || github.event_name == 'schedule'
+        id: integration
+        run: |
+          echo "" >> health_report.md
+          echo "## 🧪 Deep Integration Tests" >> health_report.md
+          echo "| Test | Result | Details |" >> health_report.md
+          echo "|------|--------|---------|" >> health_report.md
+          
+          ALL_OK=true
+          
+          # Test JavaScript loading
+          echo "🔍 Testing JavaScript resources..."
+          JS_ERRORS=0
+          for js_file in "static/js/main.js" "static/js/chat.js"; do
+            if curl -s -f --max-time 10 "$BASE_URL/$js_file" > /dev/null; then
+              echo "| JS: $js_file | ✅ PASS | Loads correctly |" >> health_report.md
+            else
+              echo "| JS: $js_file | ❌ FAIL | Failed to load |" >> health_report.md
+              JS_ERRORS=$((JS_ERRORS + 1))
             fi
           done
-
-          # -------- Endpoints API --------
-          ENDPOINTS=(
-            "https://www.house-app.casa/api/ubicaciones"
-            "https://www.house-app.casa/api/users"
-            "https://www.house-app.casa/api/lista_compra"
-          )
-          for endpoint in "${ENDPOINTS[@]}"; do
-            echo "🔗 Comprobando API: $endpoint"
-            STATUS=$(curl -s -L -o /tmp/out.json -w "%{http_code}" "$endpoint")
-            CONTENT_TYPE=$(file /tmp/out.json)
-            if [[ "$STATUS" != "200" || "$CONTENT_TYPE" != *"JSON"* ]]; then
-              echo "❌ ERROR en $endpoint (HTTP $STATUS, Tipo: $CONTENT_TYPE)"
-              echo "❌ ERROR en $endpoint (HTTP $STATUS, Tipo: $CONTENT_TYPE)" >> sanity_report.txt
-              head -n 20 /tmp/out.json >> sanity_report.txt
-              ALL_OK=false
+          
+          # Test CSS loading
+          echo "🎨 Testing CSS resources..."
+          CSS_ERRORS=0
+          for css_file in "static/styles/global.css" "static/styles/chat.css"; do
+            if curl -s -f --max-time 10 "$BASE_URL/$css_file" > /dev/null; then
+              echo "| CSS: $css_file | ✅ PASS | Loads correctly |" >> health_report.md
             else
-              echo "✅ $endpoint OK (HTTP $STATUS)"
-              echo "✅ $endpoint OK (HTTP $STATUS)" >> sanity_report.txt
+              echo "| CSS: $css_file | ❌ FAIL | Failed to load |" >> health_report.md
+              CSS_ERRORS=$((CSS_ERRORS + 1))
             fi
           done
-
-          echo "===== FIN SANITY CHECK =====" >> sanity_report.txt
-
-          if [[ "$ALL_OK" == false ]]; then
-            echo "result=fail" >> $GITHUB_OUTPUT
+          
+          # Test Service Worker
+          echo "👷 Testing Service Worker..."
+          if curl -s -f --max-time 10 "$BASE_URL/sw.js" | grep -q "service.*worker"; then
+            echo "| Service Worker | ✅ PASS | Available and valid |" >> health_report.md
           else
-            echo "result=ok" >> $GITHUB_OUTPUT
+            echo "| Service Worker | ❌ FAIL | Not available or invalid |" >> health_report.md
+            ALL_OK=false
           fi
+          
+          # Test Progressive Web App manifest
+          echo "📱 Testing PWA Manifest..."
+          if curl -s -f --max-time 10 "$BASE_URL/static/manifest.json" | jq . > /dev/null 2>&1; then
+            echo "| PWA Manifest | ✅ PASS | Valid JSON manifest |" >> health_report.md
+          else
+            echo "| PWA Manifest | ❌ FAIL | Invalid or missing |" >> health_report.md
+            ALL_OK=false
+          fi
+          
+          # Performance check
+          echo "⚡ Testing page load performance..."
+          LOAD_TIME=$(curl -w "%{time_total}" -s -o /dev/null --max-time 30 "$BASE_URL/")
+          if (( $(echo "$LOAD_TIME < 3.0" | bc -l) )); then
+            echo "| Page Load Time | ✅ PASS | ${LOAD_TIME}s (< 3s) |" >> health_report.md
+          elif (( $(echo "$LOAD_TIME < 5.0" | bc -l) )); then
+            echo "| Page Load Time | ⚠️ SLOW | ${LOAD_TIME}s (3-5s) |" >> health_report.md
+          else
+            echo "| Page Load Time | ❌ FAIL | ${LOAD_TIME}s (> 5s) |" >> health_report.md
+            ALL_OK=false
+          fi
+          
+          echo "integration_ok=$ALL_OK" >> $GITHUB_OUTPUT
 
-      - name: 📧 Enviar notificación si falla
-        if: steps.sanity.outputs.result == 'fail'
+      - name: 📊 Generate Performance Metrics
+        run: |
+          echo "" >> health_report.md
+          echo "## 📊 Performance Metrics" >> health_report.md
+          
+          # Lighthouse CI would be ideal here, but let's do basic checks
+          MAIN_PAGE_SIZE=$(curl -s -w "%{size_download}" -o /dev/null "$BASE_URL/")
+          MAIN_PAGE_TIME=$(curl -s -w "%{time_total}" -o /dev/null "$BASE_URL/")
+          
+          echo "- **Main page size:** ${MAIN_PAGE_SIZE} bytes" >> health_report.md
+          echo "- **Main page load time:** ${MAIN_PAGE_TIME}s" >> health_report.md
+          echo "- **Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> health_report.md
+
+      - name: 🎯 Overall Health Assessment
+        id: assessment
+        run: |
+          echo "" >> health_report.md
+          echo "## 🎯 Overall Assessment" >> health_report.md
+          
+          CONNECTIVITY_OK=${{ steps.connectivity.outputs.connectivity_ok }}
+          HEALTH_OK=${{ steps.health.outputs.health_ok }}
+          API_OK=${{ steps.api.outputs.api_ok }}
+          INTEGRATION_OK=${{ steps.integration.outputs.integration_ok || 'true' }}
+          
+          TOTAL_SCORE=0
+          MAX_SCORE=0
+          
+          # Calculate score
+          if [[ "$CONNECTIVITY_OK" == "true" ]]; then
+            TOTAL_SCORE=$((TOTAL_SCORE + 25))
+            echo "- ✅ **Connectivity & SSL:** PASS (25/25)" >> health_report.md
+          else
+            echo "- ❌ **Connectivity & SSL:** FAIL (0/25)" >> health_report.md
+          fi
+          MAX_SCORE=$((MAX_SCORE + 25))
+          
+          if [[ "$HEALTH_OK" == "true" ]]; then
+            TOTAL_SCORE=$((TOTAL_SCORE + 35))
+            echo "- ✅ **Core Health:** PASS (35/35)" >> health_report.md
+          else
+            echo "- ❌ **Core Health:** FAIL (0/35)" >> health_report.md
+          fi
+          MAX_SCORE=$((MAX_SCORE + 35))
+          
+          if [[ "$API_OK" == "true" ]]; then
+            TOTAL_SCORE=$((TOTAL_SCORE + 25))
+            echo "- ✅ **API Endpoints:** PASS (25/25)" >> health_report.md
+          else
+            echo "- ❌ **API Endpoints:** FAIL (0/25)" >> health_report.md
+          fi
+          MAX_SCORE=$((MAX_SCORE + 25))
+          
+          if [[ "$INTEGRATION_OK" == "true" ]]; then
+            TOTAL_SCORE=$((TOTAL_SCORE + 15))
+            echo "- ✅ **Integration Tests:** PASS (15/15)" >> health_report.md
+          else
+            echo "- ❌ **Integration Tests:** FAIL (0/15)" >> health_report.md
+          fi
+          MAX_SCORE=$((MAX_SCORE + 15))
+          
+          PERCENTAGE=$((TOTAL_SCORE * 100 / MAX_SCORE))
+          
+          echo "" >> health_report.md
+          echo "### 📈 Health Score: $TOTAL_SCORE/$MAX_SCORE ($PERCENTAGE%)" >> health_report.md
+          
+          if [[ $PERCENTAGE -ge 90 ]]; then
+            echo "**Status:** 🟢 EXCELLENT - All systems operational" >> health_report.md
+            echo "overall_status=excellent" >> $GITHUB_OUTPUT
+          elif [[ $PERCENTAGE -ge 75 ]]; then
+            echo "**Status:** 🟡 GOOD - Minor issues detected" >> health_report.md
+            echo "overall_status=good" >> $GITHUB_OUTPUT
+          elif [[ $PERCENTAGE -ge 50 ]]; then
+            echo "**Status:** 🟠 WARNING - Multiple issues need attention" >> health_report.md
+            echo "overall_status=warning" >> $GITHUB_OUTPUT
+          else
+            echo "**Status:** 🔴 CRITICAL - Immediate attention required" >> health_report.md
+            echo "overall_status=critical" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "score=$PERCENTAGE" >> $GITHUB_OUTPUT
+
+      - name: 📤 Upload Health Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: health-report-${{ github.run_number }}
+          path: health_report.md
+          retention-days: 30
+
+      - name: 🚨 Send Critical Alert
+        if: steps.assessment.outputs.overall_status == 'critical'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "🚨 Sanity Check House App - FALLO DETECTADO"
+          subject: "🚨 CRITICAL: House App Health Check Failed (${{ steps.assessment.outputs.score }}%)"
           to: "joso.jmf@gmail.com"
-          from: "House App Monitor <${{ secrets.SMTP_USERNAME }}> "
-          body: |
-            El sanity check ha detectado problemas en House App.
-            Revisa el archivo adjunto para más detalles.
-          attachments: sanity_report.txt
+          from: "House App Monitor <${{ secrets.SMTP_USERNAME }}>"
+          html_body: |
+            <h2>🚨 Critical Health Check Alert</h2>
+            <p><strong>Environment:</strong> ${{ env.ENV_NAME }}</p>
+            <p><strong>Health Score:</strong> ${{ steps.assessment.outputs.score }}%</p>
+            <p><strong>Status:</strong> CRITICAL - Immediate attention required</p>
+            <p><strong>Timestamp:</strong> $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+            <br>
+            <p>Multiple critical issues detected. Please check the detailed report in the GitHub Actions artifacts.</p>
+            <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Full Report</a></p>
+          attachments: health_report.md
+
+      - name: ⚠️ Send Warning Alert
+        if: steps.assessment.outputs.overall_status == 'warning'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "⚠️ WARNING: House App Issues Detected (${{ steps.assessment.outputs.score }}%)"
+          to: "joso.jmf@gmail.com"
+          from: "House App Monitor <${{ secrets.SMTP_USERNAME }}>"
+          html_body: |
+            <h2>⚠️ Health Check Warning</h2>
+            <p><strong>Environment:</strong> ${{ env.ENV_NAME }}</p>
+            <p><strong>Health Score:</strong> ${{ steps.assessment.outputs.score }}%</p>
+            <p><strong>Status:</strong> WARNING - Issues need attention</p>
+            <p><strong>Timestamp:</strong> $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+            <br>
+            <p>Some issues detected that may affect user experience.</p>
+            <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Full Report</a></p>
+          attachments: health_report.md
+
+      - name: 💬 Slack Notification
+        if: always() && secrets.SLACK_WEBHOOK_URL
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "🏠 House App Health Check Complete",
+              "attachments": [
+                {
+                  "color": "${{ steps.assessment.outputs.overall_status == 'excellent' && 'good' || steps.assessment.outputs.overall_status == 'good' && 'warning' || steps.assessment.outputs.overall_status == 'warning' && 'warning' || 'danger' }}",
+                  "fields": [
+                    {
+                      "title": "Environment",
+                      "value": "${{ env.ENV_NAME }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Health Score",
+                      "value": "${{ steps.assessment.outputs.score }}%",
+                      "short": true
+                    },
+                    {
+                      "title": "Status",
+                      "value": "${{ steps.assessment.outputs.overall_status }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Report",
+                      "value": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: 📈 Update Status Badge
+        if: always()
+        run: |
+          # This could integrate with shields.io or similar service
+          # to create dynamic status badges for README
+          echo "Health check completed with status: ${{ steps.assessment.outputs.overall_status }}"

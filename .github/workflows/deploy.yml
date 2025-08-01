@@ -1,73 +1,440 @@
-name: CI/CD AB-RENOVA - Build, Push & Deploy
+name: 🏠 House App CI/CD - Build, Test, Push & Deploy
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/house-app
+  CONTAINER_NAME: house-app
 
 jobs:
-  build-and-deploy:
+  # ====================================
+  # Job 1: Tests y validación de código
+  # ====================================
+  test:
+    name: 🧪 Run Tests & Code Quality
     runs-on: ubuntu-latest
-
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    
     steps:
-    - name: 📦 Checkout repo
-      uses: actions/checkout@v3
+    - name: 📦 Checkout repository
+      uses: actions/checkout@v4
 
-    - name: 🔐 Log in to Docker Hub
-      run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
 
-    - name: 🏗️ Build Docker image
-      run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest .
+    - name: 📥 Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov flake8 black safety bandit
 
-    - name: 📤 Push Docker image
-      run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+    - name: 🎨 Code formatting check (Black)
+      run: black --check --diff .
 
-    - name: 🚀 Deploy on DigitalOcean Droplet (with retries, sanity checks and logs)
-      uses: appleboy/ssh-action@v1.0.0
+    - name: 🔍 Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: 🔒 Security check with bandit
+      run: bandit -r . -f json -o bandit-report.json || true
+
+    - name: 🛡️ Vulnerability check with safety
+      run: safety check --json --output vulnerability-report.json || true
+
+    - name: 🧪 Run tests with coverage
+      run: |
+        pytest --cov=app --cov-report=xml --cov-report=html --junitxml=test-results.xml
+      env:
+        FLASK_ENV: testing
+
+    - name: 📊 Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: 📋 Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          test-results.xml
+          htmlcov/
+          bandit-report.json
+          vulnerability-report.json
+
+  # ====================================
+  # Job 2: Build y push de imagen Docker
+  # ====================================
+  build:
+    name: 🏗️ Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+    - name: 📦 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🏷️ Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DOCKER_IMAGE }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 🔐 Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: 🏗️ Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+
+    - name: 🔒 Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.DOCKER_IMAGE }}:latest
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: 🛡️ Scan image for vulnerabilities
+      uses: anchore/scan-action@v3
+      id: scan
+      with:
+        image: ${{ env.DOCKER_IMAGE }}:latest
+        fail-build: false
+        severity-cutoff: high
+
+    - name: 📋 Upload scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-results
+        path: |
+          sbom.spdx.json
+          ${{ steps.scan.outputs.sarif }}
+
+  # ====================================
+  # Job 3: Deploy a staging (opcional)
+  # ====================================
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && false  # Cambiar a true para habilitar
+    environment:
+      name: staging
+      url: https://staging.your-domain.com
+    
+    steps:
+    - name: 🚀 Deploy to staging server
+      run: echo "Deploy to staging would happen here"
+
+  # ====================================
+  # Job 4: Deploy a producción
+  # ====================================
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://your-domain.com
+    
+    steps:
+    - name: 📦 Checkout repository (for scripts)
+      uses: actions/checkout@v4
+
+    - name: 🚀 Deploy to DigitalOcean Droplet
+      uses: appleboy/ssh-action@v1.0.3
+      env:
+        DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
+        CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
       with:
         host: ${{ secrets.DROPLET_HOST }}
-        username: root
+        username: ${{ secrets.DROPLET_USER || 'root' }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
+        port: ${{ secrets.DROPLET_PORT || '22' }}
+        timeout: 60
+        command_timeout: 300
         script_stop: true
+        envs: DOCKER_IMAGE,CONTAINER_NAME
         script: |
-          set -e
+          set -euo pipefail
 
-          echo "🔄 Intentando desplegar (máx 3 intentos)..."
-          for i in 1 2 3; do
-            echo "🔁 Intento $i..."
+          # Colores para logs
+          RED='\033[0;31m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[1;33m'
+          BLUE='\033[0;34m'
+          NC='\033[0m' # No Color
 
-            echo "🛑 Parando contenedor si está en ejecución..."
-            docker stop house-app 2>/dev/null || true
+          log() {
+              echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+          }
 
-            echo "🧹 Eliminando contenedor si existe..."
-            docker rm house-app 2>/dev/null || true
+          error() {
+              echo -e "${RED}[ERROR]${NC} $1" >&2
+          }
 
-            echo "⬇️ Pulling imagen desde Docker Hub..."
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+          success() {
+              echo -e "${GREEN}[SUCCESS]${NC} $1"
+          }
 
-            echo "🚀 Lanzando nuevo contenedor..."
-            docker run -d --name house-app -p 5000:5000 \
-          -e MONGO_USER="${{ secrets.MONGO_USER }}" \
-          -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
-          -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
-          -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
-          -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-          -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-          --restart unless-stopped \
-          ${{ secrets.DOCKERHUB_USERNAME }}/house-app:latest
+          warning() {
+              echo -e "${YELLOW}[WARNING]${NC} $1"
+          }
 
-            echo "⏳ Esperando 10 segundos para verificar estado..."
-            sleep 10
+          # Función de rollback
+          rollback() {
+              warning "Iniciando rollback..."
+              if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "${DOCKER_IMAGE}:backup"; then
+                  docker stop $CONTAINER_NAME 2>/dev/null || true
+                  docker rm $CONTAINER_NAME 2>/dev/null || true
+                  docker tag ${DOCKER_IMAGE}:backup ${DOCKER_IMAGE}:latest
+                  docker run -d --name $CONTAINER_NAME -p 5000:5000 \
+                      -e MONGO_USER="${{ secrets.MONGO_USER }}" \
+                      -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
+                      -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
+                      -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
+                      -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+                      -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+                      -e FLASK_ENV="production" \
+                      --restart unless-stopped \
+                      --memory="512m" \
+                      --cpus="1.0" \
+                      --health-cmd="curl -f http://localhost:5000/health || exit 1" \
+                      --health-interval=30s \
+                      --health-timeout=10s \
+                      --health-retries=3 \
+                      ${DOCKER_IMAGE}:latest
+                  success "Rollback completado"
+              else
+                  error "No hay imagen de backup disponible"
+              fi
+          }
 
-            echo "🧪 Sanity check..."
-            if docker ps | grep house-app && docker logs house-app | tail -n 20; then
-              echo "✅ Despliegue exitoso."
-              exit 0
-            else
-              echo "⚠️ Algo falló, intentando de nuevo..."
-              sleep 5
-            fi
+          # Crear backup de la imagen actual
+          log "🔄 Creando backup de la imagen actual..."
+          if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "${DOCKER_IMAGE}:latest"; then
+              docker tag ${DOCKER_IMAGE}:latest ${DOCKER_IMAGE}:backup
+              success "Backup creado: ${DOCKER_IMAGE}:backup"
+          fi
+
+          # Pre-deployment checks
+          log "🔍 Verificando recursos del sistema..."
+          if [ $(df / | tail -1 | awk '{print $5}' | sed 's/%//') -gt 85 ]; then
+              error "Espacio en disco insuficiente (>85% usado)"
+              exit 1
+          fi
+
+          if [ $(free | grep Mem | awk '{print ($3/$2)*100}' | cut -d. -f1) -gt 90 ]; then
+              warning "Memoria RAM alta (>90% usado)"
+          fi
+
+          # Cleanup de imágenes huérfanas
+          log "🧹 Limpiando imágenes Docker huérfanas..."
+          docker system prune -f --volumes || true
+          docker image prune -f || true
+
+          # Deploy con reintentos
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              log "🔁 Intento de despliegue $RETRY_COUNT de $MAX_RETRIES..."
+
+              # Health check del contenedor actual
+              if docker ps --filter "name=$CONTAINER_NAME" --filter "status=running" | grep -q $CONTAINER_NAME; then
+                  log "📊 Estado actual del contenedor:"
+                  docker stats --no-stream $CONTAINER_NAME || true
+                  docker logs --tail=10 $CONTAINER_NAME || true
+              fi
+
+              # Graceful shutdown
+              log "🛑 Deteniendo contenedor actual..."
+              if docker ps | grep -q $CONTAINER_NAME; then
+                  docker stop --time=30 $CONTAINER_NAME 2>/dev/null || true
+                  sleep 5
+              fi
+
+              log "🧹 Eliminando contenedor anterior..."
+              docker rm $CONTAINER_NAME 2>/dev/null || true
+
+              log "⬇️ Descargando imagen desde Docker Hub..."
+              if ! docker pull ${DOCKER_IMAGE}:latest; then
+                  error "Fallo al descargar imagen"
+                  sleep 10
+                  continue
+              fi
+
+              log "🚀 Iniciando nuevo contenedor..."
+              if docker run -d --name $CONTAINER_NAME -p 5000:5000 \
+                  -e MONGO_USER="${{ secrets.MONGO_USER }}" \
+                  -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
+                  -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
+                  -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
+                  -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+                  -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+                  -e FLASK_ENV="production" \
+                  --restart unless-stopped \
+                  --memory="512m" \
+                  --cpus="1.0" \
+                  --health-cmd="curl -f http://localhost:5000/health || exit 1" \
+                  --health-interval=30s \
+                  --health-timeout=10s \
+                  --health-retries=3 \
+                  --log-driver=json-file \
+                  --log-opt max-size=50m \
+                  --log-opt max-file=3 \
+                  ${DOCKER_IMAGE}:latest; then
+
+                  log "⏳ Esperando que el contenedor esté listo..."
+                  sleep 15
+
+                  # Health checks
+                  log "🏥 Verificando salud del contenedor..."
+                  
+                  # Check 1: Container status
+                  if ! docker ps | grep -q $CONTAINER_NAME; then
+                      error "Contenedor no está ejecutándose"
+                      docker logs --tail=20 $CONTAINER_NAME
+                      sleep 5
+                      continue
+                  fi
+
+                  # Check 2: Health check interno de Docker
+                  HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null || echo "none")
+                  if [ "$HEALTH_STATUS" = "healthy" ] || [ "$HEALTH_STATUS" = "none" ]; then
+                      # Check 3: HTTP endpoint
+                      if curl -f -s --max-time 10 http://localhost:5000/health > /dev/null; then
+                          success "✅ Despliegue exitoso!"
+                          
+                          log "📊 Estado final del contenedor:"
+                          docker ps --filter "name=$CONTAINER_NAME"
+                          docker stats --no-stream $CONTAINER_NAME
+                          
+                          log "📝 Últimos logs:"
+                          docker logs --tail=10 $CONTAINER_NAME
+                          
+                          # Limpiar imagen de backup si todo está bien
+                          docker rmi ${DOCKER_IMAGE}:backup 2>/dev/null || true
+                          
+                          success "🎉 Despliegue completado exitosamente!"
+                          exit 0
+                      else
+                          error "Health check HTTP falló"
+                      fi
+                  else
+                      error "Health check de Docker falló: $HEALTH_STATUS"
+                  fi
+
+                  docker logs --tail=20 $CONTAINER_NAME
+              else
+                  error "Fallo al iniciar contenedor"
+              fi
+
+              warning "Intento $RETRY_COUNT falló, esperando antes del siguiente..."
+              sleep 10
           done
 
-          echo "❌ Despliegue fallido tras 3 intentos."
+          error "❌ Despliegue fallido tras $MAX_RETRIES intentos"
+          rollback
           exit 1
+
+  # ====================================
+  # Job 5: Smoke tests post-deploy
+  # ====================================
+  smoke-tests:
+    name: 🔍 Post-Deploy Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📦 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🧪 Run smoke tests
+      run: |
+        # Health check
+        curl -f https://your-domain.com/health || exit 1
+        
+        # Basic functionality tests
+        curl -f https://your-domain.com/ || exit 1
+        
+        echo "✅ Smoke tests passed!"
+
+    - name: 📊 Post-deploy notification
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          🏠 House App deployment ${{ job.status }}!
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ====================================
+  # Job 6: Cleanup
+  # ====================================
+  cleanup:
+    name: 🧹 Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-production, smoke-tests]
+    if: always() && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 🧹 Clean up old Docker images
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.DROPLET_HOST }}
+        username: ${{ secrets.DROPLET_USER || 'root' }}
+        key: ${{ secrets.DROPLET_SSH_KEY }}
+        script: |
+          # Mantener solo las últimas 3 imágenes
+          docker images ${{ env.DOCKER_IMAGE }} --format "table {{.ID}}\t{{.CreatedAt}}" | tail -n +4 | awk '{print $1}' | xargs -r docker rmi || true
+          
+          # Limpiar sistema
+          docker system prune -f --volumes || true

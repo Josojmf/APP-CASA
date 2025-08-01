@@ -7,6 +7,11 @@ import os
 import traceback
 import requests
 from ddgs import DDGS
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 main = Blueprint('main', __name__)
 
@@ -40,7 +45,7 @@ def get_food_image(food_name):
             if results:
                 return results[0].get("image", "/static/img/default_food.jpg")
     except Exception as e:
-        print(f"[ERROR] get_food_image: {e}")
+        logger.error(f"Error get_food_image: {e}")
     
     return "/static/img/default_food.jpg"
 
@@ -87,7 +92,7 @@ def index():
                              vapid_public_key=vapid_public_key,
                              stats=stats)
     except Exception as e:
-        print(f"[ERROR] index: {e}")
+        logger.error(f"Error index: {e}")
         return "Error interno del servidor", 500
 
 @main.route('/users_cards')
@@ -98,7 +103,7 @@ def users_cards():
         users = list(mongo.db.users.find())
         return render_template('components/cards_fragment.html', users=users)
     except Exception as e:
-        print(f"[ERROR] users_cards: {e}")
+        logger.error(f"Error users_cards: {e}")
         return "Error al cargar usuarios", 500
 
 @main.route('/user_card/<user_id>')
@@ -111,7 +116,7 @@ def user_card(user_id):
             return "Usuario no encontrado", 404
         return render_template("components/user_card.html", user=user)
     except Exception as e:
-        print(f"[ERROR] user_card: {e}")
+        logger.error(f"Error user_card: {e}")
         return "Error al cargar usuario", 500
 
 @main.route('/tareas')
@@ -149,7 +154,7 @@ def tareas():
                              vapid_public_key=vapid_public_key,
                              stats=stats)
     except Exception as e:
-        print(f"[ERROR] tareas: {e}")
+        logger.error(f"Error tareas: {e}")
         return "Error al cargar tareas", 500
 
 @main.route("/calendario")
@@ -195,7 +200,7 @@ def calendario():
                              events=eventos, 
                              vapid_public_key=vapid_public_key)
     except Exception as e:
-        print(f"[ERROR] calendario: {e}")
+        logger.error(f"Error calendario: {e}")
         return "Error al cargar calendario", 500
 
 @main.route('/menus')
@@ -243,7 +248,7 @@ def mostrar_menus():
                              users=users,
                              stats=stats)
     except Exception as e:
-        print(f"[ERROR] mostrar_menus: {e}")
+        logger.error(f"Error mostrar_menus: {e}")
         return "Error al cargar menús", 500
 
 @main.route('/api/add_menu', methods=['POST'])
@@ -272,7 +277,7 @@ def add_menu():
             try:
                 image_url = get_food_image(titulo)
             except Exception as e:
-                print(f"[ERROR] get_food_image: {e}")
+                logger.error(f"Error get_food_image: {e}")
                 image_url = "/static/img/default_food.jpg"
 
         # Actualizar o crear menú
@@ -289,7 +294,7 @@ def add_menu():
         
         return jsonify({"status": "ok", "image": image_url})
     except Exception as e:
-        print(f"[ERROR] add_menu: {e}")
+        logger.error(f"Error add_menu: {e}")
         return jsonify({"error": "Error al añadir menú"}), 500
 
 @main.route('/api/reset_menus', methods=['DELETE'])
@@ -310,7 +315,7 @@ def reset_menus():
             "deleted_count": result.deleted_count
         })
     except Exception as e:
-        print(f"[ERROR] reset_menus: {e}")
+        logger.error(f"Error reset_menus: {e}")
         return jsonify({"error": "Error al reiniciar menús"}), 500
 
 @main.route("/api/asignar_comida", methods=["POST"])
@@ -372,7 +377,8 @@ def asignar_comida():
             "prioridad": "normal",
             "created_by": session.get('user'),
             "created_at": datetime.now(),
-            "tipo": "cocina"
+            "tipo": "cocina",
+            "asignado": miembro  # Agregar campo asignado
         }
 
         # Asignar tarea al usuario
@@ -387,7 +393,7 @@ def asignar_comida():
             "tarea_titulo": tarea_titulo
         })
     except Exception as e:
-        print(f"[ERROR] asignar_comida: {e}")
+        logger.error(f"Error asignar_comida: {e}")
         return jsonify({"error": "Error al asignar comida"}), 500
 
 @main.route("/lista_compra")
@@ -395,7 +401,7 @@ def asignar_comida():
 def lista_compra():
     """Página de lista de la compra"""
     try:
-        items = list(mongo.db.lista_compra.find())
+        items = list(mongo.db.lista_compra.find().sort("created_at", -1))
         
         # Estadísticas
         total_items = len(items)
@@ -412,7 +418,7 @@ def lista_compra():
                              items=items,
                              stats=stats)
     except Exception as e:
-        print(f"[ERROR] lista_compra: {e}")
+        logger.error(f"Error lista_compra: {e}")
         return "Error al cargar lista de compra", 500
 
 @main.route('/configuracion')
@@ -439,7 +445,7 @@ def configuracion():
                              users=users,
                              system_stats=system_stats)
     except Exception as e:
-        print(f"[ERROR] configuracion: {e}")
+        logger.error(f"Error configuracion: {e}")
         return "Error al cargar configuración", 500
 
 @main.route('/api/add_user', methods=['POST'])
@@ -483,7 +489,7 @@ def add_user():
             "user_id": str(result.inserted_id)
         }), 201
     except Exception as e:
-        print(f"[ERROR] add_user: {e}")
+        logger.error(f"Error add_user: {e}")
         return jsonify({"error": "Error al crear usuario"}), 500
 
 @main.route('/api/delete_user/<user_id>', methods=['DELETE'])
@@ -513,7 +519,7 @@ def delete_user(user_id):
         
         return jsonify({"success": True}), 200
     except Exception as e:
-        print(f"[ERROR] delete_user: {e}")
+        logger.error(f"Error delete_user: {e}")
         return jsonify({"error": "Error al eliminar usuario"}), 500
 
 @main.route('/api/toggle_theme', methods=['POST'])
@@ -530,7 +536,7 @@ def toggle_theme():
         session["theme"] = new_theme
         return jsonify({"success": True, "theme": new_theme})
     except Exception as e:
-        print(f"[ERROR] toggle_theme: {e}")
+        logger.error(f"Error toggle_theme: {e}")
         return jsonify({"error": "Error al cambiar tema"}), 500
 
 @main.route("/chat")
@@ -562,7 +568,7 @@ def chat():
                              messages=messages,
                              stats=stats)
     except Exception as e:
-        print(f"[ERROR] chat: {e}")
+        logger.error(f"Error chat: {e}")
         return "Error al cargar chat", 500
 
 @main.route("/chat/messages", methods=["GET"])
@@ -586,7 +592,7 @@ def get_chat_messages():
 
         return jsonify(messages), 200
     except Exception as e:
-        print(f"[ERROR] get_chat_messages: {e}")
+        logger.error(f"Error get_chat_messages: {e}")
         return jsonify({"error": "Error al obtener mensajes"}), 500
 
 @main.route("/asistente-familiar")
@@ -604,19 +610,20 @@ def asistente_familiar_page():
         
         return render_template("ai.html", stats=stats)
     except Exception as e:
-        print(f"[ERROR] asistente_familiar_page: {e}")
+        logger.error(f"Error asistente_familiar_page: {e}")
         return "Error al cargar asistente", 500
 
 @main.route("/api/test-push/<username>")
 @login_required
 def test_push(username):
-    """Endpoint para probar notificaciones push"""
+    """Endpoint para probar notificaciones push - MEJORADO"""
     try:
         # Solo admin puede probar push
         if session.get('user') != 'Joso':
             return jsonify({"error": "Permisos insuficientes"}), 403
 
         from pywebpush import webpush, WebPushException
+        from urllib.parse import urlparse
         import json
 
         subscripcion = mongo.db.subscriptions.find_one({"user": username})
@@ -627,9 +634,27 @@ def test_push(username):
         if not vapid_private_key:
             return jsonify({"error": "VAPID no configurado"}), 500
 
+        def get_vapid_claims(endpoint_url):
+            try:
+                parsed = urlparse(endpoint_url)
+                return {
+                    "aud": f"{parsed.scheme}://{parsed.netloc}",
+                    "sub": "mailto:joso.jmf@gmail.com"
+                }
+            except Exception:
+                return None
+
         success_count = 0
         for sub in subscripcion.get("subscriptions", []):
             try:
+                endpoint = sub.get("endpoint")
+                if not endpoint:
+                    continue
+                    
+                claims = get_vapid_claims(endpoint)
+                if not claims:
+                    continue
+
                 webpush(
                     subscription_info=sub,
                     data=json.dumps({
@@ -639,14 +664,12 @@ def test_push(username):
                         "url": "/"
                     }),
                     vapid_private_key=vapid_private_key,
-                    vapid_claims={
-                        "sub": "mailto:joso.jmf@gmail.com"
-                    }
+                    vapid_claims=claims
                 )
                 success_count += 1
-                print(f"📲 Test push enviada a {username}")
+                logger.info(f"📲 Test push enviada a {username}")
             except WebPushException as ex:
-                print(f"❌ Error al enviar push: {repr(ex)}")
+                logger.error(f"❌ Error al enviar push: {repr(ex)}")
                 return jsonify({
                     "error": "Fallo al enviar push", 
                     "details": str(ex)
@@ -658,20 +681,23 @@ def test_push(username):
             "sent_count": success_count
         })
     except Exception as e:
-        print(f"[ERROR] test_push: {e}")
+        logger.error(f"Error test_push: {e}")
         return jsonify({"error": "Error interno"}), 500
 
 # ==========================================
-# Manejo de errores
+# Manejo de errores mejorado
 # ==========================================
 @main.errorhandler(404)
 def not_found_error(error):
+    logger.error(f"404 Error: {request.url}")
     return render_template('errors/404.html'), 404
 
 @main.errorhandler(500)
 def internal_error(error):
+    logger.error(f"500 Error: {error}")
     return render_template('errors/500.html'), 500
 
 @main.errorhandler(403)
 def forbidden_error(error):
+    logger.error(f"403 Error: {error}")
     return render_template('errors/403.html'), 403

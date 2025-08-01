@@ -11,7 +11,11 @@ import base64
 import os
 import requests
 from functools import wraps
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ==========================================
 # Mapeo entre TID de OwnTracks y nombre de usuario real
@@ -48,7 +52,7 @@ def get_vapid_claims(endpoint_url):
             "sub": "mailto:joso.jmf@gmail.com"
         }
     except Exception as e:
-        print(f"[ERROR] get_vapid_claims: {e}")
+        logger.error(f"Error get_vapid_claims: {e}")
         return None
 
 # ==========================================
@@ -71,7 +75,7 @@ def get_users():
             user['_id'] = str(user['_id'])
         return jsonify(users)
     except Exception as e:
-        print(f"[ERROR] get_users: {e}")
+        logger.error(f"Error get_users: {e}")
         return jsonify({"error": "No se pudieron obtener los usuarios"}), 500
 
 # ===================================================
@@ -218,7 +222,7 @@ def completar_tarea():
         
         return jsonify({"status": "ok"})
     except Exception as e:
-        print(f"[ERROR completar_tarea]: {traceback.format_exc()}")
+        logger.error(f"Error completar_tarea: {traceback.format_exc()}")
         return jsonify({"error": "Error al completar tarea"}), 500
 
 # ===================================================
@@ -268,7 +272,7 @@ def obtener_lista():
             item["_id"] = str(item["_id"])
         return jsonify(items)
     except Exception as e:
-        print(f"[ERROR] obtener_lista: {e}")
+        logger.error(f"Error obtener_lista: {e}")
         return jsonify({"error": "Error al obtener la lista"}), 500
 
 @api.route("/api/lista_compra", methods=["POST"])
@@ -309,7 +313,7 @@ def agregar_item():
 
         return jsonify({"success": True, "id": str(result.inserted_id)})
     except Exception as e:
-        print(f"[ERROR] agregar_item: {e}")
+        logger.error(f"Error agregar_item: {e}")
         return jsonify({"error": "Error al agregar el item"}), 500
 
 @api.route("/api/lista_compra/<item_id>", methods=["PUT"])
@@ -341,7 +345,7 @@ def editar_item(item_id):
 
         return jsonify({"success": True})
     except Exception as e:
-        print(f"[ERROR] editar_item: {e}")
+        logger.error(f"Error editar_item: {e}")
         return jsonify({"error": "Error al editar el item"}), 500
 
 @api.route("/api/lista_compra/<item_id>", methods=["DELETE"])
@@ -365,7 +369,7 @@ def eliminar_item(item_id):
 
         return jsonify({"success": True})
     except Exception as e:
-        print(f"[ERROR] eliminar_item: {e}")
+        logger.error(f"Error eliminar_item: {e}")
         return jsonify({"error": "Error al eliminar el item"}), 500
 
 @api.route("/api/lista_compra_all", methods=["DELETE"])
@@ -384,7 +388,7 @@ def eliminar_toda_lista():
 
         return jsonify({"success": True, "deleted_count": result.deleted_count})
     except Exception as e:
-        print(f"[ERROR] eliminar_toda_lista: {e}")
+        logger.error(f"Error eliminar_toda_lista: {e}")
         return jsonify({"error": "Error al vaciar la lista"}), 500
 
 @api.route("/api/lista_compra/<item_id>/toggle", methods=["PATCH"])
@@ -409,119 +413,8 @@ def marcar_comprado(item_id):
         
         return jsonify({"success": True, "comprado": new_status})
     except Exception as e:
-        print(f"[ERROR] marcar_comprado: {e}")
+        logger.error(f"Error marcar_comprado: {e}")
         return jsonify({"error": "Error al marcar el item"}), 500
-
-# ===================================================
-# Funciones de notificaciones mejoradas
-# ===================================================
-def send_push_to_user(user_name, title, body, url="/", icon="/static/icons/house-icon.png"):
-    """Enviar notificación push a un usuario específico"""
-    try:
-        vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
-        if not vapid_private_key:
-            print("❌ VAPID_PRIVATE_KEY no configurada")
-            return False
-
-        subscription_doc = mongo.db.subscriptions.find_one({"user": user_name})
-        if not subscription_doc:
-            print(f"❌ No hay suscripciones para {user_name}")
-            return False
-
-        success_count = 0
-        for sub in subscription_doc.get("subscriptions", []):
-            try:
-                endpoint = sub.get("endpoint")
-                if not endpoint:
-                    continue
-                    
-                claims = get_vapid_claims(endpoint)
-                if not claims:
-                    continue
-
-                webpush(
-                    subscription_info=sub,
-                    data=json.dumps({
-                        "title": title,
-                        "body": body,
-                        "icon": icon,
-                        "url": url
-                    }),
-                    vapid_private_key=vapid_private_key,
-                    vapid_claims=claims
-                )
-                success_count += 1
-                print(f"✅ Notificación enviada a {user_name}")
-                
-            except WebPushException as ex:
-                print(f"❌ Error al enviar push a {user_name}: {repr(ex)}")
-                # Limpiar suscripciones inválidas
-                if ex.response and ex.response.status_code in [410, 404]:
-                    mongo.db.subscriptions.update_one(
-                        {"user": user_name},
-                        {"$pull": {"subscriptions": sub}}
-                    )
-            except Exception as e:
-                print(f"❌ Error inesperado: {e}")
-
-        return success_count > 0
-        
-    except Exception as e:
-        print(f"❌ Error en send_push_to_user: {e}")
-        return False
-
-def send_push_to_all(title, body, url="/", icon="/static/icons/house-icon.png"):
-    """Enviar notificación push a todos los usuarios suscritos"""
-    try:
-        vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
-        if not vapid_private_key:
-            print("❌ VAPID_PRIVATE_KEY no configurada")
-            return
-
-        subscripciones = mongo.db.subscriptions.find()
-        total_sent = 0
-
-        for sub_doc in subscripciones:
-            user_name = sub_doc.get("user", "Unknown")
-            for sub in sub_doc.get("subscriptions", []):
-                try:
-                    endpoint = sub.get("endpoint")
-                    if not endpoint:
-                        continue
-                        
-                    claims = get_vapid_claims(endpoint)
-                    if not claims:
-                        continue
-
-                    webpush(
-                        subscription_info=sub,
-                        data=json.dumps({
-                            "title": title,
-                            "body": body,
-                            "icon": icon,
-                            "url": url
-                        }),
-                        vapid_private_key=vapid_private_key,
-                        vapid_claims=claims
-                    )
-                    total_sent += 1
-                    print(f"✅ Notificación enviada a {user_name}")
-                    
-                except WebPushException as ex:
-                    print(f"❌ Error al enviar push a {user_name}: {repr(ex)}")
-                    # Limpiar suscripciones inválidas
-                    if ex.response and ex.response.status_code in [410, 404]:
-                        mongo.db.subscriptions.update_one(
-                            {"user": user_name},
-                            {"$pull": {"subscriptions": sub}}
-                        )
-                except Exception as e:
-                    print(f"❌ Error inesperado al enviar push: {e}")
-
-        print(f"📊 Total notificaciones enviadas: {total_sent}")
-        
-    except Exception as e:
-        print(f"❌ Error en send_push_to_all: {e}")
 
 # ===================================================
 # Endpoint: Perfil de usuario
@@ -550,79 +443,180 @@ def get_user_profile(nombre):
             "last_status_change": user.get("last_status_change")
         })
     except Exception as e:
-        print(f"[ERROR] get_user_profile: {e}")
+        logger.error(f"Error get_user_profile: {e}")
         return jsonify({"error": "Error al obtener perfil"}), 500
 
 # ===================================================
-# Endpoint: Chat con IA familiar
+# Endpoint: Chat con IA familiar (CORREGIDO)
 # ===================================================
 @api.route("/api/chatfd", methods=["POST"])
 @login_required
 def chat_familiar():
-    """Chat con asistente familiar usando Groq"""
+    """Chat con asistente familiar usando Groq - VERSION MEJORADA"""
     try:
+        # Validate request
+        if not request.is_json:
+            logger.error("Request is not JSON")
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+            
         data = request.get_json()
+        if not data:
+            logger.error("No JSON data received")
+            return jsonify({"error": "No se recibieron datos JSON"}), 400
+            
         q = data.get("prompt", "").strip()
         
         if not q:
+            logger.error("Empty prompt received")
             return jsonify({"error": "Prompt vacío"}), 400
 
-        # Inicializar historial si no existe
+        logger.info(f"Processing chat request from user: {session.get('user')} with prompt: {q[:50]}...")
+
+        # Check API key
+        API_KEY = os.getenv("GROQ_API_KEY")
+        if not API_KEY:
+            logger.error("GROQ_API_KEY not configured")
+            return jsonify({"error": "Servicio de IA no configurado. Contacta al administrador."}), 500
+
+        # Initialize chat history
         if "chat_history" not in session:
             session["chat_history"] = [{
                 "role": "system", 
-                "content": "Eres un asistente familiar útil y amigable. Ayudas con tareas domésticas, organización familiar y consejos del hogar. Responde en español de manera concisa y práctica."
+                "content": """Eres un asistente familiar útil y amigable llamado 'Casa AI'. 
+                Ayudas con tareas domésticas, organización familiar, recetas, consejos del hogar y gestión familiar.
+                Responde en español de manera concisa, práctica y con emojis cuando sea apropiado.
+                Eres parte del sistema 'House App' que ayuda a la familia a organizarse mejor."""
             }]
 
-        # Limitar historial a últimos 20 mensajes para evitar tokens excesivos
-        if len(session["chat_history"]) > 20:
-            session["chat_history"] = session["chat_history"][:1] + session["chat_history"][-19:]
+        # Limit history to prevent token overflow
+        MAX_HISTORY = 15
+        if len(session["chat_history"]) > MAX_HISTORY:
+            session["chat_history"] = session["chat_history"][:1] + session["chat_history"][-(MAX_HISTORY-1):]
 
+        # Add user message
         session["chat_history"].append({"role": "user", "content": q})
 
-        # Configurar API
-        API_KEY = os.getenv("GROQ_API_KEY")
-        if not API_KEY:
-            return jsonify({"error": "API key no configurada"}), 500
-
-        headers = {"Authorization": f"Bearer {API_KEY}"}
+        # Prepare API request
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
         payload = {
-            "model": "llama-3.1-8b-instant",  # Modelo actualizado
+            "model": "llama-3.1-8b-instant",
             "messages": session["chat_history"],
-            "max_tokens": 500,
-            "temperature": 0.7
+            "max_tokens": 800,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "stream": False
         }
 
-        # Llamada a Groq con timeout
-        resp = requests.post(
-            "https://api.groq.cloud/v1/chat/completions", 
-            json=payload, 
-            headers=headers,
-            timeout=30
-        )
-        
-        if resp.status_code != 200:
-            print(f"[ERROR] Groq API: {resp.status_code} - {resp.text}")
-            return jsonify({"error": "Error en el servicio de IA"}), 500
+        logger.info(f"Sending request to Groq API with {len(session['chat_history'])} messages")
 
-        answer = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-        
-        if not answer:
-            return jsonify({"error": "Respuesta vacía del asistente"}), 500
+        # Make API call with proper error handling
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",  # Updated endpoint
+                json=payload, 
+                headers=headers,
+                timeout=45  # Increased timeout
+            )
+            
+            logger.info(f"Groq API response status: {resp.status_code}")
+            
+            if resp.status_code == 401:
+                logger.error("Groq API authentication failed")
+                return jsonify({"error": "Error de autenticación con el servicio de IA"}), 500
+            elif resp.status_code == 429:
+                logger.error("Groq API rate limit exceeded")
+                return jsonify({"error": "Límite de uso del servicio de IA excedido. Intenta más tarde."}), 429
+            elif resp.status_code != 200:
+                logger.error(f"Groq API error: {resp.status_code} - {resp.text}")
+                return jsonify({"error": f"Error del servicio de IA (código {resp.status_code})"}), 500
 
-        # Añadir respuesta al historial
-        session["chat_history"].append({"role": "assistant", "content": answer})
+            # Parse response
+            try:
+                response_data = resp.json()
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON from Groq API: {e}")
+                return jsonify({"error": "Respuesta inválida del servicio de IA"}), 500
 
-        return jsonify({"answer": answer})
-        
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "Timeout en el servicio de IA"}), 504
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Request error: {e}")
-        return jsonify({"error": "Error de conexión con el servicio de IA"}), 503
+            # Extract answer
+            choices = response_data.get("choices", [])
+            if not choices:
+                logger.error("No choices in Groq API response")
+                return jsonify({"error": "Respuesta vacía del servicio de IA"}), 500
+
+            message = choices[0].get("message", {})
+            answer = message.get("content", "").strip()
+            
+            if not answer:
+                logger.error("Empty content in Groq API response")
+                return jsonify({"error": "El asistente no pudo generar una respuesta"}), 500
+
+            # Add assistant response to history
+            session["chat_history"].append({"role": "assistant", "content": answer})
+            
+            # Log success
+            logger.info(f"Successfully generated AI response for user: {session.get('user')}")
+            
+            return jsonify({
+                "answer": answer,
+                "status": "success",
+                "model": "llama-3.1-8b-instant"
+            })
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout calling Groq API")
+            return jsonify({"error": "El servicio de IA tardó demasiado en responder. Intenta de nuevo."}), 504
+        except requests.exceptions.ConnectionError:
+            logger.error("Connection error calling Groq API")
+            return jsonify({"error": "No se pudo conectar con el servicio de IA. Verifica tu conexión."}), 503
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error calling Groq API: {e}")
+            return jsonify({"error": "Error de conexión con el servicio de IA"}), 503
+            
     except Exception as e:
-        print(f"[ERROR] chat_familiar: {traceback.format_exc()}")
-        return jsonify({"error": "Error interno del servidor"}), 500
+        logger.error(f"Unexpected error in chat_familiar: {traceback.format_exc()}")
+        return jsonify({"error": "Error interno del servidor. Intenta de nuevo."}), 500
+
+# ===================================================
+# Endpoint: Limpiar historial de chat
+# ===================================================
+@api.route("/api/clear_chat", methods=["POST"])
+@login_required
+def clear_chat_history():
+    """Limpiar el historial de chat del usuario"""
+    try:
+        session.pop("chat_history", None)
+        logger.info(f"Chat history cleared for user: {session.get('user')}")
+        return jsonify({"success": True, "message": "Historial de chat limpiado"})
+    except Exception as e:
+        logger.error(f"Error clearing chat history: {e}")
+        return jsonify({"error": "Error al limpiar historial"}), 500
+
+# ===================================================
+# Endpoint: Estado del servicio de IA
+# ===================================================
+@api.route("/api/ai_status", methods=["GET"])
+@login_required
+def ai_status():
+    """Verificar estado del servicio de IA"""
+    try:
+        API_KEY = os.getenv("GROQ_API_KEY")
+        has_api_key = bool(API_KEY)
+        
+        status = {
+            "available": has_api_key,
+            "model": "llama-3.1-8b-instant" if has_api_key else None,
+            "chat_history_length": len(session.get("chat_history", [])),
+            "provider": "Groq" if has_api_key else None
+        }
+        
+        return jsonify(status)
+    except Exception as e:
+        logger.error(f"Error getting AI status: {e}")
+        return jsonify({"error": "Error al verificar estado de IA"}), 500
 
 # ===================================================
 # Endpoint: Estadísticas básicas
@@ -643,7 +637,7 @@ def get_stats():
         }
         return jsonify(stats)
     except Exception as e:
-        print(f"[ERROR] get_stats: {e}")
+        logger.error(f"Error get_stats: {e}")
         return jsonify({"error": "Error al obtener estadísticas"}), 500
 
 # ===================================================
@@ -685,5 +679,116 @@ def cleanup_subscriptions():
 
         return jsonify({"success": True, "removed_count": removed_count})
     except Exception as e:
-        print(f"[ERROR] cleanup_subscriptions: {e}")
+        logger.error(f"Error cleanup_subscriptions: {e}")
         return jsonify({"error": "Error en limpieza"}), 500
+
+# ===================================================
+# Funciones de notificaciones mejoradas
+# ===================================================
+def send_push_to_user(user_name, title, body, url="/", icon="/static/icons/house-icon.png"):
+    """Enviar notificación push a un usuario específico - MEJORADO"""
+    try:
+        vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
+        if not vapid_private_key:
+            logger.error("VAPID_PRIVATE_KEY no configurada")
+            return False
+
+        subscription_doc = mongo.db.subscriptions.find_one({"user": user_name})
+        if not subscription_doc:
+            logger.warning(f"No hay suscripciones para {user_name}")
+            return False
+
+        success_count = 0
+        for sub in subscription_doc.get("subscriptions", []):
+            try:
+                endpoint = sub.get("endpoint")
+                if not endpoint:
+                    continue
+                    
+                claims = get_vapid_claims(endpoint)
+                if not claims:
+                    continue
+
+                webpush(
+                    subscription_info=sub,
+                    data=json.dumps({
+                        "title": title,
+                        "body": body,
+                        "icon": icon,
+                        "url": url
+                    }),
+                    vapid_private_key=vapid_private_key,
+                    vapid_claims=claims
+                )
+                success_count += 1
+                logger.info(f"✅ Notificación enviada a {user_name}")
+                
+            except WebPushException as ex:
+                logger.error(f"❌ Error al enviar push a {user_name}: {repr(ex)}")
+                # Limpiar suscripciones inválidas
+                if ex.response and ex.response.status_code in [410, 404]:
+                    mongo.db.subscriptions.update_one(
+                        {"user": user_name},
+                        {"$pull": {"subscriptions": sub}}
+                    )
+            except Exception as e:
+                logger.error(f"❌ Error inesperado enviando push: {e}")
+
+        return success_count > 0
+        
+    except Exception as e:
+        logger.error(f"❌ Error en send_push_to_user: {e}")
+        return False
+
+def send_push_to_all(title, body, url="/", icon="/static/icons/house-icon.png"):
+    """Enviar notificación push a todos los usuarios suscritos - MEJORADO"""
+    try:
+        vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
+        if not vapid_private_key:
+            logger.error("VAPID_PRIVATE_KEY no configurada")
+            return
+
+        subscripciones = mongo.db.subscriptions.find()
+        total_sent = 0
+
+        for sub_doc in subscripciones:
+            user_name = sub_doc.get("user", "Unknown")
+            for sub in sub_doc.get("subscriptions", []):
+                try:
+                    endpoint = sub.get("endpoint")
+                    if not endpoint:
+                        continue
+                        
+                    claims = get_vapid_claims(endpoint)
+                    if not claims:
+                        continue
+
+                    webpush(
+                        subscription_info=sub,
+                        data=json.dumps({
+                            "title": title,
+                            "body": body,
+                            "icon": icon,
+                            "url": url
+                        }),
+                        vapid_private_key=vapid_private_key,
+                        vapid_claims=claims
+                    )
+                    total_sent += 1
+                    logger.info(f"✅ Notificación enviada a {user_name}")
+                    
+                except WebPushException as ex:
+                    logger.error(f"❌ Error al enviar push a {user_name}: {repr(ex)}")
+                    # Limpiar suscripciones inválidas
+                    if ex.response and ex.response.status_code in [410, 404]:
+                        mongo.db.subscriptions.update_one(
+                            {"user": user_name},
+                            {"$pull": {"subscriptions": sub}}
+                        )
+                except Exception as e:
+                    logger.error(f"❌ Error inesperado al enviar push: {e}")
+
+        logger.info(f"📊 Total notificaciones enviadas: {total_sent}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error en send_push_to_all: {e}")
