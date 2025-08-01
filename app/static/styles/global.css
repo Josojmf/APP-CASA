@@ -656,6 +656,7 @@ button:hover {
     }
 
     .nav-links {
+        list-style: none;
         flex-direction: column;
         max-width: 85%;
         position: absolute;
