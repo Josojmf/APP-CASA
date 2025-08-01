@@ -1,103 +1,544 @@
-.theme-toggle, .user-management {
-  background: #ffffff;
+/* Variables CSS para consistencia y modo oscuro */
+:root {
+  --primary-color: #6366f1;
+  --primary-hover: #5855eb;
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+  --danger-hover: #dc2626;
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+  --gradient-danger: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+}
+
+/* Tema oscuro */
+.dark {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border-color: #334155;
+}
+
+/* Estilos base mejorados */
+body {
+  background: var(--bg-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.title {
+  text-align: center;
+  font-size: 2.5rem;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 3rem;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+/* Animaciones base */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* Secciones principales */
+.theme-toggle, 
+.task-management,
+.user-management {
+  background: var(--card-bg);
   margin: 2rem auto;
-  padding: 1.5rem;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
-  max-width: 40%;
+  padding: 2rem;
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg);
+  max-width: 600px;
+  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeInUp 0.6s ease-out;
 }
 
+.theme-toggle:nth-child(2) { animation-delay: 0.1s; }
+.task-management:nth-child(3) { animation-delay: 0.2s; }
+.user-management:nth-child(4) { animation-delay: 0.3s; }
+
+.theme-toggle:hover,
+.task-management:hover,
+.user-management:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--primary-color);
+}
+
+/* Efecto de brillo en hover */
+.theme-toggle::before,
+.task-management::before,
+.user-management::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -200px;
+  width: 200px;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.theme-toggle:hover::before,
+.task-management:hover::before,
+.user-management:hover::before {
+  left: 100%;
+}
+
+/* Títulos de sección */
 h2 {
-  margin-bottom: 1rem;
-  font-size: 1.6rem;
-  color: #1f2937;
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  position: relative;
+  padding-bottom: 0.5rem;
 }
 
+h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: var(--gradient-primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+h2:hover::after {
+  width: 120px;
+}
+
+/* Toggle switch mejorado */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 80px;
+  height: 44px;
+}
+
+.switch input { 
+  display: none; 
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; 
+  left: 0;
+  right: 0; 
+  bottom: 0;
+  background: linear-gradient(145deg, #e2e8f0, #cbd5e1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 44px;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 36px;
+  width: 36px;
+  left: 4px;
+  bottom: 4px;
+  background: linear-gradient(145deg, #ffffff, #f1f5f9);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.slider:after {
+  content: '☀️';
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  transition: all 0.4s ease;
+}
+
+input:checked + .slider {
+  background: var(--gradient-primary);
+  box-shadow: 
+    inset 0 2px 4px rgba(99, 102, 241, 0.3),
+    0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+input:checked + .slider:before {
+  transform: translateX(36px);
+  background: linear-gradient(145deg, #f8fafc, #e2e8f0);
+}
+
+input:checked + .slider:after {
+  content: '🌙';
+  left: 20px;
+}
+
+.slider:hover {
+  transform: scale(1.05);
+}
+
+/* Botón de limpiar tareas */
+#clearTasksBtn {
+  background: var(--gradient-danger);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+}
+
+#clearTasksBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+#clearTasksBtn:active {
+  transform: translateY(0);
+}
+
+#clearTasksBtn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+#clearTasksBtn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Formulario de añadir usuario */
 form#addUserForm {
-width: 100%;
+  width: 100%;
   display: flex;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  animation: slideInLeft 0.6s ease-out;
 }
 
 #addUserForm input {
   flex: 1;
-  padding: 0.8rem;
-  border-radius: 12px;
-  border: 1px solid #ccc;
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+  border: 2px solid var(--border-color);
   font-size: 1rem;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+#addUserForm input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
+}
+
+#addUserForm input[type="file"] {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+#addUserForm input[type="file"]:hover {
+  background: var(--bg-color);
 }
 
 #addUserForm button {
-  background: #6366f1;
+  background: var(--gradient-primary);
   color: white;
   border: none;
-  padding: 0.8rem 1.2rem;
-  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
 }
 
+#addUserForm button:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: var(--shadow-lg);
+}
+
+#addUserForm button::after {
+  content: '✨';
+  position: absolute;
+  top: 50%;
+  right: -30px;
+  transform: translateY(-50%);
+  transition: right 0.3s ease;
+}
+
+#addUserForm button:hover::after {
+  right: 1rem;
+}
+
+/* Lista de usuarios */
 .user-list {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
 .user-list li {
-  background: #f3f4f6;
-  padding: 1rem;
-  border-radius: 12px;
-  margin-bottom: 0.8rem;
+  background: linear-gradient(135deg, var(--card-bg) 0%, var(--bg-color) 100%);
+  padding: 1.2rem;
+  border-radius: 18px;
+  margin-bottom: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
+.user-list li:hover {
+  transform: translateX(8px);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-color);
+}
+
+.user-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background: var(--gradient-primary);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+}
+
+.user-list li:hover::before {
+  transform: scaleY(1);
+}
+
+.user-info {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Indicadores de estado animados */
+.user-info:has-text("🟢") {
+  animation: pulse 2s infinite;
+}
+
+/* Botón de eliminar */
 .delete-btn {
-  background: #ef4444;
+  background: var(--gradient-danger);
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.3s ease;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
 }
 
 .delete-btn:hover {
-  background: #dc2626;
+  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
 }
 
-/* Toggle switch */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 32px;
-}
-.switch input { display: none; }
-.slider {
+.delete-btn::before {
+  content: '';
   position: absolute;
-  cursor: pointer;
-  top: 0; left: 0;
-  right: 0; bottom: 0;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 32px;
-}
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 24px;
-  width: 24px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .4s;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
 }
-input:checked + .slider {
-  background-color: #6366f1;
+
+.delete-btn:active::before {
+  width: 100px;
+  height: 100px;
 }
-input:checked + .slider:before {
-  transform: translateX(28px);
+
+/* Efectos adicionales */
+.user-list li:nth-child(odd) {
+  animation: slideInLeft 0.6s ease-out;
+}
+
+.user-list li:nth-child(even) {
+  animation: slideInLeft 0.6s ease-out;
+  animation-delay: 0.1s;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .theme-toggle, 
+  .task-management,
+  .user-management {
+    max-width: 95%;
+    margin: 1rem auto;
+    padding: 1.5rem;
+  }
+  
+  form#addUserForm {
+    flex-direction: column;
+  }
+  
+  .title {
+    font-size: 2rem;
+  }
+  
+  .user-list li {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+}
+
+/* Efectos de carga */
+.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+/* Transiciones de tema */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Mejoras adicionales de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Estados de focus mejorados */
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Efectos de hover para móviles */
+@media (hover: none) {
+  .theme-toggle:hover,
+  .task-management:hover,
+  .user-management:hover {
+    transform: none;
+  }
+  
+  .user-list li:hover {
+    transform: none;
+  }
 }
