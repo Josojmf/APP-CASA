@@ -10,60 +10,106 @@
     <h1 class="titleMenus">🍽️ Menús de la semana</h1>
 
     <div class="menus-actions">
-        <button id="resetWeekBtn" class="reset-btn">🗑 Reiniciar semana</button>
-        <button id="addMenuBtn" class="floating-btn" title="Añadir menú">➕</button>
+        <button id="resetWeekBtn" class="reset-btn">
+            <i class="fas fa-trash-alt"></i> Reiniciar semana
+        </button>
+        <button id="addMenuBtn" class="floating-btn" title="Añadir menú">
+            <i class="fas fa-plus"></i>
+        </button>
     </div>
 
     <div class="week-grid">
         {% for day in ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'] %}
-        <div class="day-column">
+        <div class="day-column" data-day="{{ day }}">
             <h3>{{ day }}</h3>
             {% for momento in ['comida', 'cena'] %}
             <div class="meal" data-dia="{{ day }}" data-momento="{{ momento }}">
-                <span class="label">{{ momento|capitalize }}:</span>
+                <span class="label">
+                    <i class="fas fa-{{ 'sun' if momento == 'comida' else 'moon' }}"></i>
+                    {{ momento|capitalize }}
+                </span>
+                
                 {% if menus[day][momento] %}
-                <span class="meal-title">{{ menus[day][momento]['titulo'] }}</span>
-                <img src="{{ menus[day][momento]['img'] }}" alt="{{ menus[day][momento]['titulo'] }}" class="meal-img">
+                <div class="meal-content">
+                    <span class="meal-title">
+                        <i class="fas fa-utensils"></i>
+                        {{ menus[day][momento]['titulo'] }}
+                    </span>
+                    {% if menus[day][momento].get('img') %}
+                    <img src="{{ menus[day][momento]['img'] }}" 
+                         alt="{{ menus[day][momento]['titulo'] }}" 
+                         class="meal-img"
+                         loading="lazy">
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="meal-empty">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Sin plato asignado</span>
+                </div>
                 {% endif %}
+                
                 <div class="assignment">
-                    <span class="assigned-to">Le toca a: <strong>{{ menus[day][momento].asignado if menus[day][momento]
-                            and menus[day][momento]['asignado'] else 'No asignado' }}</strong></span>
-                    <button class="assign-btn" onclick="openAssignOverlay('{{ day }}', '{{ momento }}')">🔐
-                        Asignar</button>
+                    <div class="assigned-to">
+                        <i class="fas fa-user-check"></i>
+                        <span>Le toca a: 
+                            <strong>{{ menus[day][momento].asignado if menus[day][momento] and menus[day][momento]['asignado'] else 'No asignado' }}</strong>
+                        </span>
+                    </div>
+                    <button class="assign-btn" onclick="openAssignOverlay('{{ day }}', '{{ momento }}')">
+                        <i class="fas fa-hand-point-right"></i>
+                        Asignar
+                    </button>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% endfor %}
     </div>
-
 </div>
 
 <!-- Modal para añadir menú -->
 <div id="overlay" class="overlay">
     <div class="overlay-content fade-in-modal">
-        <h2>Añadir nuevo menú</h2>
+        <h2><i class="fas fa-plus-circle"></i> Añadir nuevo menú</h2>
         <form id="menuForm">
-            <label for="dia">Día:</label>
-            <select id="dia" name="dia" required>
-                <option value="">Seleccionar día</option>
-                {% for day in ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'] %}
-                <option value="{{ day }}">{{ day }}</option>
-                {% endfor %}
-            </select>
+            <div class="form-group">
+                <label for="dia">
+                    <i class="fas fa-calendar-day"></i> Día de la semana:
+                </label>
+                <select id="dia" name="dia" required>
+                    <option value="">Seleccionar día</option>
+                    {% for day in ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'] %}
+                    <option value="{{ day }}">{{ day }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-            <label for="momento">Momento:</label>
-            <select id="momento" name="momento" required>
-                <option value="comida">Comida</option>
-                <option value="cena">Cena</option>
-            </select>
+            <div class="form-group">
+                <label for="momento">
+                    <i class="fas fa-clock"></i> Momento del día:
+                </label>
+                <select id="momento" name="momento" required>
+                    <option value="comida">🌞 Comida</option>
+                    <option value="cena">🌙 Cena</option>
+                </select>
+            </div>
 
-            <label for="titulo">Título del plato:</label>
-            <input type="text" id="titulo" name="titulo" required>
+            <div class="form-group">
+                <label for="titulo">
+                    <i class="fas fa-utensils"></i> Nombre del plato:
+                </label>
+                <input type="text" id="titulo" name="titulo" required 
+                       placeholder="Ej: Paella de verduras">
+            </div>
 
             <div class="form-buttons">
-                <button type="submit">Guardar</button>
-                <button type="button" id="cancelBtn">Cancelar</button>
+                <button type="submit">
+                    <i class="fas fa-save"></i> Guardar Menú
+                </button>
+                <button type="button" id="cancelBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
             </div>
         </form>
     </div>
@@ -72,22 +118,41 @@
 <!-- Overlay para asignación -->
 <div id="assignOverlay" class="overlay">
     <div class="overlay-content fade-in-modal">
-        <h2>Asignar persona a la comida</h2>
+        <h2><i class="fas fa-user-plus"></i> Asignar persona a la comida</h2>
         <form id="assignForm">
             <input type="hidden" id="assignDia" name="dia">
             <input type="hidden" id="assignMomento" name="momento">
 
-            <label for="asignado">Asignar a:</label>
-            <select id="asignado" name="asignado" required>
-                <option value="">Seleccionar miembro</option>
-                {% for user in users %}
-                <option value="{{ user.nombre }}">{{ user.nombre }}</option>
-                {% endfor %}
-            </select>
+            <div class="assignment-preview">
+                <div class="preview-day">
+                    <i class="fas fa-calendar"></i>
+                    <span id="previewDay">-</span>
+                </div>
+                <div class="preview-meal">
+                    <i class="fas fa-clock"></i>
+                    <span id="previewMeal">-</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="asignado">
+                    <i class="fas fa-user"></i> Asignar a:
+                </label>
+                <select id="asignado" name="asignado" required>
+                    <option value="">Seleccionar miembro</option>
+                    {% for user in users %}
+                    <option value="{{ user.nombre }}">{{ user.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
             <div class="form-buttons">
-                <button type="submit">Asignar</button>
-                <button type="button" onclick="closeAssignOverlay()">Cancelar</button>
+                <button type="submit">
+                    <i class="fas fa-check"></i> Asignar
+                </button>
+                <button type="button" onclick="closeAssignOverlay()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
             </div>
         </form>
     </div>
@@ -96,83 +161,704 @@
 
 {% block extra_js %}
 <script>
-    document.getElementById('addMenuBtn').addEventListener('click', () => {
-        document.getElementById('overlay').style.display = 'flex';
-    });
+    // Variables globales
+    let currentAssignDay = '';
+    let currentAssignMoment = '';
 
-    document.getElementById('cancelBtn').addEventListener('click', () => {
-        document.getElementById('overlay').style.display = 'none';
-    });
-
-    document.getElementById('menuForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = {
-            dia: document.getElementById('dia').value,
-            momento: document.getElementById('momento').value,
-            titulo: document.getElementById('titulo').value
-        };
-
-        const res = await fetch('/api/add_menu', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animar las tarjetas al cargar
+        const dayCards = document.querySelectorAll('.day-column');
+        dayCards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
         });
 
-        if (res.ok) {
-            document.getElementById('overlay').style.display = 'none';
-            window.location.reload();
-        } else {
-            alert("Error al guardar");
-        }
+        // Configurar tooltips para imágenes
+        setupImageTooltips();
     });
 
-    document.getElementById('resetWeekBtn').addEventListener('click', async () => {
-        if (confirm("¿Estás seguro de que quieres borrar todos los menús de la semana?")) {
-            const res = await fetch('/api/reset_menus', { method: 'DELETE' });
-            if (res.ok) {
-                window.location.reload();
-            } else {
-                alert("Error al reiniciar la semana.");
+    // Abrir modal de nuevo menú
+    document.getElementById('addMenuBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+        setTimeout(() => {
+            document.getElementById('dia').focus();
+        }, 100);
+    });
+
+    // Cerrar modal de menú
+    document.getElementById('cancelBtn').addEventListener('click', closeMenuModal);
+    
+    function closeMenuModal() {
+        const overlay = document.getElementById('overlay');
+        overlay.style.animation = 'overlayFadeOut 0.3s ease forwards';
+        document.body.style.overflow = 'auto';
+        
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.style.animation = '';
+            document.getElementById('menuForm').reset();
+        }, 300);
+    }
+
+    // Cerrar modales con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const menuOverlay = document.getElementById('overlay');
+            const assignOverlay = document.getElementById('assignOverlay');
+            
+            if (menuOverlay.style.display === 'flex') {
+                closeMenuModal();
+            } else if (assignOverlay.style.display === 'flex') {
+                closeAssignOverlay();
             }
         }
     });
 
+    // Cerrar modal al hacer click fuera
+    document.getElementById('overlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            closeMenuModal();
+        }
+    });
+
+    document.getElementById('assignOverlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            closeAssignOverlay();
+        }
+    });
+
+    // Enviar formulario de menú
+    document.getElementById('menuForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Mostrar loading
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        submitBtn.disabled = true;
+
+        const data = {
+            dia: document.getElementById('dia').value,
+            momento: document.getElementById('momento').value,
+            titulo: document.getElementById('titulo').value.trim()
+        };
+
+        try {
+            const res = await fetch('/api/add_menu', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                // Mostrar éxito
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Guardado!';
+                submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                
+                setTimeout(() => {
+                    closeMenuModal();
+                    showNotification('¡Menú añadido correctamente! 🍽️', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                }, 800);
+            } else {
+                throw new Error('Error del servidor');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            
+            // Mostrar error
+            submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.style.background = '';
+                submitBtn.disabled = false;
+            }, 2000);
+        }
+    });
+
+    // Botón de reiniciar semana
+    document.getElementById('resetWeekBtn').addEventListener('click', async () => {
+        const result = await showConfirmDialog(
+            '¿Estás seguro?',
+            '¿Quieres borrar todos los menús de la semana? Esta acción no se puede deshacer.',
+            'Sí, borrar todo',
+            'Cancelar'
+        );
+
+        if (result) {
+            const btn = document.getElementById('resetWeekBtn');
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Borrando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/reset_menus', { method: 'DELETE' });
+                
+                if (res.ok) {
+                    btn.innerHTML = '<i class="fas fa-check"></i> ¡Borrado!';
+                    btn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                    
+                    showNotification('¡Semana reiniciada correctamente! 🗑️', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    throw new Error('Error del servidor');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+                btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+            }
+        }
+    });
+
+    // Función para abrir overlay de asignación
     function openAssignOverlay(dia, momento) {
+        currentAssignDay = dia;
+        currentAssignMoment = momento;
+        
         document.getElementById('assignDia').value = dia;
         document.getElementById('assignMomento').value = momento;
+        
+        // Mostrar preview
+        document.getElementById('previewDay').textContent = dia;
+        document.getElementById('previewMeal').textContent = momento === 'comida' ? '🌞 Comida' : '🌙 Cena';
+        
         document.getElementById('assignOverlay').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+        setTimeout(() => {
+            document.getElementById('asignado').focus();
+        }, 100);
     }
 
+    // Función para cerrar overlay de asignación
     function closeAssignOverlay() {
-        document.getElementById('assignOverlay').style.display = 'none';
+        const overlay = document.getElementById('assignOverlay');
+        overlay.style.animation = 'overlayFadeOut 0.3s ease forwards';
+        document.body.style.overflow = 'auto';
+        
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.style.animation = '';
+            document.getElementById('assignForm').reset();
+        }, 300);
     }
 
+    // Enviar formulario de asignación
     document.getElementById('assignForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Mostrar loading
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Asignando...';
+        submitBtn.disabled = true;
+
         const dia = document.getElementById('assignDia').value;
         const tipo = document.getElementById('assignMomento').value;
         const miembro = document.getElementById('asignado').value;
 
-        const res = await fetch('/api/asignar_comida', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dia, tipo, miembro })
-        });
+        try {
+            const res = await fetch('/api/asignar_comida', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dia, tipo, miembro })
+            });
 
-        if (res.ok) {
-            closeAssignOverlay();
-
-            // Actualiza dinámicamente el texto "Le toca a:"
-            const mealEl = document.querySelector(`.meal[data-dia="${dia}"][data-momento="${tipo}"]`);
-            if (mealEl) {
-                const assignedEl = mealEl.querySelector(".assigned-to strong");
-                if (assignedEl) {
-                    assignedEl.textContent = miembro;
-                }
+            if (res.ok) {
+                // Mostrar éxito
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Asignado!';
+                submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                
+                setTimeout(() => {
+                    closeAssignOverlay();
+                    
+                    // Actualizar dinámicamente el texto "Le toca a:"
+                    const mealEl = document.querySelector(`.meal[data-dia="${dia}"][data-momento="${tipo}"]`);
+                    if (mealEl) {
+                        const assignedEl = mealEl.querySelector(".assigned-to strong");
+                        if (assignedEl) {
+                            assignedEl.textContent = miembro;
+                            
+                            // Animación de actualización
+                            assignedEl.style.animation = 'updatePulse 0.6s ease';
+                        }
+                    }
+                    
+                    showNotification(`¡${miembro} asignado correctamente! 👤`, 'success');
+                }, 800);
+            } else {
+                throw new Error('Error del servidor');
             }
-        } else {
-            alert("Error al asignar persona.");
+        } catch (error) {
+            console.error('Error:', error);
+            
+            // Mostrar error
+            submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.style.background = '';
+                submitBtn.disabled = false;
+            }, 2000);
         }
     });
+
+    // Función para mostrar notificaciones
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            ${message}
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
+    }
+
+    // Función para mostrar dialog de confirmación
+    function showConfirmDialog(title, message, confirmText, cancelText) {
+        return new Promise((resolve) => {
+            const dialog = document.createElement('div');
+            dialog.className = 'confirm-dialog-overlay';
+            dialog.innerHTML = `
+                <div class="confirm-dialog">
+                    <div class="confirm-dialog-header">
+                        <h3><i class="fas fa-exclamation-triangle"></i> ${title}</h3>
+                    </div>
+                    <div class="confirm-dialog-body">
+                        <p>${message}</p>
+                    </div>
+                    <div class="confirm-dialog-actions">
+                        <button class="confirm-btn confirm-danger">
+                            <i class="fas fa-trash"></i> ${confirmText}
+                        </button>
+                        <button class="confirm-btn confirm-cancel">
+                            <i class="fas fa-times"></i> ${cancelText}
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(dialog);
+            document.body.style.overflow = 'hidden';
+            
+            // Animación de entrada
+            setTimeout(() => {
+                dialog.style.opacity = '1';
+                dialog.querySelector('.confirm-dialog').style.transform = 'translateY(0) scale(1)';
+            }, 10);
+            
+            // Event listeners
+            dialog.querySelector('.confirm-danger').onclick = () => {
+                closeDialog(true);
+            };
+            
+            dialog.querySelector('.confirm-cancel').onclick = () => {
+                closeDialog(false);
+            };
+            
+            dialog.onclick = (e) => {
+                if (e.target === dialog) {
+                    closeDialog(false);
+                }
+            };
+            
+            function closeDialog(result) {
+                dialog.style.opacity = '0';
+                dialog.querySelector('.confirm-dialog').style.transform = 'translateY(-20px) scale(0.95)';
+                document.body.style.overflow = 'auto';
+                
+                setTimeout(() => {
+                    dialog.remove();
+                    resolve(result);
+                }, 300);
+            }
+        });
+    }
+
+    // Configurar tooltips para imágenes
+    function setupImageTooltips() {
+        const images = document.querySelectorAll('.meal-img');
+        images.forEach(img => {
+            img.addEventListener('mouseenter', function() {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'img-tooltip';
+                tooltip.textContent = this.alt;
+                document.body.appendChild(tooltip);
+                
+                const rect = this.getBoundingClientRect();
+                tooltip.style.left = rect.left + rect.width / 2 - tooltip.offsetWidth / 2 + 'px';
+                tooltip.style.top = rect.top - tooltip.offsetHeight - 10 + 'px';
+                
+                setTimeout(() => tooltip.classList.add('show'), 10);
+                
+                this.tooltip = tooltip;
+            });
+            
+            img.addEventListener('mouseleave', function() {
+                if (this.tooltip) {
+                    this.tooltip.classList.remove('show');
+                    setTimeout(() => {
+                        if (this.tooltip && this.tooltip.parentNode) {
+                            this.tooltip.remove();
+                        }
+                    }, 300);
+                }
+            });
+        });
+    }
 </script>
+
+<style>
+/* Estilos adicionales específicos para el HTML */
+.meal-content {
+    margin: 10px 0;
+}
+
+.meal-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.meal-empty i {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: var(--accent-primary);
+    opacity: 0.5;
+}
+
+.assignment-preview {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.preview-day,
+.preview-meal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+}
+
+/* Dialog de confirmación */
+.confirm-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.confirm-dialog {
+    background: var(--card-bg-light);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    width: 90%;
+    max-width: 450px;
+    box-shadow: var(--shadow-heavy);
+    transform: translateY(-20px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.confirm-dialog::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.confirm-dialog-header {
+    padding: 25px 30px 15px;
+}
+
+.confirm-dialog-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.confirm-dialog-header i {
+    color: #ef4444;
+}
+
+.confirm-dialog-body {
+    padding: 0 30px 20px;
+}
+
+.confirm-dialog-body p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+    padding: 20px 30px 30px;
+    display: flex;
+    gap: 15px;
+}
+
+.confirm-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.confirm-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: all 0.6s ease;
+}
+
+.confirm-btn:hover::before {
+    left: 100%;
+}
+
+.confirm-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+}
+
+.confirm-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(239, 68, 68, 0.4);
+}
+
+.confirm-cancel {
+    background: rgba(107, 114, 128, 0.1);
+    color: var(--text-secondary);
+    border: 2px solid rgba(107, 114, 128, 0.2);
+}
+
+.confirm-cancel:hover {
+    background: rgba(107, 114, 128, 0.2);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(107, 114, 128, 0.2);
+}
+
+/* Tooltip para imágenes */
+.img-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    z-index: 1002;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: all 0.3s ease;
+    pointer-events: none;
+}
+
+.img-tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Notificaciones */
+.notification {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    max-width: 300px;
+}
+
+.notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-success {
+    border-left: 4px solid #22c55e;
+    color: #15803d;
+}
+
+.notification-success i {
+    color: #22c55e;
+}
+
+.notification-error {
+    border-left: 4px solid #ef4444;
+    color: #dc2626;
+}
+
+.notification-error i {
+    color: #ef4444;
+}
+
+/* Animación de actualización */
+@keyframes updatePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); background: rgba(99, 102, 241, 0.1); }
+}
+
+/* Animación de fade out para overlays */
+@keyframes overlayFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Tema oscuro para elementos específicos */
+body.dark .meal-empty {
+    color: #9ca3af;
+}
+
+body.dark .assignment-preview {
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+body.dark .preview-day,
+body.dark .preview-meal {
+    color: #8b5cf6;
+}
+
+body.dark .confirm-dialog {
+    background: var(--card-bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .confirm-dialog-header h3 {
+    color: #f3f4f6;
+}
+
+body.dark .confirm-dialog-body p {
+    color: #9ca3af;
+}
+
+body.dark .notification {
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .notification-success {
+    color: #4ade80;
+}
+
+body.dark .notification-error {
+    color: #f87171;
+}
+
+/* Mejoras responsivas adicionales */
+@media (max-width: 480px) {
+    .assignment-preview {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .confirm-dialog-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .notification {
+        top: 90px;
+        right: 15px;
+        left: 15px;
+        max-width: none;
+        font-size: 0.9rem;
+    }
+    
+    .img-tooltip {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+}
+</style>
 {% endblock %}
