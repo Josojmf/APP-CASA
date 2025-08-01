@@ -10,32 +10,68 @@
 <h1 class="title">📅 Calendario de tareas</h1>
 <div id="calendar"></div>
 
-<button id="addTaskBtn" class="floating-btn btn-calendario" title="Añadir tarea">➕</button>
+<button id="addTaskBtn" class="floating-btn btn-calendario" title="Añadir nueva tarea">
+    <i class="fas fa-plus"></i>
+</button>
 
 <div id="overlay" class="overlay">
     <div class="overlay-content">
-        <h2>Añadir nueva tarea</h2>
+        <h2><i class="fas fa-calendar-plus"></i> Añadir nueva tarea</h2>
         <form id="taskForm">
-            <label for="titulo">Título:</label>
-            <input type="text" id="titulo" name="titulo" required>
+            <div class="form-group">
+                <label for="titulo">
+                    <i class="fas fa-heading"></i> Título de la tarea:
+                </label>
+                <input type="text" id="titulo" name="titulo" required 
+                       placeholder="Ej: Reunión de equipo">
+            </div>
 
-            <label for="asignee">Asignado a:</label>
-            <select id="asignee" name="asignee" required>
-                <option value="">Seleccionar usuario</option>
-                {% for user in users %}
-                <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
-                {% endfor %}
-            </select>
+            <div class="form-group">
+                <label for="asignee">
+                    <i class="fas fa-user"></i> Asignado a:
+                </label>
+                <select id="asignee" name="asignee" required>
+                    <option value="">Seleccionar usuario</option>
+                    {% for user in users %}
+                    <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-            <label for="due_date">Fecha límite:</label>
-            <input type="date" id="due_date" name="due_date" required>
+            <div class="form-group">
+                <label for="due_date">
+                    <i class="fas fa-calendar-alt"></i> Fecha límite:
+                </label>
+                <input type="date" id="due_date" name="due_date" required>
+            </div>
 
-            <label for="pasos">Pasos (opcional):</label>
-            <textarea id="pasos" name="pasos" rows="3"></textarea>
+            <div class="form-group">
+                <label for="prioridad">
+                    <i class="fas fa-flag"></i> Prioridad:
+                </label>
+                <select id="prioridad" name="prioridad">
+                    <option value="baja">🟢 Baja</option>
+                    <option value="normal" selected>🟡 Normal</option>
+                    <option value="alta">🟠 Alta</option>
+                    <option value="urgente">🔴 Urgente</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="pasos">
+                    <i class="fas fa-list-ul"></i> Descripción:
+                </label>
+                <textarea id="pasos" name="pasos" rows="3" 
+                          placeholder="Describe la tarea o evento..."></textarea>
+            </div>
 
             <div class="form-buttons">
-                <button type="submit">Guardar</button>
-                <button type="button" id="cancelBtn">Cancelar</button>
+                <button type="submit">
+                    <i class="fas fa-save"></i> Guardar Tarea
+                </button>
+                <button type="button" id="cancelBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
             </div>
         </form>
     </div>
@@ -44,58 +80,671 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/es.global.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const calendarEl = document.getElementById('calendar');
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        locale: 'es',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
-        events: {{ events | tojson }},
-        eventColor: '#10b981',
-        eventTextColor: '#fff'
-    });
-    calendar.render();
-});
-
-document.getElementById('addTaskBtn').addEventListener('click', () => {
-    document.getElementById('overlay').style.display = 'flex';
-});
-document.getElementById('cancelBtn').addEventListener('click', () => {
-    document.getElementById('overlay').style.display = 'none';
-});
-document.getElementById('taskForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const data = {
-        titulo: document.getElementById('titulo').value,
-        asignee: document.getElementById('asignee').value,
-        due_date: document.getElementById('due_date').value,
-        pasos: document.getElementById('pasos').value,
-    };
-
-    try {
-        const res = await fetch('/api/add_task', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+    let calendar;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const calendarEl = document.getElementById('calendar');
+        
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'es',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            buttonText: {
+                today: 'Hoy',
+                month: 'Mes',
+                week: 'Semana',
+                list: 'Lista'
+            },
+            events: {{ events | tojson }},
+            eventColor: '#10b981',
+            eventTextColor: '#fff',
+            height: 'auto',
+            aspectRatio: 1.8,
+            
+            // Configuración de eventos
+            eventDidMount: function(info) {
+                // Añadir clases CSS basadas en prioridad
+                if (info.event.extendedProps.prioridad) {
+                    info.el.classList.add(`priority-${info.event.extendedProps.prioridad}`);
+                }
+                
+                // Tooltip con información adicional
+                info.el.setAttribute('title', 
+                    `${info.event.title}\nAsignado a: ${info.event.extendedProps.asignee || 'No asignado'}\nFecha: ${info.event.start.toLocaleDateString()}`
+                );
+                
+                // Animación de entrada
+                info.el.style.animation = 'eventSlideIn 0.3s ease forwards';
+            },
+            
+            // Click en evento
+            eventClick: function(info) {
+                showEventDetails(info.event);
+            },
+            
+            // Click en día
+            dateClick: function(info) {
+                document.getElementById('due_date').value = info.dateStr;
+                document.getElementById('overlay').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                setTimeout(() => {
+                    document.getElementById('titulo').focus();
+                }, 100);
+            },
+            
+            // Configuración responsiva
+            windowResize: function() {
+                calendar.updateSize();
+            }
         });
+        
+        calendar.render();
+        
+        // Configurar fecha mínima para hoy
+        const dateInput = document.getElementById('due_date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = today;
+        dateInput.value = today;
+    });
 
-        if (!res.ok) {
-            console.error("Error al añadir tarea");
-            return;
-        }
-
-        document.getElementById('overlay').style.display = 'none';
-        document.getElementById('taskForm').reset();
-        window.location.reload();
-    } catch (error) {
-        console.error("Error:", error);
+    // Función para mostrar detalles del evento
+    function showEventDetails(event) {
+        const modal = document.createElement('div');
+        modal.className = 'event-detail-modal';
+        modal.innerHTML = `
+            <div class="event-detail-content">
+                <div class="event-detail-header">
+                    <h3><i class="fas fa-calendar-check"></i> ${event.title}</h3>
+                    <button class="close-detail-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="event-detail-body">
+                    <div class="event-detail-item">
+                        <i class="fas fa-user"></i>
+                        <span>Asignado a: ${event.extendedProps.asignee || 'No asignado'}</span>
+                    </div>
+                    <div class="event-detail-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>Fecha: ${event.start.toLocaleDateString('es-ES', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}</span>
+                    </div>
+                    ${event.extendedProps.prioridad ? `
+                        <div class="event-detail-item">
+                            <i class="fas fa-flag"></i>
+                            <span>Prioridad: ${event.extendedProps.prioridad}</span>
+                        </div>
+                    ` : ''}
+                    ${event.extendedProps.pasos ? `
+                        <div class="event-detail-item">
+                            <i class="fas fa-list-ul"></i>
+                            <span>Descripción: ${event.extendedProps.pasos}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="event-detail-actions">
+                    <button class="complete-event-btn" onclick="completeEvent('${event.id}')">
+                        <i class="fas fa-check"></i> Completar
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+        
+        // Cerrar modal
+        modal.querySelector('.close-detail-btn').onclick = () => {
+            closeEventDetail(modal);
+        };
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeEventDetail(modal);
+            }
+        };
+        
+        // Animación de entrada
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.querySelector('.event-detail-content').style.transform = 'translateY(0) scale(1)';
+        }, 10);
     }
-});
+
+    function closeEventDetail(modal) {
+        modal.style.opacity = '0';
+        modal.querySelector('.event-detail-content').style.transform = 'translateY(-20px) scale(0.95)';
+        document.body.style.overflow = 'auto';
+        
+        setTimeout(() => {
+            modal.remove();
+        }, 300);
+    }
+
+    // Completar evento
+    async function completeEvent(eventId) {
+        try {
+            const event = calendar.getEventById(eventId);
+            if (!event) return;
+            
+            const res = await fetch('/api/completar_tarea', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: event.extendedProps.user_id,
+                    tarea: {
+                        titulo: event.title,
+                        due_date: event.start.toISOString().split('T')[0]
+                    }
+                }),
+            });
+
+            if (res.ok) {
+                // Animación de completado
+                const eventEl = event.el;
+                eventEl.style.animation = 'eventComplete 0.6s ease forwards';
+                
+                setTimeout(() => {
+                    event.remove();
+                    showNotification('¡Tarea completada! 🎉', 'success');
+                }, 600);
+                
+                // Cerrar modal de detalles
+                const modal = document.querySelector('.event-detail-modal');
+                if (modal) {
+                    closeEventDetail(modal);
+                }
+            } else {
+                showNotification('Error al completar la tarea', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Error al completar la tarea', 'error');
+        }
+    }
+
+    // Abrir modal de nueva tarea
+    document.getElementById('addTaskBtn').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+        setTimeout(() => {
+            document.getElementById('titulo').focus();
+        }, 100);
+    });
+
+    // Cerrar modal
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
+    
+    function closeModal() {
+        const overlay = document.getElementById('overlay');
+        overlay.style.animation = 'overlayFadeOut 0.3s ease forwards';
+        document.body.style.overflow = 'auto';
+        
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.style.animation = '';
+            document.getElementById('taskForm').reset();
+            
+            // Resetear fecha a hoy
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('due_date').value = today;
+        }, 300);
+    }
+
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const overlay = document.getElementById('overlay');
+            const eventModal = document.querySelector('.event-detail-modal');
+            
+            if (overlay.style.display === 'flex') {
+                closeModal();
+            } else if (eventModal) {
+                closeEventDetail(eventModal);
+            }
+        }
+    });
+
+    // Cerrar modal al hacer click fuera
+    document.getElementById('overlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            closeModal();
+        }
+    });
+
+    // Enviar formulario
+    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Mostrar loading
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        submitBtn.disabled = true;
+
+        const data = {
+            titulo: document.getElementById('titulo').value.trim(),
+            asignee: document.getElementById('asignee').value,
+            due_date: document.getElementById('due_date').value,
+            prioridad: document.getElementById('prioridad').value,
+            pasos: document.getElementById('pasos').value.trim(),
+        };
+
+        try {
+            const res = await fetch('/api/add_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            if (!res.ok) {
+                throw new Error('Error al añadir tarea');
+            }
+
+            // Mostrar éxito
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Guardado!';
+            submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+            
+            // Añadir evento al calendario sin recargar
+            const newEvent = {
+                title: data.titulo,
+                start: data.due_date,
+                backgroundColor: getPriorityColor(data.prioridad),
+                borderColor: getPriorityColor(data.prioridad),
+                extendedProps: {
+                    asignee: data.asignee,
+                    prioridad: data.prioridad,
+                    pasos: data.pasos
+                }
+            };
+            
+            calendar.addEvent(newEvent);
+            
+            setTimeout(() => {
+                closeModal();
+                showNotification('¡Tarea añadida al calendario! 📅', 'success');
+            }, 800);
+
+        } catch (error) {
+            console.error("Error:", error);
+            
+            // Mostrar error
+            submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.style.background = '';
+                submitBtn.disabled = false;
+            }, 2000);
+        }
+    });
+
+    // Función para obtener color basado en prioridad
+    function getPriorityColor(prioridad) {
+        const colors = {
+            'baja': '#22c55e',
+            'normal': '#f59e0b',
+            'alta': '#f97316',
+            'urgente': '#ef4444'
+        };
+        return colors[prioridad] || '#10b981';
+    }
+
+    // Función para mostrar notificaciones
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            ${message}
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
+    }
+
+    // Auto-resize para textarea
+    document.getElementById('pasos').addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
 </script>
+
+<style>
+/* Animaciones para eventos */
+@keyframes eventSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes eventComplete {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    }
+    100% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+}
+
+/* Colores por prioridad */
+.fc-event.priority-baja {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    border-color: #22c55e !important;
+}
+
+.fc-event.priority-normal {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    border-color: #f59e0b !important;
+}
+
+.fc-event.priority-alta {
+    background: linear-gradient(135deg, #f97316, #ea580c) !important;
+    border-color: #f97316 !important;
+}
+
+.fc-event.priority-urgente {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    border-color: #ef4444 !important;
+    animation: urgentPulse 2s ease-in-out infinite;
+}
+
+@keyframes urgentPulse {
+    0%, 100% { box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+    50% { box-shadow: 0 8px 25px rgba(239, 68, 68, 0.6); }
+}
+
+/* Modal de detalles del evento */
+.event-detail-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.event-detail-content {
+    background: var(--calendar-bg-light);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow-heavy);
+    transform: translateY(-20px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.event-detail-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--calendario-gradient);
+}
+
+.event-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 30px 20px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.event-detail-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.event-detail-header h3 i {
+    color: var(--accent-primary);
+}
+
+.close-detail-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.close-detail-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    transform: scale(1.1);
+}
+
+.event-detail-body {
+    padding: 20px 30px;
+}
+
+.event-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    padding: 12px;
+    background: rgba(249, 250, 252, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.event-detail-item i {
+    color: var(--accent-primary);
+    width: 20px;
+    text-align: center;
+}
+
+.event-detail-item span {
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.event-detail-actions {
+    padding: 20px 30px 30px;
+    border-top: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.complete-event-btn {
+    width: 100%;
+    background: var(--event-secondary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.complete-event-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: all 0.6s ease;
+}
+
+.complete-event-btn:hover::before {
+    left: 100%;
+}
+
+.complete-event-btn:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+}
+
+/* Tema oscuro para modal de eventos */
+body.dark .event-detail-content {
+    background: var(--calendar-bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .event-detail-header h3 {
+    color: #f3f4f6;
+}
+
+body.dark .event-detail-item {
+    background: rgba(42, 42, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .event-detail-item span {
+    color: #f3f4f6;
+}
+
+/* Notificaciones */
+.notification {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    max-width: 300px;
+}
+
+.notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-success {
+    border-left: 4px solid #22c55e;
+    color: #15803d;
+}
+
+.notification-success i {
+    color: #22c55e;
+}
+
+.notification-error {
+    border-left: 4px solid #ef4444;
+    color: #dc2626;
+}
+
+.notification-error i {
+    color: #ef4444;
+}
+
+/* Tema oscuro para notificaciones */
+body.dark .notification {
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .notification-success {
+    color: #4ade80;
+}
+
+body.dark .notification-error {
+    color: #f87171;
+}
+
+/* Animación de fade out para el overlay */
+@keyframes overlayFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Mejoras adicionales responsivas */
+@media (max-width: 480px) {
+    .event-detail-content {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .event-detail-header,
+    .event-detail-body,
+    .event-detail-actions {
+        padding: 15px 20px;
+    }
+    
+    .event-detail-header h3 {
+        font-size: 1.2rem;
+    }
+    
+    .notification {
+        top: 90px;
+        right: 15px;
+        left: 15px;
+        max-width: none;
+        font-size: 0.9rem;
+    }
+}
+</style>
 {% endblock %}
