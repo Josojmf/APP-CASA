@@ -176,7 +176,7 @@ jobs:
   # ====================================
   # Job 3: Deploy a producción
   # ====================================
-  deploy-production:
+deploy-production:
     name: 🚀 Deploy to Production
     runs-on: ubuntu-latest
     needs: [build, test]
@@ -199,8 +199,8 @@ jobs:
         username: ${{ secrets.DROPLET_USER || 'root' }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
         port: ${{ secrets.DROPLET_PORT || '22' }}
-        timeout: 60
-        command_timeout: 300
+        timeout: 60s        # CORREGIDO: agregada unidad 's'
+        command_timeout: 300s  # CORREGIDO: agregada unidad 's'
         script_stop: true
         envs: DOCKER_IMAGE,CONTAINER_NAME
         script: |
