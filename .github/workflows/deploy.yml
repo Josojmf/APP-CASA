@@ -11,6 +11,8 @@ on:
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/house-app
   CONTAINER_NAME: house-app
+  SSH_USER: ${{ secrets.DROPLET_USER != '' && secrets.DROPLET_USER || 'root' }}
+  SSH_PORT: ${{ secrets.DROPLET_PORT != '' && secrets.DROPLET_PORT || '22' }}
 
 jobs:
   # ====================================
@@ -64,10 +66,7 @@ jobs:
 
     - name: 🧪 Run tests with coverage
       run: |
-        # Crear directorio de tests si no existe
         mkdir -p tests
-        
-        # Ejecutar tests si existen, sino crear uno básico
         if [ -f "tests/test_basic.py" ]; then
           pytest --cov=app --cov-report=xml --cov-report=html --junitxml=test-results.xml -v
         else
@@ -78,12 +77,6 @@ jobs:
         FLASK_ENV: testing
 
     - name: 📊 Upload coverage reports (disabled)
-      # uses: codecov/codecov-action@v4
-      # if: always()
-      # with:
-      #   file: ./coverage.xml
-      #   flags: unittests
-      #   name: codecov-umbrella
       run: echo "Codecov upload disabled - add CODECOV_TOKEN secret to enable"
 
     - name: 📋 Upload test results
@@ -176,7 +169,7 @@ jobs:
   # ====================================
   # Job 3: Deploy a producción
   # ====================================
-deploy-production:
+  deploy-production:
     name: 🚀 Deploy to Production
     runs-on: ubuntu-latest
     needs: [build, test]
@@ -196,22 +189,21 @@ deploy-production:
         CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
       with:
         host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ secrets.DROPLET_USER || 'root' }}
+        username: ${{ env.SSH_USER }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
-        port: ${{ secrets.DROPLET_PORT || '22' }}
-        timeout: 60s        # CORREGIDO: agregada unidad 's'
-        command_timeout: 300s  # CORREGIDO: agregada unidad 's'
+        port: ${{ env.SSH_PORT }}
+        timeout: 60s
+        command_timeout: 300s
         script_stop: true
         envs: DOCKER_IMAGE,CONTAINER_NAME
         script: |
           set -euo pipefail
 
-          # Colores para logs
           RED='\033[0;31m'
           GREEN='\033[0;32m'
           YELLOW='\033[1;33m'
           BLUE='\033[0;34m'
-          NC='\033[0m' # No Color
+          NC='\033[0m'
 
           log() {
               echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
@@ -229,10 +221,8 @@ deploy-production:
               echo -e "${YELLOW}[WARNING]${NC} $1"
           }
 
-          # Deploy simplificado con mejor logging
           log "🔄 Iniciando despliegue..."
           
-          # Graceful shutdown
           if docker ps | grep -q $CONTAINER_NAME; then
               log "🛑 Deteniendo contenedor actual..."
               docker stop --time=30 $CONTAINER_NAME 2>/dev/null || true
@@ -266,7 +256,6 @@ deploy-production:
           log "⏳ Esperando que el contenedor esté listo..."
           sleep 15
 
-          # Health check simple
           if docker ps | grep -q $CONTAINER_NAME; then
               success "✅ Despliegue exitoso!"
               docker ps --filter "name=$CONTAINER_NAME"
@@ -290,11 +279,9 @@ deploy-production:
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ secrets.DROPLET_USER || 'root' }}
+        username: ${{ env.SSH_USER }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
+        port: ${{ env.SSH_PORT }}
         script: |
-          # Mantener solo las últimas 3 imágenes
           docker images ${{ env.DOCKER_IMAGE }} --format "table {{.ID}}\t{{.CreatedAt}}" | tail -n +4 | awk '{print $1}' | xargs -r docker rmi || true
-          
-          # Limpiar sistema
           docker system prune -f --volumes || true
