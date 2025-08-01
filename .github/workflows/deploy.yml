@@ -26,7 +26,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: 🐍 Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5  # ✅ Actualizado a v5
       with:
         python-version: '3.11'
         cache: 'pip'
@@ -58,7 +58,7 @@ jobs:
         FLASK_ENV: testing
 
     - name: 📊 Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4  # ✅ Actualizado a v4
       if: always()
       with:
         file: ./coverage.xml
@@ -66,7 +66,7 @@ jobs:
         name: codecov-umbrella
 
     - name: 📋 Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # ✅ Actualizado a v4
       if: always()
       with:
         name: test-results
@@ -75,6 +75,7 @@ jobs:
           htmlcov/
           bandit-report.json
           vulnerability-report.json
+        retention-days: 30
 
   # ====================================
   # Job 2: Build y push de imagen Docker
@@ -142,13 +143,14 @@ jobs:
         severity-cutoff: high
 
     - name: 📋 Upload scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # ✅ Actualizado a v4
       if: always()
       with:
         name: security-scan-results
         path: |
           sbom.spdx.json
           ${{ steps.scan.outputs.sarif }}
+        retention-days: 30
 
   # ====================================
   # Job 3: Deploy a staging (opcional)
