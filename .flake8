@@ -1,0 +1,20 @@
+[flake8]
+max-line-length = 127
+max-complexity = 15
+ignore = 
+    E203,  # whitespace before ':'
+    W503,  # line break before binary operator
+    E722,  # do not use bare 'except'
+    F401,  # imported but unused
+    F841,  # local variable assigned but never used
+    C901,  # function is too complex
+    W291   # trailing whitespace
+exclude = 
+    .git,
+    __pycache__,
+    venv,
+    env,
+    .venv,
+    migrations,
+    node_modules,
+    .pytest_cache
