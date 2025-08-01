@@ -466,65 +466,67 @@ def get_user_profile(nombre):
 @api.route("/api/chatfd", methods=["POST"])
 @login_required
 def chat_familiar():
-    """Chat con asistente familiar usando Groq - VERSION MEJORADA"""
+    """Chat con asistente familiar usando Groq con acceso a tareas"""
     try:
-        # Validate request
         if not request.is_json:
-            logger.error("Request is not JSON")
             return jsonify({"error": "Content-Type debe ser application/json"}), 400
 
         data = request.get_json()
-        if not data:
-            logger.error("No JSON data received")
-            return jsonify({"error": "No se recibieron datos JSON"}), 400
-
         q = data.get("prompt", "").strip()
-
         if not q:
-            logger.error("Empty prompt received")
             return jsonify({"error": "Prompt vacío"}), 400
 
-        logger.info(
-            f"Processing chat request from user: {session.get('user')} with prompt: {q[:50]}..."
-        )
-
-        # Check API key
         API_KEY = os.getenv("GROQ_API_KEY")
         if not API_KEY:
-            logger.error("GROQ_API_KEY not configured")
-            return (
-                jsonify(
-                    {
-                        "error": "Servicio de IA no configurado. Contacta al administrador."
-                    }
-                ),
-                500,
+            return jsonify({"error": "Servicio de IA no configurado"}), 500
+
+        # --- 📌 Recuperar tareas del usuario desde la base de datos ---
+        try:
+            from app.models import Tarea  # Ajustar a tu estructura real
+            tareas = (
+                Tarea.query.filter_by(usuario=session.get("user"))
+                .order_by(Tarea.fecha.asc())
+                .all()
             )
 
-        # Initialize chat history
+            lista_tareas = []
+            for t in tareas:
+                lista_tareas.append(
+                    f"- {t.titulo} ({t.fecha.strftime('%d/%m/%Y')} - Estado: {t.estado})"
+                )
+            tareas_texto = "\n".join(lista_tareas) if lista_tareas else "No hay tareas registradas."
+        except Exception as e:
+            logger.error(f"Error recuperando tareas: {e}")
+            tareas_texto = "No se pudieron recuperar las tareas."
+
+        # --- Inicializar historial si no existe ---
         if "chat_history" not in session:
             session["chat_history"] = [
                 {
                     "role": "system",
-                    "content": """Eres un asistente familiar útil y amigable llamado 'Casa AI'. 
-                Ayudas con tareas domésticas, organización familiar, recetas, consejos del hogar y gestión familiar.
-                Responde en español de manera concisa, práctica y con emojis cuando sea apropiado.
-                Eres parte del sistema 'House App' que ayuda a la familia a organizarse mejor.""",
+                    "content": (
+                        "Eres 'Casa AI', un asistente familiar que ayuda a organizar y optimizar las tareas del hogar, "
+                        "planificar menús, dar consejos y ayudar con la gestión familiar. "
+                        "Actualmente estas son las tareas del usuario:\n"
+                        f"{tareas_texto}\n"
+                        "Cuando el usuario pregunte, usa esta información para sugerir prioridades, "
+                        "redistribuir tareas o dar ideas para completarlas."
+                    ),
                 }
             ]
 
-        # Limit history to prevent token overflow
+        # Limitar historial
         MAX_HISTORY = 15
         if len(session["chat_history"]) > MAX_HISTORY:
             session["chat_history"] = (
                 session["chat_history"][:1]
-                + session["chat_history"][-(MAX_HISTORY - 1) :]
+                + session["chat_history"][-(MAX_HISTORY - 1):]
             )
 
-        # Add user message
+        # Añadir mensaje del usuario
         session["chat_history"].append({"role": "user", "content": q})
 
-        # Prepare API request
+        # --- Petición a Groq ---
         headers = {
             "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json",
@@ -539,110 +541,29 @@ def chat_familiar():
             "stream": False,
         }
 
-        logger.info(
-            f"Sending request to Groq API with {len(session['chat_history'])} messages"
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=45,
         )
 
-        # Make API call with proper error handling
-        try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",  # Updated endpoint
-                json=payload,
-                headers=headers,
-                timeout=45,  # Increased timeout
-            )
+        if resp.status_code != 200:
+            return jsonify({"error": f"Error del servicio de IA ({resp.status_code})"}), 500
 
-            logger.info(f"Groq API response status: {resp.status_code}")
+        response_data = resp.json()
+        answer = response_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        if not answer:
+            return jsonify({"error": "Respuesta vacía del servicio de IA"}), 500
 
-            if resp.status_code == 401:
-                logger.error("Groq API authentication failed")
-                return (
-                    jsonify({"error": "Error de autenticación con el servicio de IA"}),
-                    500,
-                )
-            elif resp.status_code == 429:
-                logger.error("Groq API rate limit exceeded")
-                return (
-                    jsonify(
-                        {
-                            "error": "Límite de uso del servicio de IA excedido. Intenta más tarde."
-                        }
-                    ),
-                    429,
-                )
-            elif resp.status_code != 200:
-                logger.error(f"Groq API error: {resp.status_code} - {resp.text}")
-                return (
-                    jsonify(
-                        {
-                            "error": f"Error del servicio de IA (código {resp.status_code})"
-                        }
-                    ),
-                    500,
-                )
+        # Añadir respuesta al historial
+        session["chat_history"].append({"role": "assistant", "content": answer})
 
-            # Parse response
-            try:
-                response_data = resp.json()
-            except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON from Groq API: {e}")
-                return jsonify({"error": "Respuesta inválida del servicio de IA"}), 500
-
-            # Extract answer
-            choices = response_data.get("choices", [])
-            if not choices:
-                logger.error("No choices in Groq API response")
-                return jsonify({"error": "Respuesta vacía del servicio de IA"}), 500
-
-            message = choices[0].get("message", {})
-            answer = message.get("content", "").strip()
-
-            if not answer:
-                logger.error("Empty content in Groq API response")
-                return (
-                    jsonify({"error": "El asistente no pudo generar una respuesta"}),
-                    500,
-                )
-
-            # Add assistant response to history
-            session["chat_history"].append({"role": "assistant", "content": answer})
-
-            # Log success
-            logger.info(
-                f"Successfully generated AI response for user: {session.get('user')}"
-            )
-
-            return jsonify(
-                {"answer": answer, "status": "success", "model": "llama-3.1-8b-instant"}
-            )
-
-        except requests.exceptions.Timeout:
-            logger.error("Timeout calling Groq API")
-            return (
-                jsonify(
-                    {
-                        "error": "El servicio de IA tardó demasiado en responder. Intenta de nuevo."
-                    }
-                ),
-                504,
-            )
-        except requests.exceptions.ConnectionError:
-            logger.error("Connection error calling Groq API")
-            return (
-                jsonify(
-                    {
-                        "error": "No se pudo conectar con el servicio de IA. Verifica tu conexión."
-                    }
-                ),
-                503,
-            )
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request error calling Groq API: {e}")
-            return jsonify({"error": "Error de conexión con el servicio de IA"}), 503
+        return jsonify({"answer": answer, "status": "success", "model": "llama-3.1-8b-instant"})
 
     except Exception as e:
-        logger.error(f"Unexpected error in chat_familiar: {traceback.format_exc()}")
-        return jsonify({"error": "Error interno del servidor. Intenta de nuevo."}), 500
+        logger.error(f"Error en chat_familiar: {traceback.format_exc()}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 
 # ===================================================
