@@ -2,8 +2,8 @@ from pymongo import MongoClient
 import os
 
 # Conexión a tu MongoDB local o Atlas
-MONGO_PASS="XyGItdDKpWkfJfjT"
-MONGO_USER="joso"
+MONGO_PASS = "XyGItdDKpWkfJfjT"
+MONGO_USER = "joso"
 cluster = "final.yzzh9ig.mongodb.net"
 dbname = "house_app"
 mongo_uri = f"mongodb+srv://{MONGO_USER}:{MONGO_PASS}@{cluster}/{dbname}?retryWrites=true&w=majority&appName=Final"
@@ -22,5 +22,7 @@ print("===========================================")
 for user in users:
     nombre = user["nombre"].lower()
     user_subs = subs_map.get(nombre, [])
-    estado = f"{len(user_subs)} subscripción/es ✅" if user_subs else "❌ Sin subscripciones"
+    estado = (
+        f"{len(user_subs)} subscripción/es ✅" if user_subs else "❌ Sin subscripciones"
+    )
     print(f"👤 {nombre}: {estado}")

@@ -11,8 +11,9 @@ load_dotenv()
 mongo = PyMongo()
 socketio = SocketIO(cors_allowed_origins="*")
 
+
 def create_app():
-    app = Flask(__name__, static_url_path='/static')
+    app = Flask(__name__, static_url_path="/static")
     app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 
     # Leer usuario y password desde .env
@@ -23,9 +24,7 @@ def create_app():
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
     VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
 
-    VAPID_CLAIMS = {
-        "sub": "mailto:joso.jmf@gmail.com"
-    }
+    VAPID_CLAIMS = {"sub": "mailto:joso.jmf@gmail.com"}
 
     # Datos del cluster
     cluster = "final.yzzh9ig.mongodb.net"

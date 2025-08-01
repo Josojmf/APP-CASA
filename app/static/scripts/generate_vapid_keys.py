@@ -10,13 +10,13 @@ public_key = private_key.public_key()
 vapid_private_pem = private_key.private_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PrivateFormat.PKCS8,
-    encryption_algorithm=serialization.NoEncryption()
+    encryption_algorithm=serialization.NoEncryption(),
 )
 
 # Clave pública en PEM (opcional, para archivo)
 vapid_public_pem = public_key.public_bytes(
     encoding=serialization.Encoding.PEM,
-    format=serialization.PublicFormat.SubjectPublicKeyInfo
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
 )
 
 # Clave privada en bytes crudos para usar en base64 URL-safe
@@ -26,9 +26,11 @@ vapid_private_b64 = base64.urlsafe_b64encode(raw_private).rstrip(b"=").decode("u
 # Clave pública en base64 URL-safe
 vapid_public_der = public_key.public_bytes(
     encoding=serialization.Encoding.DER,
-    format=serialization.PublicFormat.SubjectPublicKeyInfo
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
 )
-vapid_public_b64 = base64.urlsafe_b64encode(vapid_public_der).rstrip(b"=").decode("utf-8")
+vapid_public_b64 = (
+    base64.urlsafe_b64encode(vapid_public_der).rstrip(b"=").decode("utf-8")
+)
 
 # Imprimir todo
 print("PRIVATE KEY PEM:\n", vapid_private_pem.decode())

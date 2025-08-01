@@ -10,6 +10,7 @@ def get_food_image(query):
             return results[0].get("image", "/static/img/default_food.jpg")
         return "/static/img/default_food.jpg"
 
+
 # Inicializa la app Flask y su contexto
 app = create_app()
 
@@ -21,8 +22,7 @@ with app.app_context():
                 try:
                     img_url = get_food_image(menu["titulo"])
                     mongo.db.menus.update_one(
-                        {"_id": menu["_id"]},
-                        {"$set": {"img": img_url}}
+                        {"_id": menu["_id"]}, {"$set": {"img": img_url}}
                     )
                     print("✔️ Imagen añadida")
                 except Exception as e:
@@ -30,4 +30,3 @@ with app.app_context():
                 time.sleep(2)  # <- Esto ayuda con el rate-limit
     finally:
         mongo.cx.close()
-

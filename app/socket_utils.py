@@ -10,6 +10,7 @@ import logging
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
 # ============================================================
 #   FUNCIONES PUSH MEJORADAS
 # ============================================================
@@ -21,11 +22,12 @@ def get_vapid_claims(endpoint_url):
         parsed = urlparse(endpoint_url)
         return {
             "aud": f"{parsed.scheme}://{parsed.netloc}",
-            "sub": "mailto:joso.jmf@gmail.com"
+            "sub": "mailto:joso.jmf@gmail.com",
         }
     except Exception as e:
         logger.error(f"Error get_vapid_claims: {e}")
         return None
+
 
 def send_push_to_all(title, body, url="/", icon="/static/icons/house-icon.png"):
     """Envía notificación push a todos los usuarios con suscripción - MEJORADO."""
@@ -45,44 +47,48 @@ def send_push_to_all(title, body, url="/", icon="/static/icons/house-icon.png"):
                     endpoint = sub.get("endpoint")
                     if not endpoint:
                         continue
-                        
+
                     claims = get_vapid_claims(endpoint)
                     if not claims:
                         continue
 
                     webpush(
                         subscription_info=sub,
-                        data=json.dumps({
-                            "title": title,
-                            "body": body,
-                            "icon": icon,
-                            "badge": icon,
-                            "url": url
-                        }),
+                        data=json.dumps(
+                            {
+                                "title": title,
+                                "body": body,
+                                "icon": icon,
+                                "badge": icon,
+                                "url": url,
+                            }
+                        ),
                         vapid_private_key=vapid_private_key,
-                        vapid_claims=claims
+                        vapid_claims=claims,
                     )
                     total_sent += 1
                     logger.info(f"📲 Push enviado a {user_name}")
-                    
+
                 except WebPushException as ex:
                     logger.error(f"❌ Error push a {user_name}: {repr(ex)}")
                     # Limpiar suscripciones inválidas
                     if ex.response and ex.response.status_code in [410, 404]:
                         logger.info("🧹 Eliminando subscripción expirada...")
                         mongo.db.subscriptions.update_one(
-                            {"user": user_name},
-                            {"$pull": {"subscriptions": sub}}
+                            {"user": user_name}, {"$pull": {"subscriptions": sub}}
                         )
                 except Exception as e:
                     logger.error(f"❌ Error inesperado enviando push: {e}")
 
         logger.info(f"📊 Total notificaciones enviadas: {total_sent}")
-        
+
     except Exception as e:
         logger.error(f"❌ Error en send_push_to_all: {e}")
 
-def send_push_to_user(user_name, title, body, url="/", icon="/static/icons/house-icon.png"):
+
+def send_push_to_user(
+    user_name, title, body, url="/", icon="/static/icons/house-icon.png"
+):
     """Enviar notificación push a un usuario específico - MEJORADO"""
     try:
         vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
@@ -101,41 +107,38 @@ def send_push_to_user(user_name, title, body, url="/", icon="/static/icons/house
                 endpoint = sub.get("endpoint")
                 if not endpoint:
                     continue
-                    
+
                 claims = get_vapid_claims(endpoint)
                 if not claims:
                     continue
 
                 webpush(
                     subscription_info=sub,
-                    data=json.dumps({
-                        "title": title,
-                        "body": body,
-                        "icon": icon,
-                        "url": url
-                    }),
+                    data=json.dumps(
+                        {"title": title, "body": body, "icon": icon, "url": url}
+                    ),
                     vapid_private_key=vapid_private_key,
-                    vapid_claims=claims
+                    vapid_claims=claims,
                 )
                 success_count += 1
                 logger.info(f"✅ Notificación enviada a {user_name}")
-                
+
             except WebPushException as ex:
                 logger.error(f"❌ Error al enviar push a {user_name}: {repr(ex)}")
                 # Limpiar suscripciones inválidas
                 if ex.response and ex.response.status_code in [410, 404]:
                     mongo.db.subscriptions.update_one(
-                        {"user": user_name},
-                        {"$pull": {"subscriptions": sub}}
+                        {"user": user_name}, {"$pull": {"subscriptions": sub}}
                     )
             except Exception as e:
                 logger.error(f"❌ Error inesperado enviando push: {e}")
 
         return success_count > 0
-        
+
     except Exception as e:
         logger.error(f"❌ Error en send_push_to_user: {e}")
         return False
+
 
 # ============================================================
 #   NOTIFICACIONES DE TAREAS MEJORADAS
@@ -150,7 +153,7 @@ def notificar_tarea_a_usuario(tarea):
 
         # Intentar notificación por socket primero
         sid = user_sockets.get(username.lower())
-        
+
         if sid:
             try:
                 socketio.emit("nueva_tarea", tarea, to=sid)
@@ -163,14 +166,15 @@ def notificar_tarea_a_usuario(tarea):
             user_name=username,
             title="📋 Tarea asignada",
             body=tarea.get("titulo", "Nueva tarea"),
-            url="/tareas"
+            url="/tareas",
         )
-        
+
         if not success and not sid:
             logger.warning(f"⚠️ No se pudo notificar a {username} por ningún medio")
-            
+
     except Exception as e:
         logger.error(f"Error en notificar_tarea_a_usuario: {e}")
+
 
 # ============================================================
 #   EVENTOS DE CHAT MEJORADOS
@@ -188,11 +192,17 @@ def register_chat_events():
                 return
 
             # Usuario actual (preferir el que viene del cliente)
-            user = data.get("user") or session.get("username") or session.get("user", "Anónimo")
-            
+            user = (
+                data.get("user")
+                or session.get("username")
+                or session.get("user", "Anónimo")
+            )
+
             # Foto que viene del cliente o de la sesión
-            photo = (data.get("photo") or "").strip() or (session.get("photo") or "").strip()
-            
+            photo = (data.get("photo") or "").strip() or (
+                session.get("photo") or ""
+            ).strip()
+
             message = data.get("message", "").strip()
             if not message:
                 logger.warning("Mensaje vacío recibido")
@@ -220,7 +230,7 @@ def register_chat_events():
                     "user": user,
                     "photo": photo,
                     "message": message,
-                    "timestamp": datetime.utcnow()
+                    "timestamp": datetime.utcnow(),
                 }
                 result = mongo.db.messages.insert_one(msg_doc)
                 logger.info(f"Mensaje guardado en DB: {result.inserted_id}")
@@ -230,12 +240,15 @@ def register_chat_events():
 
             # Emitir mensaje a todos los clientes conectados
             try:
-                socketio.emit("chat_message", {
-                    "user": msg_doc["user"],
-                    "photo": msg_doc["photo"],
-                    "message": msg_doc["message"],
-                    "timestamp": msg_doc["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
-                })
+                socketio.emit(
+                    "chat_message",
+                    {
+                        "user": msg_doc["user"],
+                        "photo": msg_doc["photo"],
+                        "message": msg_doc["message"],
+                        "timestamp": msg_doc["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
                 logger.info(f"Mensaje emitido por socket de {user}")
             except Exception as e:
                 logger.error(f"Error emitiendo mensaje por socket: {e}")
@@ -244,8 +257,9 @@ def register_chat_events():
             try:
                 send_push_to_all(
                     title=f"💬 Mensaje nuevo de {user}",
-                    body=message[:100] + ("..." if len(message) > 100 else ""),  # Limitar longitud
-                    url="/chat"
+                    body=message[:100]
+                    + ("..." if len(message) > 100 else ""),  # Limitar longitud
+                    url="/chat",
                 )
             except Exception as e:
                 logger.error(f"Error enviando notificación push: {e}")
@@ -257,31 +271,32 @@ def register_chat_events():
     def handle_connect():
         """Maneja conexiones de socket - MEJORADO"""
         try:
-            user = session.get('user') or session.get('username', 'Anonymous')
-            logger.info(f'Usuario {user} conectado por socket')
-            
+            user = session.get("user") or session.get("username", "Anonymous")
+            logger.info(f"Usuario {user} conectado por socket")
+
             # Opcional: almacenar el socket ID del usuario
-            if user != 'Anonymous':
+            if user != "Anonymous":
                 user_sockets[user.lower()] = request.sid
-                
+
         except Exception as e:
-            logger.error(f'Error en connect handler: {e}')
+            logger.error(f"Error en connect handler: {e}")
 
     @socketio.on("disconnect")
     def handle_disconnect():
         """Maneja desconexiones de socket - CORREGIDO"""
         try:
-            user = session.get('user') or session.get('username', 'Unknown')
-            logger.info(f'Usuario {user} desconectado')
-            
+            user = session.get("user") or session.get("username", "Unknown")
+            logger.info(f"Usuario {user} desconectado")
+
             # Limpiar del diccionario de sockets activos
-            if user != 'Unknown' and user.lower() in user_sockets:
+            if user != "Unknown" and user.lower() in user_sockets:
                 del user_sockets[user.lower()]
-                
+
         except Exception as e:
-            logger.error(f'Error en disconnect handler: {e}')
+            logger.error(f"Error en disconnect handler: {e}")
 
     logger.info("Eventos de chat registrados correctamente")
+
 
 # ============================================================
 #   UTILIDADES ADICIONALES
@@ -293,6 +308,7 @@ def get_active_users():
     except Exception as e:
         logger.error(f"Error obteniendo usuarios activos: {e}")
         return []
+
 
 def cleanup_inactive_sockets():
     """Limpia sockets inactivos del diccionario"""

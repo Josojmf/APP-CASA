@@ -3,9 +3,11 @@ from app.globals import user_sockets  # importar aquí, no en sockets_utils
 
 app = create_app()
 
+
 @socketio.on("connect")
 def handle_connect():
     print("Cliente conectado")
+
 
 @socketio.on("registrar_usuario")
 def registrar_usuario(data):
@@ -13,6 +15,7 @@ def registrar_usuario(data):
     if username:
         user_sockets[username] = request.sid
         print(f"✅ Usuario registrado: {username} con sid {request.sid}")
+
 
 @socketio.on("disconnect")
 def handle_disconnect():
@@ -23,5 +26,6 @@ def handle_disconnect():
             print(f"❌ Usuario desconectado: {user}")
             break
 
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
