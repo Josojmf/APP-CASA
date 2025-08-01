@@ -1,6 +1,7 @@
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
 import base64
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 # Generar clave privada y pública
 private_key = ec.generate_private_key(ec.SECP256R1())

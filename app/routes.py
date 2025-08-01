@@ -1,22 +1,16 @@
-from flask import (
-    Blueprint,
-    render_template,
-    request,
-    jsonify,
-    redirect,
-    url_for,
-    session,
-    current_app,
-)
-from app import mongo
-from bson import ObjectId
-from datetime import datetime, timedelta
-from functools import wraps
+import logging
 import os
 import traceback
+from datetime import datetime, timedelta
+from functools import wraps
+
 import requests
+from bson import ObjectId
 from ddgs import DDGS
-import logging
+from flask import (Blueprint, current_app, jsonify, redirect, render_template,
+                   request, session, url_for)
+
+from app import mongo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -653,9 +647,10 @@ def test_push(username):
         if session.get("user") != "Joso":
             return jsonify({"error": "Permisos insuficientes"}), 403
 
-        from pywebpush import webpush, WebPushException
-        from urllib.parse import urlparse
         import json
+        from urllib.parse import urlparse
+
+        from pywebpush import WebPushException, webpush
 
         subscripcion = mongo.db.subscriptions.find_one({"user": username})
         if not subscripcion:

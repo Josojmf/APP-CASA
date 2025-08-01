@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, session, url_for
+from flask import (Blueprint, redirect, render_template, request, session,
+                   url_for)
+
 from app import mongo
 from app.globals import user_sockets
 

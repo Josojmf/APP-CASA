@@ -1,9 +1,10 @@
-from flask import Flask, session
-from flask_pymongo import PyMongo
-from flask_cors import CORS
-from flask_socketio import SocketIO
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
+from flask import Flask, session
+from flask_cors import CORS
+from flask_pymongo import PyMongo
+from flask_socketio import SocketIO
 
 # Cargar variables desde .env
 load_dotenv()
@@ -47,9 +48,9 @@ def create_app():
         mongo.db.messages.create_index("timestamp")
 
     # Importar blueprints después de inicializar mongo
-    from app.routes import main
     from app.api import api
     from app.auth import auth
+    from app.routes import main
     from app.socket_utils import register_chat_events
 
     app.register_blueprint(main)

@@ -1,5 +1,6 @@
-from pymongo import MongoClient
 import os
+
+from pymongo import MongoClient
 
 # Conexión a tu MongoDB local o Atlas
 MONGO_PASS = "XyGItdDKpWkfJfjT"

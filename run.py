@@ -1,3 +1,5 @@
+from flask import request  # ✅ Añadir import de request
+
 from app import create_app, socketio
 from app.globals import user_sockets  # importar aquí, no en sockets_utils
 

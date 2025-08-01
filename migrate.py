@@ -1,6 +1,8 @@
-from ddgs import DDGS
-from app import create_app, mongo
 import time
+
+from ddgs import DDGS
+
+from app import create_app, mongo
 
 
 def get_food_image(query):

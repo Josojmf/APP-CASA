@@ -1,5 +1,6 @@
-from pymongo import MongoClient
 import base64
+
+from pymongo import MongoClient
 
 # Conexión a MongoDB
 client = MongoClient(

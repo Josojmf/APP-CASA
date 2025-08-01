@@ -1,17 +1,19 @@
-from flask import Blueprint, jsonify, request, current_app, session
-from app import mongo
-from bson import ObjectId
-from pywebpush import webpush, WebPushException
-import json
-from app.socket_utils import notificar_tarea_a_usuario
-from urllib.parse import urlparse
-from datetime import datetime, timedelta
-import traceback
 import base64
-import os
-import requests
-from functools import wraps
+import json
 import logging
+import os
+import traceback
+from datetime import datetime, timedelta
+from functools import wraps
+from urllib.parse import urlparse
+
+import requests
+from bson import ObjectId
+from flask import Blueprint, current_app, jsonify, request, session
+from pywebpush import WebPushException, webpush
+
+from app import mongo
+from app.socket_utils import notificar_tarea_a_usuario
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

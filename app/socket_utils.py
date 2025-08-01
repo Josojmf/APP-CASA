@@ -1,11 +1,13 @@
-from app import socketio, mongo
-from app.globals import user_sockets
-from flask import current_app, session
-from datetime import datetime
 import json
-from pywebpush import webpush, WebPushException
-from urllib.parse import urlparse
 import logging
+from datetime import datetime
+from urllib.parse import urlparse
+
+from flask import current_app, request, session  # ✅ Añadir request
+from pywebpush import WebPushException, webpush
+
+from app import mongo, socketio
+from app.globals import user_sockets
 
 # Configure logging
 logger = logging.getLogger(__name__)
