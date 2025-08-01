@@ -711,3 +711,314 @@ body.dark .overlay-content select:focus {
         font-size: 0.9rem;
     }
 }
+
+@keyframes eventSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes eventComplete {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    }
+    100% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+}
+
+/* Colores por prioridad */
+.fc-event.priority-baja {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    border-color: #22c55e !important;
+}
+
+.fc-event.priority-normal {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    border-color: #f59e0b !important;
+}
+
+.fc-event.priority-alta {
+    background: linear-gradient(135deg, #f97316, #ea580c) !important;
+    border-color: #f97316 !important;
+}
+
+.fc-event.priority-urgente {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    border-color: #ef4444 !important;
+    animation: urgentPulse 2s ease-in-out infinite;
+}
+
+@keyframes urgentPulse {
+    0%, 100% { box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+    50% { box-shadow: 0 8px 25px rgba(239, 68, 68, 0.6); }
+}
+
+/* Modal de detalles del evento */
+.event-detail-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.event-detail-content {
+    background: var(--calendar-bg-light);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow-heavy);
+    transform: translateY(-20px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.event-detail-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--calendario-gradient);
+}
+
+.event-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 30px 20px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.event-detail-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.event-detail-header h3 i {
+    color: var(--accent-primary);
+}
+
+.close-detail-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.close-detail-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    transform: scale(1.1);
+}
+
+.event-detail-body {
+    padding: 20px 30px;
+}
+
+.event-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    padding: 12px;
+    background: rgba(249, 250, 252, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.event-detail-item i {
+    color: var(--accent-primary);
+    width: 20px;
+    text-align: center;
+}
+
+.event-detail-item span {
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.event-detail-actions {
+    padding: 20px 30px 30px;
+    border-top: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.complete-event-btn {
+    width: 100%;
+    background: var(--event-secondary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.complete-event-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: all 0.6s ease;
+}
+
+.complete-event-btn:hover::before {
+    left: 100%;
+}
+
+.complete-event-btn:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+}
+
+/* Tema oscuro para modal de eventos */
+body.dark .event-detail-content {
+    background: var(--calendar-bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .event-detail-header h3 {
+    color: #f3f4f6;
+}
+
+body.dark .event-detail-item {
+    background: rgba(42, 42, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .event-detail-item span {
+    color: #f3f4f6;
+}
+
+/* Notificaciones */
+.notification {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    max-width: 300px;
+}
+
+.notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-success {
+    border-left: 4px solid #22c55e;
+    color: #15803d;
+}
+
+.notification-success i {
+    color: #22c55e;
+}
+
+.notification-error {
+    border-left: 4px solid #ef4444;
+    color: #dc2626;
+}
+
+.notification-error i {
+    color: #ef4444;
+}
+
+/* Tema oscuro para notificaciones */
+body.dark .notification {
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.dark .notification-success {
+    color: #4ade80;
+}
+
+body.dark .notification-error {
+    color: #f87171;
+}
+
+/* Animación de fade out para el overlay */
+@keyframes overlayFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Mejoras adicionales responsivas */
+@media (max-width: 480px) {
+    .event-detail-content {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .event-detail-header,
+    .event-detail-body,
+    .event-detail-actions {
+        padding: 15px 20px;
+    }
+    
+    .event-detail-header h3 {
+        font-size: 1.2rem;
+    }
+    
+    .notification {
+        top: 90px;
+        right: 15px;
+        left: 15px;
+        max-width: none;
+        font-size: 0.9rem;
+    }
+}
