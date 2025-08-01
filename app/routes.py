@@ -613,30 +613,57 @@ def add_user():
 def delete_user(user_id):
     """Eliminar usuario"""
     try:
+        current_user = session.get('user')
+        logger.info(f"Intento de eliminación por: {current_user}, ID objetivo: {user_id}")
+        
         # Verificar permisos (solo Joso puede eliminar usuarios)
-        if session.get('user') != 'Joso':
-            return jsonify({"error": "Permisos insuficientes"}), 403
+        if current_user != 'Joso':
+            logger.warning(f"Intento no autorizado de eliminación por: {current_user}")
+            return jsonify({
+                "error": "Permisos insuficientes",
+                "message": "Solo el administrador puede eliminar usuarios"
+            }), 403
 
         obj_id = ObjectId(user_id)
         
         # Obtener información del usuario antes de eliminar
         user = mongo.db.users.find_one({"_id": obj_id})
         if not user:
-            return jsonify({"error": "Usuario no encontrado"}), 404
+            logger.warning(f"Usuario no encontrado: {user_id}")
+            return jsonify({
+                "error": "Usuario no encontrado",
+                "message": f"No existe usuario con ID {user_id}"
+            }), 404
+
+        # Registrar acción
+        logger.info(f"Eliminando usuario: {user['nombre']} (ID: {user_id})")
 
         # Eliminar usuario
         mongo.db.users.delete_one({"_id": obj_id})
         
-        # Limpiar suscripciones relacionadas
-        mongo.db.subscriptions.delete_many({"user": user.get("nombre")})
+        # Limpiar datos relacionados
+        nombre_usuario = user.get("nombre")
+        result_subs = mongo.db.subscriptions.delete_many({"user": nombre_usuario})
+        result_tasks = mongo.db.completed_tasks.delete_many({"completed_by": nombre_usuario})
         
-        # Limpiar tareas completadas relacionadas
-        mongo.db.completed_tasks.delete_many({"completed_by": user.get("nombre")})
+        logger.info(f"Datos relacionados eliminados: "
+                    f"{result_subs.deleted_count} suscripciones, "
+                    f"{result_tasks.deleted_count} tareas completadas")
         
-        return jsonify({"success": True}), 200
+        return jsonify({
+            "success": True,
+            "message": f"Usuario {nombre_usuario} eliminado correctamente",
+            "deleted_subs": result_subs.deleted_count,
+            "deleted_tasks": result_tasks.deleted_count
+        }), 200
+        
     except Exception as e:
-        logger.error(f"Error delete_user: {e}")
-        return jsonify({"error": "Error al eliminar usuario"}), 500
+        logger.error(f"Error crítico en delete_user: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "error": "Error interno del servidor",
+            "message": str(e)
+        }), 500
 
 @main.route('/api/toggle_theme', methods=['POST'])
 @login_required
