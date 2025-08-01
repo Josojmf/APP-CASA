@@ -784,3 +784,13 @@ def send_push_to_all(title, body, url="/", icon="/static/icons/house-icon.png"):
 
     except Exception as e:
         logger.error(f"❌ Error en send_push_to_all: {e}")
+
+@api.route("/api/clear_all_tasks", methods=["POST"])
+def clear_all_tasks():
+    """Eliminar todas las tareas"""
+    try:
+        mongo.db.users.update_many({}, {"$set": {"tareas": []}})
+        return jsonify({"success": True, "message": "Todas las tareas han sido eliminadas"})
+    except Exception as e:
+        logger.error(f"Error al eliminar todas las tareas: {e}")
+        return jsonify({"error": "Error al eliminar las tareas"}), 500

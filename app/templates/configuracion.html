@@ -15,7 +15,23 @@
         <span class="slider round"></span>
     </label>
 </section>
-
+<section class="task-management">
+    <h2>Gestión de tareas</h2>
+    <button id="clearTasksBtn">Eliminar todas las tareas</button>
+    <script>
+        document.getElementById("clearTasksBtn").addEventListener("click", async () => {
+            if (confirm("¿Estás seguro de que quieres eliminar todas las tareas?")) {
+                const res = await fetch("/api/clear_all_tasks", { method: "POST" });
+                if (res.ok) {
+                    alert("✅ Todas las tareas han sido eliminadas");
+                    location.reload();
+                } else {
+                    alert("⚠️ Error al eliminar las tareas");
+                }
+            }
+        });
+    </script>
+</section>
 <section class="user-management">
     <h2>Usuarios</h2>
     <form id="addUserForm">
