@@ -192,6 +192,26 @@
 .notification-info {
     background: linear-gradient(135deg, #3b82f6, #2563eb);
 }
+
+/* Estilos para errores de formulario */
+.form-error {
+    background: #fee2e2;
+    color: #b91c1c;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 4px solid #b91c1c;
+    animation: shake 0.5s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
 </style>
 {% endblock %}
 
@@ -226,8 +246,7 @@
                 <label for="titulo">
                     <i class="fas fa-heading"></i> Título:
                 </label>
-                <input type="text" id="titulo" name="titulo" required 
-                       placeholder="Ej: Reunión importante">
+                <input type="text" id="titulo" name="titulo" placeholder="Ej: Reunión importante">
             </div>
 
             <!-- Campos específicos para tareas -->
@@ -236,7 +255,7 @@
                     <label for="asignee">
                         <i class="fas fa-user"></i> Asignado a:
                     </label>
-                    <select id="asignee" name="asignee" required>
+                    <select id="asignee" name="asignee">
                         <option value="">Seleccionar usuario</option>
                         {% for user in users %}
                         <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
@@ -248,7 +267,7 @@
                     <label for="due_date">
                         <i class="fas fa-calendar-alt"></i> Fecha límite:
                     </label>
-                    <input type="date" id="due_date" name="due_date" required>
+                    <input type="date" id="due_date" name="due_date">
                 </div>
 
                 <div class="form-group">
@@ -270,7 +289,7 @@
                     <label for="eventStart">
                         <i class="fas fa-calendar-day"></i> Fecha de inicio:
                     </label>
-                    <input type="date" id="eventStart" name="start_date" required>
+                    <input type="date" id="eventStart" name="start_date">
                 </div>
 
                 <div class="form-group">
@@ -349,6 +368,10 @@
         document.querySelectorAll('.specific-fields').forEach(field => field.classList.remove('active'));
         document.querySelector('.task-fields').classList.add('active');
         currentType = "task";
+        
+        // Limpiar errores
+        const errorContainer = document.getElementById('form-error');
+        if (errorContainer) errorContainer.remove();
     }
     
     // Función para mostrar notificaciones
@@ -372,6 +395,33 @@
                 notification.remove();
             }, 300);
         }, 3000);
+    }
+    
+    // Función para mostrar errores en el formulario
+    function showFormError(message) {
+        // Eliminar error existente
+        const existingError = document.getElementById('form-error');
+        if (existingError) existingError.remove();
+        
+        // Crear nuevo elemento de error
+        const errorContainer = document.createElement('div');
+        errorContainer.id = 'form-error';
+        errorContainer.className = 'form-error';
+        errorContainer.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i> ${message}
+        `;
+        
+        // Insertar al principio del formulario
+        const form = document.getElementById('itemForm');
+        form.prepend(errorContainer);
+        
+        // Animación y scroll
+        errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Eliminar después de 5 segundos
+        setTimeout(() => {
+            errorContainer.remove();
+        }, 5000);
     }
     
     // Función para obtener color basado en prioridad
@@ -583,11 +633,20 @@
             let res, result;
             
             if (currentType === "task") {
+                // Validar campos de tarea
+                const titulo = document.getElementById('titulo').value.trim();
+                const asignee = document.getElementById('asignee').value;
+                const due_date = document.getElementById('due_date').value;
+                
+                if (!titulo || !asignee || !due_date) {
+                    throw new Error('Por favor, complete todos los campos obligatorios para la tarea');
+                }
+
                 // Datos específicos de tarea
                 const taskData = {
-                    titulo: document.getElementById('titulo').value.trim(),
-                    asignee: document.getElementById('asignee').value,
-                    due_date: document.getElementById('due_date').value,
+                    titulo: titulo,
+                    asignee: asignee,
+                    due_date: due_date,
                     prioridad: document.getElementById('prioridad').value,
                     pasos: document.getElementById('descripcion').value.trim()
                 };
@@ -614,7 +673,8 @@
                     extendedProps: {
                         asignee: taskData.asignee,
                         prioridad: taskData.prioridad,
-                        pasos: taskData.pasos
+                        pasos: taskData.pasos,
+                        user_id: result.user_id
                     }
                 };
                 
@@ -630,11 +690,19 @@
                 }, 800);
                 
             } else {
+                // Validar campos de evento
+                const titulo = document.getElementById('titulo').value.trim();
+                const start_date = document.getElementById('eventStart').value;
+                
+                if (!titulo || !start_date) {
+                    throw new Error('Por favor, complete todos los campos obligatorios para el evento');
+                }
+
                 // Datos específicos de evento
                 const eventData = {
-                    title: document.getElementById('titulo').value.trim(),
-                    start_date: document.getElementById('eventStart').value,
-                    end_date: document.getElementById('eventEnd').value || document.getElementById('eventStart').value,
+                    title: titulo,
+                    start_date: start_date,
+                    end_date: document.getElementById('eventEnd').value || start_date,
                     description: document.getElementById('descripcion').value.trim(),
                     color: document.getElementById('eventColor').value
                 };
@@ -681,8 +749,9 @@
 
         } catch (error) {
             console.error("Error:", error);
+            showFormError(error.message);
             
-            // Mostrar error
+            // Mostrar error en el botón
             submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
             submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
             
@@ -786,6 +855,10 @@
                     field.classList.remove('active');
                 });
                 document.querySelector(`.${currentType}-fields`).classList.add('active');
+                
+                // Limpiar errores al cambiar tipo
+                const errorContainer = document.getElementById('form-error');
+                if (errorContainer) errorContainer.remove();
             });
         });
         

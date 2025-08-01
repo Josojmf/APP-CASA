@@ -208,6 +208,52 @@ def add_event():
     except Exception as e:
         logger.error(f"Error add_event: {e}")
         return jsonify({"error": "Error al añadir evento"}), 500
+    
+
+@main.route('/api/add_task', methods=['POST'])  # <-- Añade esta nueva ruta para tareas
+@login_required
+def add_task():
+    try:
+        data = request.get_json()
+        titulo = data.get("titulo")
+        asignee = data.get("asignee")
+        due_date = data.get("due_date")
+        prioridad = data.get("prioridad")
+        pasos = data.get("pasos")
+
+        if not titulo or not asignee or not due_date:
+            return jsonify({"error": "Faltan campos obligatorios para la tarea"}), 400
+
+        # Buscar usuario por nombre
+        user = mongo.db.users.find_one({"nombre": asignee})
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Crear nueva tarea
+        nueva_tarea = {
+            "titulo": titulo,
+            "due_date": due_date,
+            "pasos": pasos,
+            "prioridad": prioridad,
+            "created_by": session.get('user'),
+            "created_at": datetime.now(),
+            "asignado": asignee
+        }
+
+        # Añadir tarea al usuario
+        mongo.db.users.update_one(
+            {"_id": user['_id']},
+            {"$push": {"tareas": nueva_tarea}}
+        )
+
+        return jsonify({
+            "success": True, 
+            "task_id": str(nueva_tarea.get('_id', '')),
+            "message": "Tarea añadida exitosamente"
+        })
+    except Exception as e:
+        logger.error(f"Error add_task: {e}")
+        return jsonify({"error": "Error al añadir tarea"}), 500
 
 # Actualizar la ruta del calendario
 @main.route("/calendario")
