@@ -236,12 +236,33 @@ def calendario():
                 }
             })
 
-        # Obtener tareas (existente)
+        # Obtener tareas
         for user in users:
             nombre = user.get("nombre", "Sin nombre")
             tareas = user.get("tareas", [])
             for tarea in tareas:
-                # ... (código existente para tareas)
+                # Determinar color según prioridad
+                color_map = {
+                    'urgente': '#ef4444',
+                    'alta': '#f97316', 
+                    'normal': '#f59e0b',
+                    'baja': '#22c55e'
+                }
+                color = color_map.get(tarea.get('prioridad', 'normal'), '#10b981')
+                
+                eventos.append({
+                    "title": f"{tarea.get('titulo', '')} - {nombre}",
+                    "start": tarea.get("due_date"),
+                    "allDay": True,
+                    "backgroundColor": color,
+                    "borderColor": color,
+                    "extendedProps": {
+                        "asignee": nombre,
+                        "prioridad": tarea.get('prioridad', 'normal'),
+                        "pasos": tarea.get('pasos', ''),
+                        "user_id": str(user['_id'])
+                    }
+                })
 
         vapid_public_key = current_app.config.get("VAPID_PUBLIC_KEY", "")
         return render_template("calendario.html", 
