@@ -5,6 +5,125 @@
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/calendario.css') }}">
 <style>
+/* Estilos para el selector de tipo */
+.type-selector {
+    display: flex;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.type-option {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    color: #4a5568;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.type-option.active {
+    background: #8b5cf6;
+    color: white;
+    box-shadow: 0 4px 6px rgba(139, 92, 246, 0.2);
+}
+
+.type-option:not(.active):hover {
+    background: #e2e8f0;
+}
+
+/* Campos específicos */
+.specific-fields {
+    display: none;
+    animation: fadeIn 0.4s ease;
+}
+
+.specific-fields.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ajustes para eventos */
+.event-fields .form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Botón flotante único */
+#addItemBtn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: white;
+    border: none;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 90;
+}
+
+#addItemBtn:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, #047857, #065f46);
+}
+
+#addItemBtn .tooltip {
+    position: absolute;
+    top: -40px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+#addItemBtn:hover .tooltip {
+    opacity: 1;
+}
+
+/* Animación para el modal */
+@keyframes overlayFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes contentSlideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.overlay.active {
+    display: flex;
+    animation: overlayFadeIn 0.3s ease forwards;
+}
+
+.overlay.active .overlay-content {
+    animation: contentSlideIn 0.4s ease forwards;
+}
+
 /* Nuevos estilos para eventos */
 .fc-event-event {
     border-left: 4px solid #9c27b0 !important;
@@ -19,16 +138,6 @@
     margin-left: 10px;
     background: #9c27b0;
     color: white;
-}
-
-/* Botón para eventos */
-.btn-calendario.event-btn {
-    background: linear-gradient(135deg, #9c27b0, #7b1fa2);
-    right: 100px;
-}
-
-.btn-calendario.event-btn:hover {
-    background: linear-gradient(135deg, #7b1fa2, #6a1b9a);
 }
 
 /* Botón para eliminar eventos */
@@ -57,127 +166,108 @@
 <h1 class="title">📅 Calendario de tareas y eventos</h1>
 <div id="calendar"></div>
 
-<!-- Botón para añadir tareas -->
-<button id="addTaskBtn" class="floating-btn btn-calendario" title="Añadir nueva tarea">
+<!-- Botón único para añadir tareas/eventos -->
+<button id="addItemBtn" title="Añadir nueva tarea o evento">
     <i class="fas fa-plus"></i>
+    <span class="tooltip">Añadir tarea/evento</span>
 </button>
 
-<!-- Botón para añadir eventos -->
-<button id="addEventBtn" class="floating-btn btn-calendario event-btn" title="Añadir nuevo evento">
-    <i class="fas fa-calendar-star"></i>
-</button>
-
-<!-- Modal para tareas -->
+<!-- Modal unificado -->
 <div id="overlay" class="overlay">
     <div class="overlay-content">
-        <h2><i class="fas fa-calendar-plus"></i> Añadir nueva tarea</h2>
-        <form id="taskForm">
+        <h2><i class="fas fa-calendar-plus"></i> Añadir nuevo elemento</h2>
+        
+        <!-- Selector de tipo -->
+        <div class="type-selector">
+            <div class="type-option active" data-type="task">
+                <i class="fas fa-tasks"></i> Tarea
+            </div>
+            <div class="type-option" data-type="event">
+                <i class="fas fa-calendar-star"></i> Evento
+            </div>
+        </div>
+        
+        <form id="itemForm">
+            <!-- Campos comunes -->
             <div class="form-group">
                 <label for="titulo">
-                    <i class="fas fa-heading"></i> Título de la tarea:
+                    <i class="fas fa-heading"></i> Título:
                 </label>
                 <input type="text" id="titulo" name="titulo" required 
-                       placeholder="Ej: Reunión de equipo">
+                       placeholder="Ej: Reunión importante">
+            </div>
+
+            <!-- Campos específicos para tareas -->
+            <div class="specific-fields task-fields active">
+                <div class="form-group">
+                    <label for="asignee">
+                        <i class="fas fa-user"></i> Asignado a:
+                    </label>
+                    <select id="asignee" name="asignee" required>
+                        <option value="">Seleccionar usuario</option>
+                        {% for user in users %}
+                        <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="due_date">
+                        <i class="fas fa-calendar-alt"></i> Fecha límite:
+                    </label>
+                    <input type="date" id="due_date" name="due_date" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="prioridad">
+                        <i class="fas fa-flag"></i> Prioridad:
+                    </label>
+                    <select id="prioridad" name="prioridad">
+                        <option value="baja">🟢 Baja</option>
+                        <option value="normal" selected>🟡 Normal</option>
+                        <option value="alta">🟠 Alta</option>
+                        <option value="urgente">🔴 Urgente</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Campos específicos para eventos -->
+            <div class="specific-fields event-fields">
+                <div class="form-group">
+                    <label for="eventStart">
+                        <i class="fas fa-calendar-day"></i> Fecha de inicio:
+                    </label>
+                    <input type="date" id="eventStart" name="start_date" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="eventEnd">
+                        <i class="fas fa-calendar-week"></i> Fecha de fin (opcional):
+                    </label>
+                    <input type="date" id="eventEnd" name="end_date">
+                </div>
+
+                <div class="form-group">
+                    <label for="eventColor">
+                        <i class="fas fa-palette"></i> Color:
+                    </label>
+                    <input type="color" id="eventColor" name="color" value="#9c27b0">
+                </div>
             </div>
 
             <div class="form-group">
-                <label for="asignee">
-                    <i class="fas fa-user"></i> Asignado a:
-                </label>
-                <select id="asignee" name="asignee" required>
-                    <option value="">Seleccionar usuario</option>
-                    {% for user in users %}
-                    <option value="{{ user['nombre'] }}">{{ user['nombre'] }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="due_date">
-                    <i class="fas fa-calendar-alt"></i> Fecha límite:
-                </label>
-                <input type="date" id="due_date" name="due_date" required>
-            </div>
-
-            <div class="form-group">
-                <label for="prioridad">
-                    <i class="fas fa-flag"></i> Prioridad:
-                </label>
-                <select id="prioridad" name="prioridad">
-                    <option value="baja">🟢 Baja</option>
-                    <option value="normal" selected>🟡 Normal</option>
-                    <option value="alta">🟠 Alta</option>
-                    <option value="urgente">🔴 Urgente</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="pasos">
-                    <i class="fas fa-list-ul"></i> Descripción:
-                </label>
-                <textarea id="pasos" name="pasos" rows="3" 
-                          placeholder="Describe la tarea o evento..."></textarea>
-            </div>
-
-            <div class="form-buttons">
-                <button type="submit">
-                    <i class="fas fa-save"></i> Guardar Tarea
-                </button>
-                <button type="button" id="cancelBtn">
-                    <i class="fas fa-times"></i> Cancelar
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Modal para eventos -->
-<div id="eventOverlay" class="overlay">
-    <div class="overlay-content">
-        <h2><i class="fas fa-calendar-star"></i> Añadir nuevo evento</h2>
-        <form id="eventForm">
-            <div class="form-group">
-                <label for="eventTitle">
-                    <i class="fas fa-heading"></i> Título del evento:
-                </label>
-                <input type="text" id="eventTitle" name="title" required 
-                       placeholder="Ej: Viaje a Barcelona">
-            </div>
-
-            <div class="form-group">
-                <label for="eventStart">
-                    <i class="fas fa-calendar-day"></i> Fecha de inicio:
-                </label>
-                <input type="date" id="eventStart" name="start_date" required>
-            </div>
-
-            <div class="form-group">
-                <label for="eventEnd">
-                    <i class="fas fa-calendar-week"></i> Fecha de fin (opcional):
-                </label>
-                <input type="date" id="eventEnd" name="end_date">
-            </div>
-
-            <div class="form-group">
-                <label for="eventDescription">
+                <label for="descripcion">
                     <i class="fas fa-align-left"></i> Descripción:
                 </label>
-                <textarea id="eventDescription" name="description" rows="3"
-                          placeholder="Detalles del evento..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="eventColor">
-                    <i class="fas fa-palette"></i> Color:
-                </label>
-                <input type="color" id="eventColor" name="color" value="#9c27b0">
+                <textarea id="descripcion" name="descripcion" rows="3" 
+                          placeholder="Detalles..."></textarea>
             </div>
 
             <div class="form-buttons">
-                <button type="submit">
-                    <i class="fas fa-calendar-plus"></i> Guardar Evento
+                <button type="submit" id="saveBtn">
+                    <i class="fas fa-save"></i> Guardar
                 </button>
-                <button type="button" id="cancelEventBtn">
+                <button type="button" id="cancelBtn">
                     <i class="fas fa-times"></i> Cancelar
                 </button>
             </div>
@@ -191,6 +281,7 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/es.global.min.js"></script>
 <script>
     let calendar;
+    let currentType = "task"; // Por defecto: tarea
     
     document.addEventListener('DOMContentLoaded', function() {
         const calendarEl = document.getElementById('calendar');
@@ -248,13 +339,9 @@
             
             // Click en día
             dateClick: function(info) {
+                openModal();
                 document.getElementById('due_date').value = info.dateStr;
-                document.getElementById('overlay').style.display = 'flex';
-                document.body.style.overflow = 'hidden';
-                
-                setTimeout(() => {
-                    document.getElementById('titulo').focus();
-                }, 100);
+                document.getElementById('eventStart').value = info.dateStr;
             },
             
             // Configuración responsiva
@@ -266,10 +353,29 @@
         calendar.render();
         
         // Configurar fecha mínima para hoy
-        const dateInput = document.getElementById('due_date');
         const today = new Date().toISOString().split('T')[0];
-        dateInput.min = today;
-        dateInput.value = today;
+        document.getElementById('due_date').min = today;
+        document.getElementById('due_date').value = today;
+        document.getElementById('eventStart').min = today;
+        document.getElementById('eventStart').value = today;
+        
+        // Selector de tipo
+        document.querySelectorAll('.type-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.type-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                currentType = this.dataset.type;
+                
+                // Mostrar campos específicos según el tipo seleccionado
+                document.querySelectorAll('.specific-fields').forEach(field => {
+                    field.classList.remove('active');
+                });
+                document.querySelector(`.${currentType}-fields`).classList.add('active');
+            });
+        });
     });
 
     // Función para mostrar detalles del evento
@@ -454,148 +560,176 @@
         }
     }
 
-    // Abrir modal de nueva tarea
-    document.getElementById('addTaskBtn').addEventListener('click', () => {
-        document.getElementById('overlay').style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        
-        setTimeout(() => {
-            document.getElementById('titulo').focus();
-        }, 100);
-    });
-
-    // Abrir modal de nuevo evento
-    document.getElementById('addEventBtn').addEventListener('click', () => {
-        document.getElementById('eventOverlay').style.display = 'flex';
+    // Abrir modal unificado
+    document.getElementById('addItemBtn').addEventListener('click', openModal);
+    
+    function openModal() {
+        const overlay = document.getElementById('overlay');
+        overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
         
         // Establecer fecha mínima como hoy
         const today = new Date().toISOString().split('T')[0];
+        document.getElementById('due_date').value = today;
         document.getElementById('eventStart').value = today;
-        document.getElementById('eventStart').min = today;
         
         setTimeout(() => {
-            document.getElementById('eventTitle').focus();
+            document.getElementById('titulo').focus();
         }, 100);
-    });
+    }
 
-    // Cerrar modal de tareas
-    document.getElementById('cancelBtn').addEventListener('click', closeTaskModal);
+    // Cerrar modal
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
     
-    function closeTaskModal() {
+    function closeModal() {
         const overlay = document.getElementById('overlay');
-        overlay.style.animation = 'overlayFadeOut 0.3s ease forwards';
+        overlay.classList.remove('active');
         document.body.style.overflow = 'auto';
+        document.getElementById('itemForm').reset();
         
-        setTimeout(() => {
-            overlay.style.display = 'none';
-            overlay.style.animation = '';
-            document.getElementById('taskForm').reset();
-            
-            // Resetear fecha a hoy
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('due_date').value = today;
-        }, 300);
+        // Resetear fecha a hoy
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('due_date').value = today;
+        document.getElementById('eventStart').value = today;
+        
+        // Restablecer tipo a tarea
+        document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
+        document.querySelector('.type-option[data-type="task"]').classList.add('active');
+        document.querySelectorAll('.specific-fields').forEach(field => field.classList.remove('active'));
+        document.querySelector('.task-fields').classList.add('active');
+        currentType = "task";
     }
 
-    // Cerrar modal de eventos
-    document.getElementById('cancelEventBtn').addEventListener('click', closeEventModal);
-    
-    function closeEventModal() {
-        const overlay = document.getElementById('eventOverlay');
-        overlay.style.animation = 'overlayFadeOut 0.3s ease forwards';
-        document.body.style.overflow = 'auto';
-        
-        setTimeout(() => {
-            overlay.style.display = 'none';
-            overlay.style.animation = '';
-            document.getElementById('eventForm').reset();
-        }, 300);
-    }
-
-    // Cerrar modales con Escape
+    // Cerrar modal con Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            const taskOverlay = document.getElementById('overlay');
-            const eventOverlay = document.getElementById('eventOverlay');
+            const overlay = document.getElementById('overlay');
             const eventModal = document.querySelector('.event-detail-modal');
             
-            if (taskOverlay.style.display === 'flex') {
-                closeTaskModal();
-            } else if (eventOverlay.style.display === 'flex') {
-                closeEventModal();
+            if (overlay.classList.contains('active')) {
+                closeModal();
             } else if (eventModal) {
                 closeEventDetail(eventModal);
             }
         }
     });
 
-    // Cerrar modales al hacer click fuera
+    // Cerrar modal al hacer click fuera
     document.getElementById('overlay').addEventListener('click', (e) => {
         if (e.target === e.currentTarget) {
-            closeTaskModal();
-        }
-    });
-    
-    document.getElementById('eventOverlay').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) {
-            closeEventModal();
+            closeModal();
         }
     });
 
-    // Enviar formulario de tarea
-    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+    // Enviar formulario unificado
+    document.getElementById('itemForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const submitBtn = document.getElementById('saveBtn');
         const originalText = submitBtn.innerHTML;
+        const originalBackground = submitBtn.style.background;
         
         // Mostrar loading
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         submitBtn.disabled = true;
 
+        // Datos comunes
         const data = {
             titulo: document.getElementById('titulo').value.trim(),
-            asignee: document.getElementById('asignee').value,
-            due_date: document.getElementById('due_date').value,
-            prioridad: document.getElementById('prioridad').value,
-            pasos: document.getElementById('pasos').value.trim(),
+            descripcion: document.getElementById('descripcion').value.trim(),
         };
 
         try {
-            const res = await fetch('/api/add_task', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-
-            if (!res.ok) {
-                throw new Error('Error al añadir tarea');
-            }
-
-            // Mostrar éxito
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Guardado!';
-            submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+            let res, result;
             
-            // Añadir evento al calendario sin recargar
-            const newEvent = {
-                title: data.titulo,
-                start: data.due_date,
-                backgroundColor: getPriorityColor(data.prioridad),
-                borderColor: getPriorityColor(data.prioridad),
-                extendedProps: {
-                    asignee: data.asignee,
-                    prioridad: data.prioridad,
-                    pasos: data.pasos
+            if (currentType === "task") {
+                // Datos específicos de tarea
+                data.asignee = document.getElementById('asignee').value;
+                data.due_date = document.getElementById('due_date').value;
+                data.prioridad = document.getElementById('prioridad').value;
+                
+                res = await fetch('/api/add_task', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Error al añadir tarea');
                 }
-            };
-            
-            calendar.addEvent(newEvent);
-            
-            setTimeout(() => {
-                closeTaskModal();
-                showNotification('¡Tarea añadida al calendario! 📅', 'success');
-            }, 800);
+                
+                result = await res.json();
+                
+                // Añadir evento al calendario
+                const newEvent = {
+                    id: result.task_id,
+                    title: data.titulo,
+                    start: data.due_date,
+                    backgroundColor: getPriorityColor(data.prioridad),
+                    borderColor: getPriorityColor(data.prioridad),
+                    extendedProps: {
+                        asignee: data.asignee,
+                        prioridad: data.prioridad,
+                        pasos: data.descripcion
+                    }
+                };
+                
+                calendar.addEvent(newEvent);
+                
+                // Mostrar éxito
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Tarea guardada!';
+                submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                
+                setTimeout(() => {
+                    closeModal();
+                    showNotification('¡Tarea añadida al calendario! 📅', 'success');
+                }, 800);
+                
+            } else {
+                // Datos específicos de evento
+                data.start_date = document.getElementById('eventStart').value;
+                data.end_date = document.getElementById('eventEnd').value || document.getElementById('eventStart').value;
+                data.color = document.getElementById('eventColor').value;
+                
+                res = await fetch('/api/add_event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Error al añadir evento');
+                }
+                
+                result = await res.json();
+                
+                // Añadir evento al calendario
+                const newEvent = {
+                    id: result.event_id,
+                    title: `⭐ ${data.titulo}`,
+                    start: data.start_date,
+                    end: data.end_date,
+                    allDay: true,
+                    backgroundColor: data.color,
+                    borderColor: data.color,
+                    extendedProps: {
+                        type: "event",
+                        reported_by: "{{ session.get('user') }}",
+                        description: data.descripcion
+                    }
+                };
+                
+                calendar.addEvent(newEvent);
+                
+                // Mostrar éxito
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Evento guardado!';
+                submitBtn.style.background = 'linear-gradient(135deg, #9c27b0, #7b1fa2)';
+                
+                setTimeout(() => {
+                    closeModal();
+                    showNotification('¡Evento añadido al calendario! 🌟', 'success');
+                }, 800);
+            }
 
         } catch (error) {
             console.error("Error:", error);
@@ -606,81 +740,7 @@
             
             setTimeout(() => {
                 submitBtn.innerHTML = originalText;
-                submitBtn.style.background = '';
-                submitBtn.disabled = false;
-            }, 2000);
-        }
-    });
-
-    // Enviar formulario de evento
-    document.getElementById('eventForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        
-        // Mostrar loading
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-        submitBtn.disabled = true;
-
-        const data = {
-            title: document.getElementById('eventTitle').value.trim(),
-            start_date: document.getElementById('eventStart').value,
-            end_date: document.getElementById('eventEnd').value || document.getElementById('eventStart').value,
-            description: document.getElementById('eventDescription').value.trim(),
-            color: document.getElementById('eventColor').value
-        };
-
-        try {
-            const res = await fetch('/api/add_event', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-
-            if (!res.ok) {
-                throw new Error('Error al añadir evento');
-            }
-
-            const result = await res.json();
-            
-            // Añadir evento al calendario
-            const newEvent = {
-                id: result.event_id,
-                title: `⭐ ${data.title}`,
-                start: data.start_date,
-                end: data.end_date,
-                allDay: true,
-                backgroundColor: data.color,
-                borderColor: data.color,
-                extendedProps: {
-                    type: "event",
-                    reported_by: "{{ session.get('user') }}",
-                    description: data.description
-                }
-            };
-            
-            calendar.addEvent(newEvent);
-            
-            // Mostrar éxito
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Guardado!';
-            submitBtn.style.background = 'linear-gradient(135deg, #9c27b0, #7b1fa2)';
-            
-            setTimeout(() => {
-                closeEventModal();
-                showNotification('¡Evento añadido al calendario! 🌟', 'success');
-            }, 800);
-
-        } catch (error) {
-            console.error("Error:", error);
-            
-            // Mostrar error
-            submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
-            submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-            
-            setTimeout(() => {
-                submitBtn.innerHTML = originalText;
-                submitBtn.style.background = '';
+                submitBtn.style.background = originalBackground;
                 submitBtn.disabled = false;
             }, 2000);
         }
@@ -720,13 +780,8 @@
         }, 3000);
     }
 
-    // Auto-resize para textareas
-    document.getElementById('pasos').addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    });
-    
-    document.getElementById('eventDescription').addEventListener('input', function() {
+    // Auto-resize para textarea
+    document.getElementById('descripcion').addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
     });
