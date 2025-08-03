@@ -1560,73 +1560,92 @@ def mercadona_categories():
 @main.route('/mercadona/category/<int:category_id>')
 @login_required
 def mercadona_category_products(category_id):
-    """Obtener productos de una categoría específica"""
-    try:
-        # First try to get from cache if available
-        cache_key = f"mercadona_category_{category_id}"
-        cached_data = _mercadona_categories_cache.get(cache_key)
-        if cached_data and (datetime.now() - cached_data["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL:
-            return jsonify(cached_data["data"])
+    """Obtener productos de una categoría o subcategoría, usando cache si la API falla."""
+    global _mercadona_categories_cache
 
-        # Add retry mechanism for API calls
-        max_retries = 3
-        retry_delay = 1  # seconds
-        
-        for attempt in range(max_retries):
-            try:
-                # Get main categories with timeout
-                main_categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
-                main_categories_response = requests.get(
-                    main_categories_url, 
-                    headers=MERCADONA_HEADERS, 
-                    timeout=10
-                )
-                
-                if main_categories_response.status_code == 200:
-                    break  # Success, exit retry loop
-                    
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-                logger.warning(f"Attempt {attempt + 1} failed for category {category_id}: {str(e)}")
-                if attempt == max_retries - 1:
-                    if cached_data:  # Fall back to cache if available
-                        return jsonify(cached_data["data"])
+    try:
+        # Verificar si tenemos datos en cache de categorías principales
+        categories_data = None
+        if (_mercadona_categories_cache["data"] and
+            _mercadona_categories_cache["timestamp"] and
+            (datetime.now() - _mercadona_categories_cache["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL):
+            # Reconstruimos estructura similar a la API original
+            categories_data = {"results": []}
+            for cat in _mercadona_categories_cache["data"]["categories"]:
+                categories_data["results"].append({
+                    "id": cat["id"],
+                    "name": cat["name"],
+                    "categories": cat.get("categories", [])  # Si no tienes esta info, dejar lista vacía
+                })
+
+        # Si no hay cache o ha caducado, pedimos a la API
+        if not categories_data:
+            url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+            resp = requests.get(url, headers=MERCADONA_HEADERS, timeout=10)
+
+            if resp.status_code == 200:
+                categories_data = resp.json()
+                # Actualizamos cache principal
+                categories = []
+                for category in categories_data.get('results', []):
+                    subcategories_count = len(category.get('categories', []))
+                    categories.append({
+                        'id': category.get('id'),
+                        'name': category.get('name', 'Sin nombre'),
+                        'subcategories_count': subcategories_count,
+                        'categories': category.get('categories', [])
+                    })
+                _mercadona_categories_cache["data"] = {'success': True, 'categories': categories}
+                _mercadona_categories_cache["timestamp"] = datetime.now()
+            else:
+                # Si la API falla y hay cache viejo, usarlo
+                if _mercadona_categories_cache["data"]:
+                    categories_data = {"results": []}
+                    for cat in _mercadona_categories_cache["data"]["categories"]:
+                        categories_data["results"].append({
+                            "id": cat["id"],
+                            "name": cat["name"],
+                            "categories": cat.get("categories", [])
+                        })
+                else:
                     return jsonify({
                         'success': False,
-                        'error': 'No se pudo conectar con Mercadona después de varios intentos'
+                        'error': 'No se pudo obtener la lista de categorías principales'
                     }), 500
-                time.sleep(retry_delay)
-                continue
-                
-        if main_categories_response.status_code != 200:
-            if cached_data:
-                return jsonify(cached_data["data"])
-            return jsonify({
-                'success': False,
-                'error': 'No se pudo obtener la lista de categorías principales'
-            }), 500
 
-        # Rest of your existing processing logic...
-        
-        # Cache the successful response
-        response_data = {
+        all_products = []
+        category_name = "Categoría"
+        is_second_level = False
+
+        # Buscar si el ID es de categoría principal o subcategoría
+        for main_cat in categories_data.get('results', []):
+            if main_cat.get('id') == category_id:
+                category_name = main_cat.get('name', 'Categoría')
+                for subcat in main_cat.get('categories', []):
+                    subcat_id = subcat.get('id')
+                    if subcat_id:
+                        all_products.extend(get_products_from_subcategory(subcat_id))
+                break
+
+            for subcat in main_cat.get('categories', []):
+                if subcat.get('id') == category_id:
+                    category_name = subcat.get('name', 'Subcategoría')
+                    is_second_level = True
+                    all_products.extend(get_products_from_subcategory(category_id))
+                    break
+            if is_second_level:
+                break
+
+        return jsonify({
             'success': True,
             'category_name': category_name,
             'products': all_products,
             'is_second_level': is_second_level,
             'total_products': len(all_products)
-        }
-        
-        _mercadona_categories_cache[cache_key] = {
-            "data": response_data,
-            "timestamp": datetime.now()
-        }
-        
-        return jsonify(response_data)
+        })
 
     except Exception as e:
         logger.error(f"Error en mercadona_category_products: {str(e)}")
-        if cached_data:
-            return jsonify(cached_data["data"])
         return jsonify({
             'success': False,
             'error': 'Error interno del servidor',
