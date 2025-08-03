@@ -11,6 +11,10 @@ import logging
 import json
 import traceback  
 from datetime import datetime
+#Retry 
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
 
 
 
@@ -19,6 +23,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 main = Blueprint('main', __name__)
+
+# Configuración de retry para requests
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[408, 429, 500, 502, 503, 504]
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
 
 # ==========================================
 # Decorador para autenticación
@@ -1556,94 +1568,127 @@ def mercadona_categories():
         if _mercadona_categories_cache["data"]:
             return jsonify(_mercadona_categories_cache["data"])
         return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
-    
+
 @main.route('/mercadona/category/<int:category_id>')
 @login_required
 def mercadona_category_products(category_id):
-    """Obtener productos de una categoría específica (incluyendo subcategorías de segundo nivel)"""
+    #category id +100 e.g initial 12 -Z 112
+    category_id += 100
+    """Obtener productos de una categoría específica"""
     try:
-        # Primero obtenemos todas las categorías principales
-        main_categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
-        main_categories_response = requests.get(main_categories_url, headers=MERCADONA_HEADERS, timeout=10)
+        # Verificar primero si tenemos datos en caché
+        cache_key = f"category_{category_id}"
+        cached_data = _mercadona_categories_cache.get(cache_key)
         
-        if main_categories_response.status_code != 200:
+        if cached_data and (datetime.now() - cached_data["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL:
+            return jsonify(cached_data["data"])
+
+        # Configuración de la solicitud con timeout
+        session = requests.Session()
+        session.headers.update(MERCADONA_HEADERS)
+        adapter = requests.adapters.HTTPAdapter(max_retries=3)
+        session.mount("https://", adapter)
+
+        # 1. Obtener categorías principales con manejo de timeout
+        try:
+            main_categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+            response = session.get(main_categories_url, timeout=10)
+            response.raise_for_status()  # Lanza error para códigos 4XX/5XX
+            categories_data = response.json()
+        except (requests.exceptions.RequestException, ValueError) as e:
+            logger.error(f"Error obteniendo categorías principales: {str(e)}")
+            if cached_data:
+                return jsonify(cached_data["data"])
             return jsonify({
                 'success': False,
-                'error': 'No se pudo obtener la lista de categorías principales'
+                'error': 'No se pudo obtener la lista de categorías principales',
+                'details': str(e)
             }), 500
 
-        all_products = []
+        # 2. Buscar la categoría solicitada
         category_name = "Categoría"
-        is_second_level = False
+        all_products = []
+        found = False
 
-        # Buscamos en todas las categorías principales
-        for main_category in main_categories_response.json().get('results', []):
-            # Verificamos si el ID buscado es una categoría principal
+        for main_category in categories_data.get('results', []):
             if main_category.get('id') == category_id:
                 category_name = main_category.get('name', 'Categoría')
-                # Obtenemos sus subcategorías (primer nivel)
-                for subcategory in main_category.get('categories', []):
-                    subcat_id = subcategory.get('id')
-                    if subcat_id:
-                        products = get_products_from_subcategory(subcat_id)
-                        all_products.extend(products)
+                products = get_products_from_subcategory(session, category_id)
+                all_products.extend(products)
+                found = True
                 break
-            
-            # Si no es categoría principal, buscamos en sus subcategorías (segundo nivel)
+
             for subcategory in main_category.get('categories', []):
                 if subcategory.get('id') == category_id:
                     category_name = subcategory.get('name', 'Subcategoría')
-                    is_second_level = True
-                    products = get_products_from_subcategory(category_id)
+                    products = get_products_from_subcategory(session, category_id)
                     all_products.extend(products)
+                    found = True
                     break
-            
-            if is_second_level:
-                break
 
-        return jsonify({
+        if not found:
+            return jsonify({
+                'success': False,
+                'error': 'Categoría no encontrada'
+            }), 404
+
+        # Preparar respuesta y guardar en caché
+        response_data = {
             'success': True,
             'category_name': category_name,
             'products': all_products,
-            'is_second_level': is_second_level,
             'total_products': len(all_products)
-        })
+        }
+
+        _mercadona_categories_cache[cache_key] = {
+            "data": response_data,
+            "timestamp": datetime.now()
+        }
+
+        return jsonify(response_data)
 
     except Exception as e:
-        logger.error(f"Error en mercadona_category_products: {str(e)}")
+        logger.error(f"Error en mercadona_category_products: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'error': 'Error interno del servidor',
             'details': str(e)
-        }), 500
+        }), 500    
 
-def get_products_from_subcategory(subcategory_id):
-    """Función auxiliar para obtener productos de una subcategoría"""
+
+def get_products_from_subcategory(session, subcategory_id):
+    """Función auxiliar para obtener productos de una subcategoría con manejo de errores"""
     try:
         subcat_url = f"{MERCADONA_BASE_URL}/categories/{subcategory_id}/?lang=es&wh=mad1"
-        subcat_response = requests.get(subcat_url, headers=MERCADONA_HEADERS, timeout=10)
-        
-        if subcat_response.status_code != 200:
-            return []
+        response = session.get(subcat_url, timeout=10)
+        response.raise_for_status()
+        subcat_data = response.json()
 
-        subcat_data = subcat_response.json()
         products = []
         
-        # Procesamos productos directos de la subcategoría
+        # Procesar productos directos
         for product in subcat_data.get('products', []):
-            formatted_product = format_mercadona_product(product)
-            products.append(formatted_product)
+            try:
+                formatted = format_mercadona_product(product)
+                products.append(formatted)
+            except Exception as e:
+                logger.error(f"Error formateando producto: {str(e)}")
+                continue
         
-        # Procesamos también sub-subcategorías si existen
+        # Procesar sub-subcategorías
         for sub_subcategory in subcat_data.get('categories', []):
             for product in sub_subcategory.get('products', []):
-                formatted_product = format_mercadona_product(product)
-                products.append(formatted_product)
+                try:
+                    formatted = format_mercadona_product(product)
+                    products.append(formatted)
+                except Exception as e:
+                    logger.error(f"Error formateando producto: {str(e)}")
+                    continue
         
         return products
         
     except Exception as e:
-        logger.error(f"Error obteniendo productos de subcategoría {subcategory_id}: {str(e)}")
+        logger.error(f"Error obteniendo subcategoría {subcategory_id}: {str(e)}")
         return []
 
 @main.route('/mercadona/product/<product_id>')
