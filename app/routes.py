@@ -1493,38 +1493,37 @@ def mercadona_store():
 @main.route('/mercadona/categories')
 @login_required
 def mercadona_categories():
-    """Obtener todas las categorías de Mercadona"""
     try:
         url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
         response = requests.get(url, headers=MERCADONA_HEADERS, timeout=10)
-        
-        if response.status_code == 200:
+
+        if response.status_code != 200:
+            return jsonify({'success': False, 'error': 'Error al conectar con Mercadona'}), 500
+
+        try:
             categories_data = response.json()
-            categories = []
-            
-            for category in categories_data.get('results', []):
-                subcategories_count = len(category.get('categories', []))
-                categories.append({
-                    'id': category.get('id'),
-                    'name': category.get('name', 'Sin nombre'),
-                    'subcategories_count': subcategories_count
-                })
-            
-            return jsonify({
-                'success': True,
-                'categories': categories
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Respuesta inválida de Mercadona'}), 500
+
+        results = categories_data.get('results')
+        if not isinstance(results, list):
+            return jsonify({'success': False, 'error': 'Formato de datos inválido'}), 500
+
+        categories = []
+        for category in results:
+            subcategories_count = len(category.get('categories', []))
+            categories.append({
+                'id': category.get('id'),
+                'name': category.get('name', 'Sin nombre'),
+                'subcategories_count': subcategories_count
             })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Error al conectar con Mercadona'
-            }), 500
-            
+
+        return jsonify({'success': True, 'categories': categories})
+        
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': 'Error interno del servidor'
-        }), 500
+        logger.error(f"Error mercadona_categories: {e}")
+        return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
+    
 @main.route('/mercadona/category/<int:category_id>')
 @login_required
 def mercadona_category_products(category_id):
