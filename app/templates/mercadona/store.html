@@ -41,13 +41,6 @@
 
 <!-- Main Content -->
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-    <!-- Loading State -->
-    <div id="loading-state" class="text-center py-12 hidden">
-        <div class="loading-spinner"></div>
-        <p class="loading-text">Cargando productos...</p>
-    </div>
-
     <!-- Categories Grid -->
     <div id="categories-container" class="fade-in">
         <div class="mb-6">
@@ -72,9 +65,6 @@
         <!-- Header de productos -->
         <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
             <div>
-                <button id="back-to-categories" class="back-link text-blue-600 hover:text-blue-800 mb-2">
-                    <i class="fas fa-arrow-left mr-1"></i> Volver a categorías
-                </button>
                 <h2 id="category-title" class="text-2xl font-bold text-gray-900"></h2>
                 <p id="products-count" class="text-gray-600"></p>
             </div>
@@ -146,6 +136,7 @@
             const data = await response.json();
 
             if (data.success && data.categories.length > 0) {
+                categoriesData = data.categories;
                 displayCategories(data.categories);
                 hideLoading();
                 showCategories();
@@ -171,9 +162,17 @@
                 allProducts = data.products;
                 filteredProducts = [...allProducts];
 
+                // CLAVE: Ocultar categorías y mostrar productos
+                hideCategories();
                 displayProducts();
                 hideLoading();
                 showProducts();
+                
+                // Limpiar búsqueda cuando se selecciona una categoría
+                const searchInput = document.getElementById('search-products');
+                if (searchInput) {
+                    searchInput.value = '';
+                }
             } else {
                 throw new Error(data.error);
             }
@@ -201,6 +200,8 @@
                 allProducts = data.products;
                 filteredProducts = [...allProducts];
 
+                // Para búsquedas también ocultar categorías
+                hideCategories();
                 displayProducts();
                 hideLoading();
                 showProducts();
@@ -327,7 +328,6 @@
             return;
         }
 
-        // Usar nombre del producto si no se proporciona
         const nameToUse = productName || product.name;
         const packagingToUse = packaging || product.packaging || '';
 
@@ -335,7 +335,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken() // Asegúrate de tener esta función
+                'X-CSRFToken': getCSRFToken()
             },
             body: JSON.stringify({
                 product_id: productId,
@@ -361,23 +361,16 @@
             });
     }
 
-    // Función para añadir desde el modal
     function addToListFromModal(productId) {
         const quantity = getQuantity(`modal-${productId}`);
         const product = allProducts.find(p => p.id == productId);
 
         if (product) {
-            addToList(
-                productId,
-                quantity,
-                product.name,
-                product.packaging
-            );
+            addToList(productId, quantity, product.name, product.packaging);
             hideProductDetails();
         }
     }
 
-    // Función auxiliar para obtener CSRF token
     function getCSRFToken() {
         const meta = document.querySelector('meta[name="csrf-token"]');
         return meta ? meta.content : '';
@@ -389,24 +382,30 @@
 
     function displayCategories(categories) {
         const grid = document.getElementById('categories-grid');
+        if (!grid) return;
+        
         grid.innerHTML = '';
 
-        categories.forEach(category => {
+        categories.forEach((category, index) => {
             const icon = categoryIcons[category.name] || '🛍️';
 
-            const categoryCard = `
-                <div class="category-card slide-in-up" onclick="loadCategoryProducts(${category.id}, '${category.name.replace(/'/g, "\\'")}')">
-                    <div class="text-center">
-                        <div class="category-icon">${icon}</div>
-                        <h3 class="category-name">${category.name}</h3>
-                        <p class="category-subcategories">${category.subcategories_count} subcategorías</p>
-                        <div class="category-id-badge">
-                            ID: ${category.id}
-                        </div>
+            const categoryCard = document.createElement('div');
+            categoryCard.className = 'category-card slide-in-up';
+            categoryCard.style.animationDelay = `${index * 0.1}s`;
+            categoryCard.onclick = () => loadCategoryProducts(category.id, category.name);
+            
+            categoryCard.innerHTML = `
+                <div class="text-center">
+                    <div class="category-icon">${icon}</div>
+                    <h3 class="category-name">${category.name}</h3>
+                    <p class="category-subcategories">${category.subcategories_count} subcategorías</p>
+                    <div class="category-id-badge">
+                        ID: ${category.id}
                     </div>
                 </div>
             `;
-            grid.innerHTML += categoryCard;
+            
+            grid.appendChild(categoryCard);
         });
     }
 
@@ -414,6 +413,8 @@
         const grid = document.getElementById('products-grid');
         const titleEl = document.getElementById('category-title');
         const countEl = document.getElementById('products-count');
+
+        if (!grid || !titleEl || !countEl) return;
 
         if (currentCategory.isSearch) {
             titleEl.innerHTML = `<i class="fas fa-search mr-2"></i>${currentCategory.name}`;
@@ -435,7 +436,7 @@
             return;
         }
 
-        filteredProducts.forEach(product => {
+        filteredProducts.forEach((product, index) => {
             const hasDiscount = product.is_discounted || (product.previous_price && product.previous_price.trim() !== '');
             const priceDisplay = hasDiscount ?
                 `<span class="price-main price-discount">${product.price}€</span>
@@ -445,50 +446,53 @@
             const subcategoryBadge = product.subcategory ?
                 `<div class="subcategory-badge mb-2">${product.subcategory}</div>` : '';
 
-            const productCard = `
-                <div class="product-card slide-in-up">
-                    <div class="product-image-container">
-                        <img src="${product.thumbnail}" 
-                             alt="${product.name}" 
-                             class="product-image"
-                             onerror="this.src='/static/img/default_food.jpg'">
-                        ${hasDiscount ? '<div class="discount-badge">¡Oferta!</div>' : ''}
+            const productCard = document.createElement('div');
+            productCard.className = 'product-card slide-in-up';
+            productCard.style.animationDelay = `${index * 0.1}s`;
+            
+            productCard.innerHTML = `
+                <div class="product-image-container">
+                    <img src="${product.thumbnail}" 
+                         alt="${product.name}" 
+                         class="product-image"
+                         onerror="this.src='/static/img/default_food.jpg'">
+                    ${hasDiscount ? '<div class="discount-badge">¡Oferta!</div>' : ''}
+                </div>
+                
+                <div class="product-content">
+                    ${subcategoryBadge}
+                    <h3 class="product-name">${product.name}</h3>
+                    <p class="product-details">${product.packaging} • ${product.size}${product.size_format}</p>
+                    
+                    <div class="product-price-section">
+                        <div>${priceDisplay}</div>
+                        <div class="price-reference">${product.reference_price}€/${product.size_format}</div>
                     </div>
                     
-                    <div class="product-content">
-                        ${subcategoryBadge}
-                        <h3 class="product-name">${product.name}</h3>
-                        <p class="product-details">${product.packaging} • ${product.size}${product.size_format}</p>
-                        
-                        <div class="product-price-section">
-                            <div>${priceDisplay}</div>
-                            <div class="price-reference">${product.reference_price}€/${product.size_format}</div>
-                        </div>
-                        
-                        <div class="product-actions">
-                            <div class="quantity-controls">
-                                <button onclick="changeQuantity('${product.id}', -1)" class="quantity-btn">
-                                    <i class="fas fa-minus text-xs"></i>
-                                </button>
-                                <span id="qty-${product.id}" class="quantity-display">1</span>
-                                <button onclick="changeQuantity('${product.id}', 1)" class="quantity-btn">
-                                    <i class="fas fa-plus text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <button onclick="addToList('${product.id}', getQuantity('${product.id}'))" class="add-to-cart-btn">
-                                <i class="fas fa-plus"></i>
-                                <span>Añadir</span>
+                    <div class="product-actions">
+                        <div class="quantity-controls">
+                            <button onclick="changeQuantity('${product.id}', -1)" class="quantity-btn">
+                                <i class="fas fa-minus text-xs"></i>
+                            </button>
+                            <span id="qty-${product.id}" class="quantity-display">1</span>
+                            <button onclick="changeQuantity('${product.id}', 1)" class="quantity-btn">
+                                <i class="fas fa-plus text-xs"></i>
                             </button>
                         </div>
                         
-                        <button onclick="showProductDetails('${product.id}')" class="details-btn">
-                            Ver detalles
+                        <button onclick="addToList('${product.id}', getQuantity('${product.id}'))" class="add-to-cart-btn">
+                            <i class="fas fa-plus"></i>
+                            <span>Añadir</span>
                         </button>
                     </div>
+                    
+                    <button onclick="showProductDetails('${product.id}')" class="details-btn">
+                        Ver detalles
+                    </button>
                 </div>
             `;
-            grid.innerHTML += productCard;
+            
+            grid.appendChild(productCard);
         });
     }
 
@@ -498,6 +502,8 @@
 
     function changeQuantity(productId, delta) {
         const qtyEl = document.getElementById(`qty-${productId}`);
+        if (!qtyEl) return;
+        
         let currentQty = parseInt(qtyEl.textContent);
         currentQty = Math.max(1, currentQty + delta);
         qtyEl.textContent = currentQty;
@@ -505,12 +511,17 @@
 
     function getQuantity(productId) {
         const qtyEl = document.getElementById(`qty-${productId}`);
-        return parseInt(qtyEl.textContent);
+        return qtyEl ? parseInt(qtyEl.textContent) : 1;
     }
 
     function filterProducts() {
-        const searchTerm = document.getElementById('search-products').value.toLowerCase();
-        const sortBy = document.getElementById('sort-products').value;
+        const searchInput = document.getElementById('search-products');
+        const sortSelect = document.getElementById('sort-products');
+        
+        if (!searchInput) return;
+        
+        const searchTerm = searchInput.value.toLowerCase();
+        const sortBy = sortSelect ? sortSelect.value : 'name';
 
         filteredProducts = allProducts.filter(product =>
             product.name.toLowerCase().includes(searchTerm)
@@ -533,6 +544,8 @@
 
     function showToast(message, type = 'info') {
         const container = document.getElementById('toast-container');
+        if (!container) return;
+        
         const toastId = 'toast-' + Date.now();
 
         let toastClass = 'toast toast-info';
@@ -557,56 +570,95 @@
 
     function hideProductDetails() {
         const modal = document.getElementById('product-modal');
-        modal.classList.remove('active');
-        document.body.style.overflow = 'auto';
-    }
-
-    function addToListFromModal(productId) {
-        const quantity = getQuantity(`modal-${productId}`);
-        addToList(productId, quantity);
-        hideProductDetails();
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
     }
 
     // ================================
-    // FUNCIONES DE ESTADO
+    // FUNCIONES DE ESTADO CORREGIDAS
     // ================================
 
     function showLoading() {
-        document.getElementById('loading-state').classList.remove('hidden');
-        document.getElementById('categories-container').classList.add('hidden');
-        document.getElementById('products-container').classList.add('hidden');
+        const loadingEl = document.getElementById('loading-state');
+        const categoriesEl = document.getElementById('categories-container');
+        const productsEl = document.getElementById('products-container');
+        
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (categoriesEl) categoriesEl.classList.add('hidden');
+        if (productsEl) productsEl.classList.add('hidden');
     }
 
     function hideLoading() {
-        document.getElementById('loading-state').classList.add('hidden');
+        const loadingEl = document.getElementById('loading-state');
+        if (loadingEl) loadingEl.classList.add('hidden');
     }
 
     function showCategories() {
-        document.getElementById('categories-container').classList.remove('hidden');
-        document.getElementById('products-container').classList.add('hidden');
-        document.getElementById('search-products').value = '';
+        const categoriesEl = document.getElementById('categories-container');
+        const productsEl = document.getElementById('products-container');
+        const searchInput = document.getElementById('search-products');
+        
+        if (categoriesEl) categoriesEl.classList.remove('hidden');
+        if (productsEl) productsEl.classList.add('hidden');
+        if (searchInput) searchInput.value = '';
+        
+        // Resetear estado
+        currentCategory = null;
+        allProducts = [];
+        filteredProducts = [];
+    }
+
+    function hideCategories() {
+        const categoriesEl = document.getElementById('categories-container');
+        if (categoriesEl) categoriesEl.classList.add('hidden');
     }
 
     function showProducts() {
-        document.getElementById('categories-container').classList.add('hidden');
-        document.getElementById('products-container').classList.remove('hidden');
+        const categoriesEl = document.getElementById('categories-container');
+        const productsEl = document.getElementById('products-container');
+        
+        if (categoriesEl) categoriesEl.classList.add('hidden');
+        if (productsEl) productsEl.classList.remove('hidden');
+    }
+
+    function showError() {
+        const loadingEl = document.getElementById('loading-state');
+        const categoriesEl = document.getElementById('categories-container');
+        const productsEl = document.getElementById('products-container');
+        
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (categoriesEl) categoriesEl.classList.add('hidden');
+        if (productsEl) productsEl.classList.add('hidden');
+        
+        showToast('Error al cargar la aplicación', 'error');
     }
 
     // ================================
-    // BÚSQUEDA GLOBAL
+    // BÚSQUEDA GLOBAL MEJORADA
     // ================================
 
     function handleSearchInput() {
-        const query = document.getElementById('search-products').value.trim();
+        const searchInput = document.getElementById('search-products');
+        if (!searchInput) return;
+        
+        const query = searchInput.value.trim();
 
-        if (query) {
+        if (query.length === 0) {
+            // Si no hay búsqueda y estamos en productos, volver a categorías
+            if (currentCategory) {
+                showCategories();
+            }
+            return;
+        }
+
+        if (query.length >= 2) {
+            // Buscar globalmente si hay al menos 2 caracteres
             searchAllProducts(query);
-        } else if (currentCategory && currentCategory.isSearch) {
-            showCategories();
-        } else if (currentCategory && currentCategory.id) {
-            loadCategoryProducts(currentCategory.id, currentCategory.name);
-        } else {
-            showCategories();
+        } else if (currentCategory && currentCategory.id && !currentCategory.isSearch) {
+            // Si estamos en una categoría específica, filtrar localmente
+            filterProducts();
         }
     }
 
@@ -615,28 +667,48 @@
     // ================================
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Cargar categorías al inicio
         loadCategories();
 
-        document.getElementById('back-to-categories').addEventListener('click', function () {
-            showCategories();
-        });
+        // Botón volver a categorías
+        const backBtn = document.getElementById('back-to-categories');
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                showCategories();
+            });
+        }
 
-        document.getElementById('search-products').addEventListener('input', debounce(handleSearchInput, 300));
-        document.getElementById('sort-products').addEventListener('change', filterProducts);
+        // Input de búsqueda
+        const searchInput = document.getElementById('search-products');
+        if (searchInput) {
+            searchInput.addEventListener('input', debounce(handleSearchInput, 300));
+        }
 
+        // Select de ordenamiento
+        const sortSelect = document.getElementById('sort-products');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', filterProducts);
+        }
+
+        // Cerrar modal con ESC
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
                 hideProductDetails();
             }
         });
 
-        document.getElementById('product-modal').addEventListener('click', function (e) {
-            if (e.target === this) {
-                hideProductDetails();
-            }
-        });
+        // Cerrar modal haciendo click fuera
+        const modal = document.getElementById('product-modal');
+        if (modal) {
+            modal.addEventListener('click', function (e) {
+                if (e.target === this) {
+                    hideProductDetails();
+                }
+            });
+        }
     });
 
+    // Función de debounce para optimizar búsquedas
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
