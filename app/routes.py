@@ -261,6 +261,15 @@ def index():
     except Exception as e:
         logger.error(f"Error index: {e}")
         return "Error interno del servidor", 500
+    
+# ==========================================
+#Caché de 2 mins
+# ==========================================
+_mercadona_categories_cache = {
+    "data": None,
+    "timestamp": None
+}
+_CATEGORIES_CACHE_TTL = 120  # segundos
 
 @main.route('/users_cards')
 @login_required
@@ -1493,20 +1502,35 @@ def mercadona_store():
 @main.route('/mercadona/categories')
 @login_required
 def mercadona_categories():
+    global _mercadona_categories_cache
+
+    # Si hay cache y no ha caducado
+    if (_mercadona_categories_cache["data"] and 
+        _mercadona_categories_cache["timestamp"] and
+        (datetime.now() - _mercadona_categories_cache["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL):
+        return jsonify(_mercadona_categories_cache["data"])
+
     try:
         url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
         response = requests.get(url, headers=MERCADONA_HEADERS, timeout=10)
 
         if response.status_code != 200:
+            # Si falla la API y tenemos cache, devolverlo
+            if _mercadona_categories_cache["data"]:
+                return jsonify(_mercadona_categories_cache["data"])
             return jsonify({'success': False, 'error': 'Error al conectar con Mercadona'}), 500
 
         try:
             categories_data = response.json()
         except ValueError:
+            if _mercadona_categories_cache["data"]:
+                return jsonify(_mercadona_categories_cache["data"])
             return jsonify({'success': False, 'error': 'Respuesta inválida de Mercadona'}), 500
 
         results = categories_data.get('results')
         if not isinstance(results, list):
+            if _mercadona_categories_cache["data"]:
+                return jsonify(_mercadona_categories_cache["data"])
             return jsonify({'success': False, 'error': 'Formato de datos inválido'}), 500
 
         categories = []
@@ -1518,10 +1542,19 @@ def mercadona_categories():
                 'subcategories_count': subcategories_count
             })
 
-        return jsonify({'success': True, 'categories': categories})
-        
+        data = {'success': True, 'categories': categories}
+
+        # Guardar en cache
+        _mercadona_categories_cache["data"] = data
+        _mercadona_categories_cache["timestamp"] = datetime.now()
+
+        return jsonify(data)
+
     except Exception as e:
         logger.error(f"Error mercadona_categories: {e}")
+        # Si falla y tenemos cache, devolverlo
+        if _mercadona_categories_cache["data"]:
+            return jsonify(_mercadona_categories_cache["data"])
         return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
     
 @main.route('/mercadona/category/<int:category_id>')
