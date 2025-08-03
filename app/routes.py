@@ -1560,79 +1560,44 @@ def mercadona_categories():
 @main.route('/mercadona/category/<int:category_id>')
 @login_required
 def mercadona_category_products(category_id):
-    """Obtener productos de una categoría o subcategoría, usando cache si la API falla."""
-    global _mercadona_categories_cache
-
+    """Obtener productos de una categoría específica (incluyendo subcategorías de segundo nivel)"""
     try:
-        # Verificar si tenemos datos en cache de categorías principales
-        categories_data = None
-        if (_mercadona_categories_cache["data"] and
-            _mercadona_categories_cache["timestamp"] and
-            (datetime.now() - _mercadona_categories_cache["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL):
-            # Reconstruimos estructura similar a la API original
-            categories_data = {"results": []}
-            for cat in _mercadona_categories_cache["data"]["categories"]:
-                categories_data["results"].append({
-                    "id": cat["id"],
-                    "name": cat["name"],
-                    "categories": cat.get("categories", [])  # Si no tienes esta info, dejar lista vacía
-                })
-
-        # Si no hay cache o ha caducado, pedimos a la API
-        if not categories_data:
-            url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
-            resp = requests.get(url, headers=MERCADONA_HEADERS, timeout=10)
-
-            if resp.status_code == 200:
-                categories_data = resp.json()
-                # Actualizamos cache principal
-                categories = []
-                for category in categories_data.get('results', []):
-                    subcategories_count = len(category.get('categories', []))
-                    categories.append({
-                        'id': category.get('id'),
-                        'name': category.get('name', 'Sin nombre'),
-                        'subcategories_count': subcategories_count,
-                        'categories': category.get('categories', [])
-                    })
-                _mercadona_categories_cache["data"] = {'success': True, 'categories': categories}
-                _mercadona_categories_cache["timestamp"] = datetime.now()
-            else:
-                # Si la API falla y hay cache viejo, usarlo
-                if _mercadona_categories_cache["data"]:
-                    categories_data = {"results": []}
-                    for cat in _mercadona_categories_cache["data"]["categories"]:
-                        categories_data["results"].append({
-                            "id": cat["id"],
-                            "name": cat["name"],
-                            "categories": cat.get("categories", [])
-                        })
-                else:
-                    return jsonify({
-                        'success': False,
-                        'error': 'No se pudo obtener la lista de categorías principales'
-                    }), 500
+        # Primero obtenemos todas las categorías principales
+        main_categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+        main_categories_response = requests.get(main_categories_url, headers=MERCADONA_HEADERS, timeout=10)
+        
+        if main_categories_response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'error': 'No se pudo obtener la lista de categorías principales'
+            }), 500
 
         all_products = []
         category_name = "Categoría"
         is_second_level = False
 
-        # Buscar si el ID es de categoría principal o subcategoría
-        for main_cat in categories_data.get('results', []):
-            if main_cat.get('id') == category_id:
-                category_name = main_cat.get('name', 'Categoría')
-                for subcat in main_cat.get('categories', []):
-                    subcat_id = subcat.get('id')
+        # Buscamos en todas las categorías principales
+        for main_category in main_categories_response.json().get('results', []):
+            # Verificamos si el ID buscado es una categoría principal
+            if main_category.get('id') == category_id:
+                category_name = main_category.get('name', 'Categoría')
+                # Obtenemos sus subcategorías (primer nivel)
+                for subcategory in main_category.get('categories', []):
+                    subcat_id = subcategory.get('id')
                     if subcat_id:
-                        all_products.extend(get_products_from_subcategory(subcat_id))
+                        products = get_products_from_subcategory(subcat_id)
+                        all_products.extend(products)
                 break
-
-            for subcat in main_cat.get('categories', []):
-                if subcat.get('id') == category_id:
-                    category_name = subcat.get('name', 'Subcategoría')
+            
+            # Si no es categoría principal, buscamos en sus subcategorías (segundo nivel)
+            for subcategory in main_category.get('categories', []):
+                if subcategory.get('id') == category_id:
+                    category_name = subcategory.get('name', 'Subcategoría')
                     is_second_level = True
-                    all_products.extend(get_products_from_subcategory(category_id))
+                    products = get_products_from_subcategory(category_id)
+                    all_products.extend(products)
                     break
+            
             if is_second_level:
                 break
 
