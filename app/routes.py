@@ -9,6 +9,10 @@ import requests
 from ddgs import DDGS
 import logging
 import json
+import traceback  
+from datetime import datetime
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1453,6 +1457,320 @@ Responde de manera práctica y específica."""
         return jsonify({"error": "Error interno del servidor"}), 500
 
 # ==========================================
+# Rutas de mercadona
+# ==========================================
+MERCADONA_BASE_URL = "https://tienda.mercadona.es/api"
+MERCADONA_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'es-ES,es;q=0.9',
+    'Referer': 'https://tienda.mercadona.es/'
+}
+
+# ==========================================
+# RUTAS DE MERCADONA
+# ==========================================
+
+@main.route('/mercadona')
+@login_required
+def mercadona_store():
+    """Página principal de la tienda Mercadona"""
+    try:
+        # Obtener estadísticas de nuestra lista actual
+        current_list_count = mongo.db.lista_compra.count_documents({"comprado": False})
+        
+        stats = {
+            "current_list_items": current_list_count,
+            "warehouse": "mad1",  # Madrid por defecto
+            "last_sync": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Usar datetime.now() correctamente
+        }
+        
+        return render_template("mercadona/store.html", stats=stats, now=datetime.now())
+    except Exception as e:
+        logger.error(f"Error mercadona_store: {e}")
+        return "Error al cargar tienda", 500
+
+@main.route('/mercadona/categories')
+@login_required
+def mercadona_categories():
+    """Obtener todas las categorías de Mercadona"""
+    try:
+        url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+        response = requests.get(url, headers=MERCADONA_HEADERS, timeout=10)
+        
+        if response.status_code == 200:
+            categories_data = response.json()
+            categories = []
+            
+            for category in categories_data.get('results', []):
+                subcategories_count = len(category.get('categories', []))
+                categories.append({
+                    'id': category.get('id'),
+                    'name': category.get('name', 'Sin nombre'),
+                    'subcategories_count': subcategories_count
+                })
+            
+            return jsonify({
+                'success': True,
+                'categories': categories
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al conectar con Mercadona'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor'
+        }), 500
+@main.route('/mercadona/category/<int:category_id>')
+@login_required
+def mercadona_category_products(category_id):
+    """Obtener productos de una categoría específica (incluyendo subcategorías de segundo nivel)"""
+    try:
+        # Primero obtenemos todas las categorías principales
+        main_categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+        main_categories_response = requests.get(main_categories_url, headers=MERCADONA_HEADERS, timeout=10)
+        
+        if main_categories_response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'error': 'No se pudo obtener la lista de categorías principales'
+            }), 500
+
+        all_products = []
+        category_name = "Categoría"
+        is_second_level = False
+
+        # Buscamos en todas las categorías principales
+        for main_category in main_categories_response.json().get('results', []):
+            # Verificamos si el ID buscado es una categoría principal
+            if main_category.get('id') == category_id:
+                category_name = main_category.get('name', 'Categoría')
+                # Obtenemos sus subcategorías (primer nivel)
+                for subcategory in main_category.get('categories', []):
+                    subcat_id = subcategory.get('id')
+                    if subcat_id:
+                        products = get_products_from_subcategory(subcat_id)
+                        all_products.extend(products)
+                break
+            
+            # Si no es categoría principal, buscamos en sus subcategorías (segundo nivel)
+            for subcategory in main_category.get('categories', []):
+                if subcategory.get('id') == category_id:
+                    category_name = subcategory.get('name', 'Subcategoría')
+                    is_second_level = True
+                    products = get_products_from_subcategory(category_id)
+                    all_products.extend(products)
+                    break
+            
+            if is_second_level:
+                break
+
+        return jsonify({
+            'success': True,
+            'category_name': category_name,
+            'products': all_products,
+            'is_second_level': is_second_level,
+            'total_products': len(all_products)
+        })
+
+    except Exception as e:
+        logger.error(f"Error en mercadona_category_products: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }), 500
+
+def get_products_from_subcategory(subcategory_id):
+    """Función auxiliar para obtener productos de una subcategoría"""
+    try:
+        subcat_url = f"{MERCADONA_BASE_URL}/categories/{subcategory_id}/?lang=es&wh=mad1"
+        subcat_response = requests.get(subcat_url, headers=MERCADONA_HEADERS, timeout=10)
+        
+        if subcat_response.status_code != 200:
+            return []
+
+        subcat_data = subcat_response.json()
+        products = []
+        
+        # Procesamos productos directos de la subcategoría
+        for product in subcat_data.get('products', []):
+            formatted_product = format_mercadona_product(product)
+            products.append(formatted_product)
+        
+        # Procesamos también sub-subcategorías si existen
+        for sub_subcategory in subcat_data.get('categories', []):
+            for product in sub_subcategory.get('products', []):
+                formatted_product = format_mercadona_product(product)
+                products.append(formatted_product)
+        
+        return products
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo productos de subcategoría {subcategory_id}: {str(e)}")
+        return []
+
+@main.route('/mercadona/product/<product_id>')
+@login_required
+def mercadona_product_detail(product_id):
+    """Obtener detalles completos de un producto"""
+    try:
+        url = f"{MERCADONA_BASE_URL}/products/{product_id}/?lang=es&wh=mad1"
+        
+        response = requests.get(url, headers=MERCADONA_HEADERS, timeout=10)
+        
+        if response.status_code == 200:
+            product_data = response.json()
+            
+            formatted_product = {
+                'id': product_data.get('id'),
+                'name': product_data.get('display_name'),
+                'brand': product_data.get('brand'),
+                'price': product_data.get('price_instructions', {}).get('unit_price', '0'),
+                'reference_price': product_data.get('price_instructions', {}).get('reference_price', '0'),
+                'size': product_data.get('price_instructions', {}).get('unit_size', 1),
+                'size_format': product_data.get('price_instructions', {}).get('size_format', ''),
+                'packaging': product_data.get('packaging'),
+                'thumbnail': product_data.get('thumbnail'),
+                'photos': product_data.get('photos', []),
+                'origin': product_data.get('origin'),
+                'description': product_data.get('details', {}).get('description', ''),
+                'ingredients': product_data.get('nutrition_information', {}).get('ingredients', ''),
+                'storage': product_data.get('details', {}).get('storage_instructions', ''),
+                'ean': product_data.get('ean'),
+                'slug': product_data.get('slug')
+            }
+            
+            return jsonify({
+                'success': True,
+                'product': formatted_product
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Producto no encontrado'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error mercadona_product_detail: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Error al obtener detalles del producto'
+        }), 500
+
+
+
+# ==========================================
+# FUNCIÓN AUXILIAR
+# ==========================================
+
+def format_mercadona_product(product_data):
+    """Formatear datos de producto para uso consistente con manejo robusto de None"""
+    if not product_data:
+        raise ValueError("Datos de producto vacíos")
+    
+    price_info = product_data.get('price_instructions', {})
+    
+    # Función auxiliar para manejar strings que pueden ser None
+    def safe_string(value, default=''):
+        """Convierte None a string vacío y aplica strip si es necesario"""
+        if value is None:
+            return default
+        return str(value).strip() if hasattr(value, 'strip') else str(value)
+    
+    # Función auxiliar para manejar números que pueden ser None
+    def safe_number(value, default=0):
+        """Convierte None a número por defecto"""
+        if value is None:
+            return default
+        try:
+            return float(value) if '.' in str(value) else int(value)
+        except (ValueError, TypeError):
+            return default
+    
+    # Validar campos esenciales
+    product_id = product_data.get('id')
+    if not product_id:
+        raise ValueError("Producto sin ID")
+    
+    return {
+        'id': str(product_id),
+        'name': safe_string(product_data.get('display_name'), 'Sin nombre'),
+        'slug': safe_string(product_data.get('slug')),
+        'thumbnail': safe_string(product_data.get('thumbnail'), '/static/img/default_food.jpg'),
+        'packaging': safe_string(product_data.get('packaging')),
+        'price': safe_string(price_info.get('unit_price'), '0'),
+        'reference_price': safe_string(price_info.get('reference_price'), '0'),
+        'size': safe_number(price_info.get('unit_size'), 1),
+        'size_format': safe_string(price_info.get('size_format')),
+        'bulk_price': safe_string(price_info.get('bulk_price'), '0'),
+        'previous_price': safe_string(price_info.get('previous_unit_price')),
+        'is_discounted': bool(price_info.get('price_decreased', False)),
+        'status': safe_string(product_data.get('status'), 'available'),
+        'limit': safe_number(product_data.get('limit'), 999),
+        'share_url': safe_string(product_data.get('share_url')),
+        'categories': [safe_string(cat.get('name')) for cat in product_data.get('categories', []) if cat and cat.get('name')]
+        
+    }
+    
+
+@main.route('/mercadona/search')
+@login_required
+def mercadona_search():
+    """Buscar productos en Mercadona"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify(success=False, error="Empty query")
+        
+        # Primero buscamos en todas las categorías
+        categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+        categories_response = requests.get(categories_url, headers=MERCADONA_HEADERS, timeout=10)
+        
+        if categories_response.status_code != 200:
+            return jsonify(success=False, error="No se pudo obtener categorías")
+        
+        all_products = []
+        categories_data = categories_response.json()
+        
+        # Buscar en cada categoría y subcategoría
+        for category in categories_data.get('results', []):
+            for subcat in category.get('categories', []):
+                subcat_id = subcat.get('id')
+                if subcat_id:
+                    try:
+                        subcat_url = f"{MERCADONA_BASE_URL}/categories/{subcat_id}/?lang=es&wh=mad1"
+                        subcat_response = requests.get(subcat_url, headers=MERCADONA_HEADERS, timeout=10)
+                        
+                        if subcat_response.status_code == 200:
+                            subcat_data = subcat_response.json()
+                            
+                            if 'products' in subcat_data:
+                                for product in subcat_data['products']:
+                                    if query.lower() in product.get('display_name', '').lower():
+                                        formatted_product = format_mercadona_product(product)
+                                        formatted_product['subcategory'] = subcat.get('name', 'Sin nombre')
+                                        all_products.append(formatted_product)
+                    except:
+                        continue
+        
+        return jsonify({
+            'success': True,
+            'products': all_products,
+            'query': query
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error en la búsqueda'
+        }), 500
+# ==========================================
 # Manejo de errores mejorado
 # ==========================================
 @main.errorhandler(404)
@@ -1469,3 +1787,4 @@ def internal_error(error):
 def forbidden_error(error):
     logger.error(f"403 Error: {error}")
     return render_template('errors/403.html'), 403
+

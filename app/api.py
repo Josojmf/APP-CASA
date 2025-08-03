@@ -1070,3 +1070,87 @@ def clear_all_tasks():
     except Exception as e:
         logger.error(f"Error al eliminar todas las tareas: {e}")
         return jsonify({"error": "Error al eliminar las tareas"}), 500
+
+# ==========================================
+# CORRECCIONES CRÍTICAS PARA api.py
+# ==========================================
+
+# 1. ELIMINAR estas líneas duplicadas del final de api.py (están mal colocadas):
+
+"""
+# APIS DE MERCADONA
+"""
+
+# 2. CORREGIR el decorador de la función en api.py:
+# Cambiar de @main.route a @api.route
+
+@api.route("/api/mercadona/add_to_list", methods=['POST'])
+@login_required
+def add_mercadona_to_list():
+    """Añadir producto de Mercadona a nuestra lista de compra"""
+    try:
+        data = request.get_json()
+        product_id = data.get('product_id')
+        product_name = data.get('product_name')  # Nuevo: recibir nombre directamente
+        quantity = int(data.get('quantity', 1))
+        packaging = data.get('packaging', '')    # Nuevo: recibir empaque
+        
+        if not product_id or not product_name:
+            return jsonify({'error': 'Datos de producto requeridos'}), 400
+            
+        # Formatear nombre con detalles
+        formatted_name = product_name.title()  # Asegurar formato de título
+        if packaging:
+            formatted_name += f" ({packaging})"
+        
+        # Verificar si ya existe en nuestra lista
+        existing = mongo.db.lista_compra.find_one(
+            {"nombre": {"$regex": f"^{formatted_name}$", "$options": "i"}}
+        )
+        
+        if existing:
+            # Si existe, actualizar cantidad
+            new_quantity = int(existing.get('cantidad', '1')) + quantity
+            mongo.db.lista_compra.update_one(
+                {"_id": existing['_id']},
+                {"$set": {
+                    "cantidad": str(new_quantity),
+                    "updated_by": session.get('user'),
+                    "updated_at": datetime.now()
+                }}
+            )
+            action = 'updated'
+        else:
+            # Si no existe, crear nuevo
+            new_item = {
+                "nombre": formatted_name,
+                "cantidad": str(quantity),
+                "unidad": "",  # Dejar vacío o usar data.get('size_format', '')
+                "comprado": False,
+                "created_by": session.get("user"),
+                "created_at": datetime.now(),
+                "mercadona_id": product_id,
+                "source": "mercadona"
+            }
+            
+            mongo.db.lista_compra.insert_one(new_item)
+            action = 'added'
+        
+        # Notificar
+        action_text = "actualizó cantidad de" if action == 'updated' else "añadió"
+        send_push_to_all(
+            title="🛒 Producto desde Mercadona",
+            body=f"{session.get('user')} {action_text}: {formatted_name}",
+            url="/lista_compra"
+        )
+        
+        return jsonify({
+            'success': True,
+            'action': action,
+            'product_name': formatted_name,
+            'quantity': quantity
+        })
+        
+    except Exception as e:
+        logger.error(f"Error add_mercadona_to_list: {e}")
+        return jsonify({'error': 'Error al añadir producto a la lista'}), 500
