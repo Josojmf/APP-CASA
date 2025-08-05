@@ -2475,6 +2475,112 @@ def add_shopping_item():
         logger.error(f"Error add_shopping_item: {e}")
         return jsonify({"error": "Error al añadir producto"}), 500     
     
+    
+@main.route('/planes', methods=['GET'])
+@login_required
+def planes():
+    """Página principal de gestión de planes"""
+    try:
+        # Obtener el tema actual del usuario
+        theme = session.get('theme', 'light')
+        
+        return render_template('planes.html', 
+                             theme=theme,
+                             current_page='planes')
+        
+    except Exception as e:
+        logger.error(f"Error cargando planes: {str(e)}")
+        flash('Error al cargar la página de planes', 'error')
+        return redirect(url_for('main.index'))
+
+
+@main.route('/planes/add', methods=['POST'])
+@login_required
+def add_plan():
+    """Añadir un nuevo plan desde el formulario"""
+    try:
+        titulo = request.form.get('titulo')
+        descripcion = request.form.get('descripcion', '')
+        prioridad = int(request.form.get('prioridad', 2))  # Default a media prioridad
+        
+        if not titulo:
+            flash('El título del plan es requerido', 'error')
+            return redirect(url_for('main.planes'))
+        
+        nuevo_plan = {
+            'user_id': current_user.id,
+            'titulo': titulo,
+            'descripcion': descripcion,
+            'prioridad': prioridad,
+            'fecha_creacion': datetime.now(),
+            'completado': False
+        }
+        
+        mongo.db.planes.insert_one(nuevo_plan)
+        flash('Plan añadido correctamente', 'success')
+        
+    except Exception as e:
+        logger.error(f"Error añadiendo plan: {str(e)}")
+        flash('Error al añadir el plan', 'error')
+    
+    return redirect(url_for('main.planes'))
+
+
+@main.route('/planes/delete/<plan_id>', methods=['POST'])
+@login_required
+def delete_plan(plan_id):
+    """Eliminar un plan existente"""
+    try:
+        result = mongo.db.planes.delete_one({
+            '_id': ObjectId(plan_id),
+            'user_id': current_user.id
+        })
+        
+        if result.deleted_count == 0:
+            flash('Plan no encontrado', 'error')
+        else:
+            flash('Plan eliminado correctamente', 'success')
+            
+    except Exception as e:
+        logger.error(f"Error eliminando plan: {str(e)}")
+        flash('Error al eliminar el plan', 'error')
+    
+    return redirect(url_for('main.planes'))
+
+
+@main.route('/planes/move_top/<plan_id>', methods=['POST'])
+@login_required
+def move_plan_to_top(plan_id):
+    """Mover un plan al top de prioridad"""
+    try:
+        # Obtener la máxima prioridad actual
+        max_priority_plan = mongo.db.planes.find_one(
+            {'user_id': current_user.id},
+            sort=[("prioridad", -1)]
+        )
+        
+        if not max_priority_plan:
+            flash('No hay planes existentes', 'error')
+            return redirect(url_for('main.planes'))
+        
+        new_priority = max_priority_plan['prioridad'] + 1
+        
+        result = mongo.db.planes.update_one(
+            {'_id': ObjectId(plan_id), 'user_id': current_user.id},
+            {'$set': {'prioridad': new_priority}}
+        )
+        
+        if result.modified_count == 0:
+            flash('Plan no encontrado', 'error')
+        else:
+            flash('Plan movido al top de prioridad', 'success')
+            
+    except Exception as e:
+        logger.error(f"Error moviendo plan al top: {str(e)}")
+        flash('Error al mover el plan', 'error')
+    
+    return redirect(url_for('main.planes'))
+    
   
 
 

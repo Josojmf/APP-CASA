@@ -1,0 +1,622 @@
+{% extends "layout.html" %}
+{% block title %}Planes{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/planes.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1 class="title">📋 Planes </h1>
+
+<div class="planes-container">
+    <div class="planes-list" id="planesList">
+        <!-- Los planes se cargarán dinámicamente aquí -->
+    </div>
+</div>
+
+<button id="addPlanBtn" class="floating-btn btn-planes" title="Añadir nuevo plan">
+    <i class="fas fa-plus"></i>
+</button>
+
+<!-- Overlay para añadir nuevo plan -->
+<div id="overlayPlan" class="overlay">
+    <div class="overlay-content">
+        <h2><i class="fas fa-plus-circle"></i> Nuevo Plan</h2>
+        <form id="planForm">
+            <div class="form-group">
+                <label for="planTitulo">
+                    <i class="fas fa-heading"></i> Título:
+                </label>
+                <input type="text" id="planTitulo" name="titulo" required placeholder="Ej: Renovar el baño">
+            </div>
+
+            <div class="form-group">
+                <label for="planDescripcion">
+                    <i class="fas fa-align-left"></i> Descripción:
+                </label>
+                <textarea id="planDescripcion" name="descripcion" rows="3"
+                    placeholder="Detalles del plan..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="planPrioridad">
+                    <i class="fas fa-flag"></i> Prioridad:
+                </label>
+                <select id="planPrioridad" name="prioridad" required>
+                    <option value="3">🟢 Baja</option>
+                    <option value="2" selected>🟡 Media</option>
+                    <option value="1">🔴 Alta</option>
+                </select>
+            </div>
+
+            <div class="form-buttons">
+                <button type="submit">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                <button type="button" id="cancelPlanBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Toast de notificaciones -->
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Variables globales
+    let planes = [];
+    let draggedElement = null;
+    let draggedId = null;
+
+    // Cargar planes al iniciar
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('🚀 Inicializando planes...');
+        await loadPlanes();
+        setupEventListeners();
+    });
+
+    // Configurar event listeners
+    function setupEventListeners() {
+        // Botón añadir plan
+        document.getElementById('addPlanBtn').addEventListener('click', openPlanModal);
+
+        // Botón cancelar modal
+        document.getElementById('cancelPlanBtn').addEventListener('click', closePlanModal);
+
+        // Formulario de nuevo plan
+        document.getElementById('planForm').addEventListener('submit', handlePlanSubmit);
+
+        // Cerrar modal con ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closePlanModal();
+            }
+        });
+
+        // Click fuera del modal para cerrar
+        document.getElementById('overlayPlan').addEventListener('click', (e) => {
+            if (e.target.id === 'overlayPlan') {
+                closePlanModal();
+            }
+        });
+    }
+
+    // Cargar planes desde la API
+    async function loadPlanes() {
+        try {
+            console.log('📥 Cargando planes...');
+            const response = await fetch('/api/planes');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            planes = await response.json();
+            console.log(`✅ ${planes.length} planes cargados`);
+            renderPlanes();
+        } catch (error) {
+            console.error('❌ Error cargando planes:', error);
+            showToast('⚠️ Error al cargar planes: ' + error.message, 'error');
+
+            // Mostrar mensaje de error en el contenedor
+            const container = document.getElementById('planesList');
+            container.innerHTML = `
+                <div class="error-message" style="text-align: center; padding: 40px; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                    Error al cargar los planes
+                    <br><small>${error.message}</small>
+                    <br><button onclick="loadPlanes()" style="margin-top: 10px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        <i class="fas fa-refresh"></i> Reintentar
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    // Renderizar la lista de planes
+    function renderPlanes() {
+        const container = document.getElementById('planesList');
+        container.innerHTML = '';
+
+        if (planes.length === 0) {
+            container.innerHTML = `
+                <div class="no-plans">
+                    <i class="fas fa-clipboard-list"></i>
+                    <em>¡No hay planes creados!</em>
+                    <br><small>Haz clic en el botón + para crear tu primer plan</small>
+                </div>
+            `;
+            return;
+        }
+
+        planes.forEach((plan, index) => {
+            const planElement = document.createElement('div');
+            planElement.className = `plan-card priority-${plan.prioridad}`;
+            planElement.dataset.id = plan._id || plan.id;
+            planElement.dataset.order = index;
+            planElement.draggable = true;
+
+            planElement.innerHTML = `
+                <div class="plan-content">
+                    <h3>${escapeHtml(plan.titulo)}</h3>
+                    ${plan.descripcion ? `<p>${escapeHtml(plan.descripcion)}</p>` : ''}
+                    <div class="plan-meta">
+                        <span class="plan-date">
+                            <i class="fas fa-calendar"></i> ${formatDate(plan.fecha_creacion || plan.created_at)}
+                        </span>
+                        <span class="plan-priority">
+                            ${getPriorityIcon(plan.prioridad)} ${getPriorityText(plan.prioridad)}
+                        </span>
+                    </div>
+                </div>
+                <div class="plan-actions">
+                    <button class="plan-delete" onclick="deletePlan('${plan._id || plan.id}')" title="Eliminar plan">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="plan-top" onclick="movePlanToTop('${plan._id || plan.id}')" title="Mover al inicio">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(planElement);
+        });
+
+        // Configurar drag and drop después de renderizar
+        setupDragAndDrop();
+    }
+
+    // Configurar drag and drop mejorado
+    function setupDragAndDrop() {
+        const container = document.getElementById('planesList');
+        const cards = container.querySelectorAll('.plan-card');
+
+        cards.forEach(card => {
+            // Eventos de drag
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+
+            // Eventos de drop
+            card.addEventListener('dragover', handleDragOver);
+            card.addEventListener('dragenter', handleDragEnter);
+            card.addEventListener('dragleave', handleDragLeave);
+            card.addEventListener('drop', handleDrop);
+        });
+
+        // También permitir drop en el contenedor vacío
+        container.addEventListener('dragover', handleDragOver);
+        container.addEventListener('drop', handleDrop);
+    }
+
+    function handleDragStart(e) {
+        draggedElement = e.currentTarget;
+        draggedId = e.currentTarget.dataset.id;
+
+        e.currentTarget.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+
+        console.log('🔄 Arrastrando plan:', draggedId);
+
+        // Hacer que otros elementos sean más transparentes
+        setTimeout(() => {
+            document.querySelectorAll('.plan-card:not(.dragging)').forEach(card => {
+                card.style.opacity = '0.5';
+            });
+        }, 0);
+    }
+
+    function handleDragEnd(e) {
+        console.log('✋ Fin del arrastre');
+
+        // Safely remove classes
+        if (e.currentTarget && e.currentTarget.classList) {
+            e.currentTarget.classList.remove('dragging');
+        }
+
+        // Restaurar opacidad para todos los elementos
+        document.querySelectorAll('.plan-card').forEach(card => {
+            if (card.style) {
+                card.style.opacity = '1';
+            }
+            if (card.classList) {
+                card.classList.remove('drag-over', 'drop-target');
+            }
+        });
+
+        // Reset global variables
+        draggedElement = null;
+        draggedId = null;
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+
+    function handleDragEnter(e) {
+        if (e.currentTarget !== draggedElement && e.currentTarget.classList) {
+            e.currentTarget.classList.add('drag-over');
+        }
+    }
+
+    function handleDragLeave(e) {
+        if (e.currentTarget && e.currentTarget.classList) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+    }
+
+    // Fixed handleDrop function and related drag/drop code for planes.html
+
+    // Replace the existing handleDrop function with this corrected version:
+    async function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const dropTarget = e.currentTarget;
+        dropTarget.classList.remove('drag-over', 'drop-target');
+
+        // Check if we have valid dragged element and it's not dropping on itself
+        if (!draggedElement || !draggedId || dropTarget === draggedElement) {
+            return false;
+        }
+
+        console.log('📍 Drop en:', dropTarget.dataset.id);
+
+        try {
+            // Store reference to dragged element before it might be modified
+            const draggedRef = draggedElement;
+
+            // Obtener todos los elementos del contenedor
+            const container = document.getElementById('planesList');
+            const allCards = Array.from(container.querySelectorAll('.plan-card'));
+
+            // Encontrar las posiciones
+            const draggedIndex = allCards.indexOf(draggedElement);
+            const targetIndex = allCards.indexOf(dropTarget);
+
+            console.log(`🔄 Moviendo de posición ${draggedIndex} a ${targetIndex}`);
+
+            // Only proceed if we have valid indices
+            if (draggedIndex === -1 || targetIndex === -1) {
+                console.warn('⚠️ Índices inválidos para drag/drop');
+                return false;
+            }
+
+            // Mover en el DOM
+            if (draggedIndex < targetIndex) {
+                container.insertBefore(draggedElement, dropTarget.nextSibling);
+            } else {
+                container.insertBefore(draggedElement, dropTarget);
+            }
+
+            // Actualizar el orden en el servidor
+            await updatePlanOrder();
+
+            // Feedback visual - check if element still exists
+            if (draggedRef && draggedRef.classList) {
+                draggedRef.classList.add('drop-success');
+                setTimeout(() => {
+                    if (draggedRef && draggedRef.classList) {
+                        draggedRef.classList.remove('drop-success');
+                    }
+                }, 1000);
+            }
+
+            showToast('✅ Orden actualizado correctamente', 'success');
+
+        } catch (error) {
+            console.error('❌ Error en drop:', error);
+            showToast('⚠️ Error al reordenar: ' + error.message, 'error');
+            // Recargar para restaurar el orden original
+            await loadPlanes();
+        }
+
+        return false;
+    }
+
+    // Actualizar orden de planes en el servidor
+    async function updatePlanOrder() {
+        try {
+            const container = document.getElementById('planesList');
+            if (!container) {
+                throw new Error('Container not found');
+            }
+
+            const cards = Array.from(container.querySelectorAll('.plan-card'));
+
+            if (cards.length === 0) {
+                console.warn('⚠️ No cards found for reordering');
+                return;
+            }
+
+            // Crear array con el nuevo orden (order invertido para que el primero tenga el valor más alto)
+            const newOrder = cards.map((card, index) => {
+                const id = card.dataset.id;
+                if (!id) {
+                    console.warn('⚠️ Card without ID found:', card);
+                    return null;
+                }
+                return {
+                    id: id,
+                    order: cards.length - index // Invertir orden: primer elemento = valor más alto
+                };
+            }).filter(item => item !== null); // Filtrar elementos nulos
+
+            if (newOrder.length === 0) {
+                throw new Error('No valid cards to reorder');
+            }
+
+            console.log('📤 Enviando nuevo orden:', newOrder);
+
+            const response = await fetch('/api/planes/reorder', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ order: newOrder })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Orden actualizado en servidor:', result);
+
+        } catch (error) {
+            console.error('❌ Error actualizando orden:', error);
+            throw error;
+        }
+    }
+
+    // Eliminar plan
+    async function deletePlan(planId) {
+        if (!planId) {
+            showToast('⚠️ ID de plan no válido', 'error');
+            return;
+        }
+
+        if (!confirm('¿Estás seguro de que quieres eliminar este plan?')) {
+            return;
+        }
+
+        try {
+            console.log('🗑️ Eliminando plan:', planId);
+
+            const response = await fetch(`/api/planes/${planId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            await loadPlanes();
+            showToast('🗑️ Plan eliminado correctamente', 'success');
+
+        } catch (error) {
+            console.error('❌ Error eliminando plan:', error);
+            showToast('⚠️ Error al eliminar: ' + error.message, 'error');
+        }
+    }
+
+    // Mover plan al top
+    async function movePlanToTop(planId) {
+        if (!planId) {
+            showToast('⚠️ ID de plan no válido', 'error');
+            return;
+        }
+
+        try {
+            console.log('⬆️ Moviendo plan al top:', planId);
+
+            const response = await fetch(`/api/planes/${planId}/top`, {
+                method: 'PUT'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            await loadPlanes();
+            showToast('⬆️ Plan movido al inicio', 'success');
+
+        } catch (error) {
+            console.error('❌ Error moviendo plan:', error);
+            showToast('⚠️ Error al mover: ' + error.message, 'error');
+        }
+    }
+
+    // Manejar envío del formulario
+    async function handlePlanSubmit(e) {
+        e.preventDefault();
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+
+        // Obtener valores del formulario
+        const titulo = document.getElementById('planTitulo').value.trim();
+        const descripcion = document.getElementById('planDescripcion').value.trim();
+        const prioridad = document.getElementById('planPrioridad').value;
+
+        if (!titulo) {
+            showToast('⚠️ El título es obligatorio', 'error');
+            return;
+        }
+
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        submitBtn.disabled = true;
+
+        try {
+            console.log('📤 Creando nuevo plan:', { titulo, descripcion, prioridad });
+
+            const response = await fetch('/api/planes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    titulo: titulo,
+                    descripcion: descripcion,
+                    prioridad: parseInt(prioridad)
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Plan creado:', result);
+
+            closePlanModal();
+            await loadPlanes();
+            showToast('✅ Plan añadido correctamente', 'success');
+
+        } catch (error) {
+            console.error('❌ Error creando plan:', error);
+            showToast('⚠️ Error al guardar: ' + error.message, 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    }
+
+    // Abrir modal de nuevo plan
+    function openPlanModal() {
+        document.getElementById('overlayPlan').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+            document.getElementById('planTitulo').focus();
+        }, 100);
+    }
+
+    // Cerrar modal
+    function closePlanModal() {
+        document.getElementById('overlayPlan').style.display = 'none';
+        document.body.style.overflow = 'auto';
+        document.getElementById('planForm').reset();
+    }
+
+    // Funciones auxiliares
+    function getPriorityIcon(priority) {
+        switch (parseInt(priority)) {
+            case 1: return '🔴';
+            case 2: return '🟡';
+            case 3: return '🟢';
+            default: return '⚪';
+        }
+    }
+
+    function getPriorityText(priority) {
+        switch (parseInt(priority)) {
+            case 1: return 'Alta';
+            case 2: return 'Media';
+            case 3: return 'Baja';
+            default: return 'Sin prioridad';
+        }
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'Sin fecha';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        } catch {
+            return 'Fecha inválida';
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Sistema de notificaciones mejorado
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) {
+            console.error('Toast container not found');
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.style.cssText = `
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+
+        toast.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+
+        container.appendChild(toast);
+
+        // Animación de entrada
+        setTimeout(() => {
+            toast.style.transform = 'translateX(0)';
+        }, 100);
+
+        // Auto-remove después de 4 segundos
+        setTimeout(() => {
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 300);
+        }, 4000);
+    }
+
+    // Hacer funciones globales para los onclick
+    window.deletePlan = deletePlan;
+    window.movePlanToTop = movePlanToTop;
+    window.loadPlanes = loadPlanes;
+
+</script>
+{% endblock %}

@@ -1706,3 +1706,225 @@ def get_storage_details():
             "message": str(e),
             "type": type(e).__name__
         }), 500
+        
+# Endpoints para planes
+# REEMPLAZAR el endpoint reorder_planes en api.py con esta versión corregida:
+from pymongo import UpdateOne, InsertOne, DeleteOne, ReplaceOne
+@api.route('/api/planes/reorder', methods=['PUT'])
+@login_required
+def reorder_planes():
+    """Reordenar planes según el nuevo orden proporcionado"""
+    try:
+        data = request.get_json()
+        
+        # Soportar ambos formatos: 'order' (nuevo) y 'operations' (legacy)
+        if 'order' in data:
+            # Formato nuevo: [{ id: "...", order: 1 }, { id: "...", order: 2 }]
+            order_data = data.get('order', [])
+            
+            if not order_data:
+                return jsonify({"error": "No order data provided"}), 400
+            
+            # Crear operaciones de bulk update
+            operations = []
+            for item in order_data:
+                plan_id = item.get('id')
+                new_order = item.get('order')
+                
+                if not plan_id or new_order is None:
+                    continue
+                
+                operations.append(
+                    UpdateOne(
+                        {"_id": ObjectId(plan_id)},
+                        {"$set": {
+                            "order": new_order,
+                            "updated_at": datetime.now(),
+                            "updated_by": session.get('user')
+                        }}
+                    )
+                )
+        
+        elif 'operations' in data:
+            # Formato legacy para compatibilidad
+            operations = data.get('operations', [])
+            
+            if not operations:
+                return jsonify({"error": "No operations provided"}), 400
+        
+        else:
+            return jsonify({"error": "No valid data format provided"}), 400
+        
+        if not operations:
+            return jsonify({"error": "No valid operations to perform"}), 400
+        
+        # Ejecutar operaciones en bulk
+        result = mongo.db.planes.bulk_write(operations)
+        
+        logger.info(f"📊 Planes reordenados: {result.modified_count} modificados por {session.get('user')}")
+        
+        return jsonify({
+            "success": True,
+            "modified": result.modified_count,
+            "matched": result.matched_count
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error reordering planes: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            "error": "Error interno al reordenar planes",
+            "details": str(e) if current_app.debug else None
+        }), 500
+
+
+# TAMBIÉN AÑADIR estos endpoints si no existen:
+
+@api.route('/api/planes', methods=['GET'])
+@login_required
+def get_planes():
+    """Obtener todos los planes ordenados"""
+    try:
+        # Obtener planes ordenados por 'order' (descendente) y luego por fecha de creación
+        planes = list(mongo.db.planes.find().sort([
+            ("order", -1),  # Orden personalizado (mayor = más arriba)
+            ("created_at", -1)  # Más recientes primero como fallback
+        ]))
+        
+        # Convertir ObjectId a string para JSON
+        for plan in planes:
+            plan['_id'] = str(plan['_id'])
+            # Formatear fechas si existen
+            if 'created_at' in plan:
+                plan['fecha_creacion'] = plan['created_at'].strftime('%Y-%m-%d')
+        
+        return jsonify(planes)
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting planes: {str(e)}")
+        return jsonify({"error": "Error al obtener planes"}), 500
+
+
+@api.route('/api/planes', methods=['POST'])
+@login_required
+def create_plan():
+    """Crear nuevo plan"""
+    try:
+        data = request.get_json()
+        
+        titulo = data.get('titulo', '').strip()
+        descripcion = data.get('descripcion', '').strip()
+        prioridad = data.get('prioridad', 2)
+        
+        if not titulo:
+            return jsonify({"error": "El título es obligatorio"}), 400
+        
+        # Obtener el orden más alto actual para colocar el nuevo plan al inicio
+        max_order_plan = mongo.db.planes.find_one(sort=[("order", -1)])
+        new_order = (max_order_plan.get('order', 0) + 1) if max_order_plan else 1
+        
+        new_plan = {
+            "titulo": titulo,
+            "descripcion": descripcion,
+            "prioridad": int(prioridad),
+            "order": new_order,
+            "created_at": datetime.now(),
+            "created_by": session.get('user'),
+            "updated_at": datetime.now()
+        }
+        
+        result = mongo.db.planes.insert_one(new_plan)
+        
+        logger.info(f"📝 Nuevo plan creado: '{titulo}' por {session.get('user')}")
+        
+        return jsonify({
+            "success": True,
+            "id": str(result.inserted_id),
+            "message": "Plan creado correctamente"
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating plan: {str(e)}")
+        return jsonify({
+            "error": "Error al crear plan",
+            "details": str(e) if current_app.debug else None
+        }), 500
+
+
+@api.route('/api/planes/<plan_id>', methods=['DELETE'])
+@login_required
+def delete_plan(plan_id):
+    """Eliminar plan por ID"""
+    try:
+        if not plan_id:
+            return jsonify({"error": "ID de plan requerido"}), 400
+        
+        # Verificar que el plan existe
+        plan = mongo.db.planes.find_one({"_id": ObjectId(plan_id)})
+        if not plan:
+            return jsonify({"error": "Plan no encontrado"}), 404
+        
+        # Eliminar el plan
+        result = mongo.db.planes.delete_one({"_id": ObjectId(plan_id)})
+        
+        if result.deleted_count > 0:
+            logger.info(f"🗑️ Plan eliminado: '{plan.get('titulo', 'Sin título')}' por {session.get('user')}")
+            return jsonify({
+                "success": True,
+                "message": "Plan eliminado correctamente"
+            })
+        else:
+            return jsonify({"error": "No se pudo eliminar el plan"}), 500
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting plan {plan_id}: {str(e)}")
+        return jsonify({
+            "error": "Error al eliminar plan",
+            "details": str(e) if current_app.debug else None
+        }), 500
+
+
+@api.route('/api/planes/<plan_id>/top', methods=['PUT'])
+@login_required
+def move_plan_to_top(plan_id):
+    """Mover plan al inicio de la lista"""
+    try:
+        if not plan_id:
+            return jsonify({"error": "ID de plan requerido"}), 400
+        
+        # Verificar que el plan existe
+        plan = mongo.db.planes.find_one({"_id": ObjectId(plan_id)})
+        if not plan:
+            return jsonify({"error": "Plan no encontrado"}), 404
+        
+        # Obtener el orden más alto actual
+        max_order_plan = mongo.db.planes.find_one(sort=[("order", -1)])
+        new_order = (max_order_plan.get('order', 0) + 1) if max_order_plan else 1
+        
+        # Actualizar el plan para ponerlo al inicio
+        result = mongo.db.planes.update_one(
+            {"_id": ObjectId(plan_id)},
+            {"$set": {
+                "order": new_order,
+                "updated_at": datetime.now(),
+                "updated_by": session.get('user')
+            }}
+        )
+        
+        if result.modified_count > 0:
+            logger.info(f"⬆️ Plan movido al top: '{plan.get('titulo', 'Sin título')}' por {session.get('user')}")
+            return jsonify({
+                "success": True,
+                "message": "Plan movido al inicio correctamente"
+            })
+        else:
+            return jsonify({"error": "No se pudo mover el plan"}), 500
+        
+    except Exception as e:
+        logger.error(f"❌ Error moving plan {plan_id} to top: {str(e)}")
+        return jsonify({
+            "error": "Error al mover plan",
+            "details": str(e) if current_app.debug else None
+        }), 500
+
+
