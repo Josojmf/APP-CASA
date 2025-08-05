@@ -785,12 +785,141 @@ async function loadCategoryProducts(categoryId, categoryName) {
     }
 }
 
+// ========================================
+// SISTEMA DE CACHÉ FRONTEND
+// ========================================
+
+class FrontendSearchCache {
+    constructor(maxSize = 50, ttlMinutes = 15) {
+        this.maxSize = maxSize;
+        this.ttlMs = ttlMinutes * 60 * 1000;
+        this.cache = new Map();
+        this.accessOrder = [];
+    }
+    
+    _generateKey(query, filters = {}) {
+        const keyData = {
+            query: query.toLowerCase().trim(),
+            filters: filters
+        };
+        return JSON.stringify(keyData);
+    }
+    
+    _isExpired(timestamp) {
+        return (Date.now() - timestamp) > this.ttlMs;
+    }
+    
+    _updateAccessOrder(key) {
+        // Mover al final (LRU)
+        const index = this.accessOrder.indexOf(key);
+        if (index > -1) {
+            this.accessOrder.splice(index, 1);
+        }
+        this.accessOrder.push(key);
+    }
+    
+    get(query, filters = {}) {
+        const key = this._generateKey(query, filters);
+        const entry = this.cache.get(key);
+        
+        if (entry) {
+            if (!this._isExpired(entry.timestamp)) {
+                this._updateAccessOrder(key);
+                console.log(`🎯 Frontend Cache HIT para: "${query}"`);
+                return {
+                    ...entry.data,
+                    from_frontend_cache: true,
+                    frontend_cache_age_ms: Date.now() - entry.timestamp
+                };
+            } else {
+                // Eliminar entrada expirada
+                this.cache.delete(key);
+                const orderIndex = this.accessOrder.indexOf(key);
+                if (orderIndex > -1) {
+                    this.accessOrder.splice(orderIndex, 1);
+                }
+                console.log(`⏰ Frontend Cache EXPIRED para: "${query}"`);
+            }
+        }
+        
+        console.log(`💥 Frontend Cache MISS para: "${query}"`);
+        return null;
+    }
+    
+    set(query, data, filters = {}) {
+        const key = this._generateKey(query, filters);
+        
+        // Si la caché está llena, eliminar el menos usado (LRU)
+        if (this.cache.size >= this.maxSize) {
+            const oldestKey = this.accessOrder.shift();
+            this.cache.delete(oldestKey);
+            console.log(`🗑️ Frontend Cache LRU eliminación para: ${oldestKey}`);
+        }
+        
+        this.cache.set(key, {
+            data: data,
+            timestamp: Date.now()
+        });
+        
+        this._updateAccessOrder(key);
+        
+        console.log(`💾 Frontend Cache SAVE para: "${query}" (${data.products?.length || 0} productos)`);
+    }
+    
+    clear() {
+        this.cache.clear();
+        this.accessOrder = [];
+        console.log('🧹 Frontend Cache limpiada');
+    }
+    
+    getStats() {
+        return {
+            totalEntries: this.cache.size,
+            maxSize: this.maxSize,
+            ttlMinutes: this.ttlMs / (60 * 1000),
+            oldestEntry: this.accessOrder.length > 0 ? this.accessOrder[0] : null,
+            newestEntry: this.accessOrder.length > 0 ? this.accessOrder[this.accessOrder.length - 1] : null
+        };
+    }
+}
+
+// Instancia global de caché frontend
+const frontendCache = new FrontendSearchCache(50, 15);
+
+// ========================================
+// FUNCIONES DE BÚSQUEDA MEJORADAS CON CACHÉ
+// ========================================
+
 async function searchProducts(query) {
     if (currentState.isLoading || !query.trim()) return;
     
     try {
-        setLoading(true);
         currentState.searchQuery = query.trim();
+        
+        // 1. Intentar obtener de caché frontend primero
+        const cachedResult = frontendCache.get(query);
+        if (cachedResult) {
+            // Usar datos cacheados
+            const searchCategory = {
+                id: null,
+                name: `Resultados para "${query}"`,
+                isSearch: true
+            };
+            
+            updateViewState('products', {
+                category: searchCategory,
+                products: cachedResult.products
+            });
+            
+            // Mostrar indicador de caché
+            showCacheIndicator(cachedResult);
+            showToast(`⚡ ${cachedResult.products.length} productos (desde caché)`, 'success');
+            return;
+        }
+        
+        // 2. Si no está en caché, mostrar loading y buscar
+        setLoading(true);
+        showSearchingMessage(query);
         
         const response = await fetch(`/mercadona/search?q=${encodeURIComponent(query)}`);
         const data = await response.json();
@@ -798,23 +927,217 @@ async function searchProducts(query) {
         if (data.success) {
             const searchCategory = {
                 id: null,
-                name: 'Resultados de búsqueda',
+                name: `Resultados para "${query}"`,
                 isSearch: true
             };
             
+            // Actualizar estado con los resultados
             updateViewState('products', {
                 category: searchCategory,
                 products: data.products
             });
+            
+            // Guardar en caché frontend para futuras búsquedas
+            frontendCache.set(query, data);
+            
+            // Mostrar indicadores de performance
+            showSearchResults(data);
+            
+            if (data.products.length === 0) {
+                showNoResultsMessage(query);
+            } else {
+                const cacheType = data.from_cache ? 'servidor' : 'búsqueda';
+                const duration = data.search_duration_seconds ? `${data.search_duration_seconds}s` : '';
+                showToast(`✅ ${data.products.length} productos encontrados (${cacheType}) ${duration}`, 'success');
+            }
         } else {
             throw new Error(data.error || 'Error en la búsqueda');
         }
     } catch (error) {
         console.error('Error searching products:', error);
-        showToast(`Error: ${error.message}`, 'error');
+        showToast(`❌ Error: ${error.message}`, 'error');
+        showSearchErrorMessage(query, error.message);
     } finally {
         setLoading(false);
     }
+}
+
+function showCacheIndicator(cachedData) {
+    // Mostrar indicador visual de que los datos vienen de caché
+    const searchSection = document.querySelector('.search-section');
+    if (searchSection) {
+        const indicator = document.createElement('div');
+        indicator.className = 'cache-indicator';
+        indicator.innerHTML = `
+            <i class="fas fa-bolt"></i>
+            <span>Desde caché (${Math.round(cachedData.frontend_cache_age_ms / 1000)}s)</span>
+        `;
+        
+        searchSection.appendChild(indicator);
+        
+        // Remover después de 3 segundos
+        setTimeout(() => {
+            if (indicator.parentElement) {
+                indicator.remove();
+            }
+        }, 3000);
+    }
+}
+
+function showSearchResults(data) {
+    // Mostrar información detallada de la búsqueda
+    const searchInfo = {
+        total: data.total_found,
+        duration: data.search_duration_seconds,
+        fromCache: data.from_cache,
+        subcategories: data.searched_subcategories
+    };
+    
+    console.log('📊 Resultados de búsqueda:', searchInfo);
+    
+    // Actualizar título con información adicional
+    updateProductsHeader(data);
+}
+
+function updateProductsHeader(searchData = null) {
+    const title = document.getElementById('products-title');
+    const subtitle = document.getElementById('products-subtitle');
+    
+    if (currentState.category) {
+        if (currentState.category.isSearch) {
+            title.textContent = currentState.category.name;
+            
+            let subtitleText = `${currentState.filteredProducts.length} productos encontrados`;
+            
+            if (searchData) {
+                if (searchData.from_cache) {
+                    subtitleText += ' (desde caché del servidor)';
+                } else if (searchData.search_duration_seconds) {
+                    subtitleText += ` en ${searchData.search_duration_seconds}s`;
+                }
+                
+                if (searchData.searched_subcategories) {
+                    subtitleText += ` • ${searchData.searched_subcategories} categorías exploradas`;
+                }
+            }
+            
+            subtitle.textContent = subtitleText;
+        } else {
+            title.textContent = currentState.category.name;
+            subtitle.textContent = `${currentState.filteredProducts.length} productos disponibles`;
+        }
+    }
+}
+
+// ========================================
+// GESTIÓN DE CACHÉ
+// ========================================
+
+function clearAllCaches() {
+    frontendCache.clear();
+    showToast('🧹 Caché limpiada', 'info');
+}
+
+function getCacheStats() {
+    const stats = frontendCache.getStats();
+    console.log('📊 Estadísticas de caché frontend:', stats);
+    return stats;
+}
+
+// ========================================
+// FUNCIONES DE DEBUG Y MONITORING
+// ========================================
+
+function debugSearchCache() {
+    console.log('=== DEBUG: Search Cache ===');
+    console.log('Frontend Cache Stats:', frontendCache.getStats());
+    
+    // Obtener stats del backend también
+    fetch('/api/mercadona/cache/stats')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Backend Cache Stats:', data);
+        })
+        .catch(error => {
+            console.log('Error obteniendo stats del backend:', error);
+        });
+}
+
+// Exponer funciones para debug en consola
+window.debugMercadona = {
+    clearCache: clearAllCaches,
+    getStats: getCacheStats,
+    debugCache: debugSearchCache,
+    frontendCache: frontendCache
+};
+
+function showSearchingMessage(query) {
+    // Si ya estamos en vista de productos, mostrar mensaje temporal
+    if (currentState.view === 'products') {
+        const grid = document.getElementById('products-grid');
+        if (grid) {
+            grid.innerHTML = `
+                <div class="searching-message">
+                    <i class="fas fa-search fa-2x text-primary mb-3"></i>
+                    <h3>Buscando "${query}"...</h3>
+                    <p class="text-secondary">Explorando todas las categorías de Mercadona</p>
+                    <div class="loading-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+        }
+    }
+}
+
+function showNoResultsMessage(query) {
+    const grid = document.getElementById('products-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = `
+        <div class="no-results">
+            <i class="fas fa-search fa-3x mb-4 text-gray-400"></i>
+            <h3 class="text-xl font-semibold mb-2">No se encontraron productos</h3>
+            <p class="text-gray-600 mb-4">No hay productos que coincidan con "${query}"</p>
+            <div class="suggestions">
+                <h4 class="font-semibold mb-2">Sugerencias:</h4>
+                <ul class="text-left text-gray-600">
+                    <li>• Verifica la ortografía de tu búsqueda</li>
+                    <li>• Intenta con términos más generales</li>
+                    <li>• Usa sinónimos o nombres alternativos</li>
+                    <li>• Busca por marca en lugar del producto específico</li>
+                </ul>
+            </div>
+            <button onclick="clearSearch()" class="back-button mt-4">
+                <i class="fas fa-arrow-left"></i>
+                Volver a categorías
+            </button>
+        </div>
+    `;
+}
+
+function showSearchErrorMessage(query, errorMessage) {
+    const grid = document.getElementById('products-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = `
+        <div class="error-state">
+            <i class="fas fa-exclamation-triangle fa-3x mb-4"></i>
+            <h3 class="text-xl font-semibold mb-2">Error en la búsqueda</h3>
+            <p class="mb-2">No se pudo buscar "${query}"</p>
+            <p class="text-sm text-gray-600 mb-4">Error: ${errorMessage}</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="searchProducts('${query}')" class="back-button">
+                    <i class="fas fa-refresh"></i>
+                    Reintentar
+                </button>
+                <button onclick="clearSearch()" class="back-button">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a categorías
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 // ========================================

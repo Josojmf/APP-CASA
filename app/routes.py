@@ -15,6 +15,11 @@ import re
 #Retry 
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+import hashlib
+from collections import OrderedDict
+import threading
+
+
 
 
 
@@ -234,6 +239,119 @@ def get_fecha_real_desde_dia_semana(dia_nombre):
         return fecha_objetivo.strftime("%Y-%m-%d")
     except ValueError:
         return datetime.now().strftime("%Y-%m-%d")
+    
+    
+# ==========================================
+# Cache de categorías de Mercadona
+# ==========================================
+class SearchCache:
+    """
+    Sistema de caché inteligente para búsquedas de productos
+    con TTL, LRU y limpieza automática
+    """
+    def __init__(self, max_size=500, ttl_minutes=30):
+        self.max_size = max_size
+        self.ttl_seconds = ttl_minutes * 60
+        self.cache = OrderedDict()
+        self.access_times = {}
+        self.lock = threading.RLock()
+        
+    def _generate_key(self, query, filters=None):
+        """Generar clave única para la búsqueda"""
+        key_data = f"{query.lower().strip()}"
+        if filters:
+            key_data += f"_filters_{str(sorted(filters.items()))}"
+        return hashlib.md5(key_data.encode()).hexdigest()
+    
+    def _is_expired(self, timestamp):
+        """Verificar si una entrada ha expirado"""
+        return (datetime.now() - timestamp).total_seconds() > self.ttl_seconds
+    
+    def _cleanup_expired(self):
+        """Limpiar entradas expiradas"""
+        current_time = datetime.now()
+        expired_keys = []
+        
+        for key, (_, timestamp) in self.cache.items():
+            if self._is_expired(timestamp):
+                expired_keys.append(key)
+        
+        for key in expired_keys:
+            self.cache.pop(key, None)
+            self.access_times.pop(key, None)
+    
+    def get(self, query, filters=None):
+        """Obtener resultado de caché si existe y no ha expirado"""
+        with self.lock:
+            key = self._generate_key(query, filters)
+            
+            if key in self.cache:
+                data, timestamp = self.cache[key]
+                
+                if not self._is_expired(timestamp):
+                    # Mover al final (LRU)
+                    self.cache.move_to_end(key)
+                    self.access_times[key] = datetime.now()
+                    
+                    logger.info(f"🎯 Cache HIT para búsqueda: '{query}'")
+                    return data
+                else:
+                    # Eliminar entrada expirada
+                    del self.cache[key]
+                    self.access_times.pop(key, None)
+                    logger.info(f"⏰ Cache EXPIRED para búsqueda: '{query}'")
+            
+            logger.info(f"💥 Cache MISS para búsqueda: '{query}'")
+            return None
+    
+    def set(self, query, data, filters=None):
+        """Guardar resultado en caché"""
+        with self.lock:
+            key = self._generate_key(query, filters)
+            current_time = datetime.now()
+            
+            # Limpiar expirados antes de añadir
+            self._cleanup_expired()
+            
+            # Si la caché está llena, eliminar el menos usado (LRU)
+            if len(self.cache) >= self.max_size:
+                oldest_key = next(iter(self.cache))
+                del self.cache[oldest_key]
+                self.access_times.pop(oldest_key, None)
+                logger.info(f"🗑️ Cache LRU eliminación: {oldest_key}")
+            
+            self.cache[key] = (data, current_time)
+            self.access_times[key] = current_time
+            
+            logger.info(f"💾 Cache SAVE para búsqueda: '{query}' ({len(data.get('products', []))} productos)")
+    
+    def clear(self):
+        """Limpiar toda la caché"""
+        with self.lock:
+            self.cache.clear()
+            self.access_times.clear()
+            logger.info("🧹 Cache completamente limpiada")
+    
+    def get_stats(self):
+        """Obtener estadísticas de la caché"""
+        with self.lock:
+            self._cleanup_expired()
+            
+            total_entries = len(self.cache)
+            memory_usage = sum(len(str(data)) for data, _ in self.cache.values())
+            
+            return {
+                "total_entries": total_entries,
+                "max_size": self.max_size,
+                "memory_usage_bytes": memory_usage,
+                "ttl_minutes": self.ttl_seconds // 60,
+                "oldest_entry": min(self.access_times.values()) if self.access_times else None,
+                "newest_entry": max(self.access_times.values()) if self.access_times else None
+            }
+
+# Instancia global de caché
+search_cache = SearchCache(max_size=500, ttl_minutes=30)
+
 
 # ==========================================
 # Rutas principales
@@ -1483,10 +1601,17 @@ Responde de manera práctica y específica."""
 # ==========================================
 MERCADONA_BASE_URL = "https://tienda.mercadona.es/api"
 MERCADONA_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-    'Accept': 'application/json',
-    'Accept-Language': 'es-ES,es;q=0.9',
-    'Referer': 'https://tienda.mercadona.es/'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Cache-Control': 'max-age=0'
 }
 
 # ==========================================
@@ -1796,60 +1921,502 @@ def format_mercadona_product(product_data):
     }
     
 
+# REEMPLAZAR la función mercadona_search en routes.py con esta versión mejorada:
+
 @main.route('/mercadona/search')
 @login_required
 def mercadona_search():
-    """Buscar productos en Mercadona"""
+    """Buscar productos en Mercadona con sistema de caché avanzado"""
     try:
         query = request.args.get('q', '').strip()
         
         if not query:
-            return jsonify(success=False, error="Empty query")
+            return jsonify(success=False, error="Query vacía")
         
-        # Primero buscamos en todas las categorías
-        categories_url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
-        categories_response = requests.get(categories_url, headers=MERCADONA_HEADERS, timeout=10)
+        if len(query) < 2:
+            return jsonify(success=False, error="Query muy corta, mínimo 2 caracteres")
         
-        if categories_response.status_code != 200:
-            return jsonify(success=False, error="No se pudo obtener categorías")
+        # Filtros adicionales (para futuras mejoras)
+        filters = {
+            'min_price': request.args.get('min_price'),
+            'max_price': request.args.get('max_price'),
+            'category': request.args.get('category'),
+            'discount_only': request.args.get('discount_only') == 'true'
+        }
+        # Eliminar filtros vacíos y falsos
+        filters = {k: v for k, v in filters.items() if v is not None and v is not False}
+        
+        # Logging más conciso
+        logger.info(f"🔍 Búsqueda: '{query}'" + (f" +filtros" if filters else ""))
+        
+        # Intentar obtener de caché primero
+        cached_result = search_cache.get(query, filters if filters else None)
+        if cached_result:
+            cached_result['from_cache'] = True
+            cached_result['cache_timestamp'] = datetime.now().isoformat()
+            logger.info(f"🎯 Cache HIT: '{query}' ({cached_result.get('total_found', 0)} productos)")
+            return jsonify(cached_result)
+        
+        # Si no está en caché, realizar búsqueda
+        logger.info(f"💥 Cache MISS: '{query}' - iniciando búsqueda")
+        
+        # Configurar sesión con retry y timeout
+        session_search = requests.Session()
+        session_search.headers.update(MERCADONA_HEADERS)
+        adapter = requests.adapters.HTTPAdapter(max_retries=2)
+        session_search.mount("https://", adapter)
+        
+        # Obtener todas las categorías
+        categories_data = get_mercadona_categories_cached(session_search)
+        if not categories_data:
+            error_msg = "No se pudo obtener categorías de Mercadona"
+            logger.error(f"❌ {error_msg}")
+            return jsonify(success=False, error=error_msg), 500
         
         all_products = []
-        categories_data = categories_response.json()
+        processed_subcategories = set()
+        search_start_time = datetime.now()
+        
+        # Normalizar query para búsqueda más flexible
+        query_normalized = query.lower().strip()
+        query_words = query_normalized.split()
+        
+        # Contadores para estadísticas
+        total_subcategories = sum(len(cat.get('categories', [])) for cat in categories_data.get('results', []))
+        processed_count = 0
+        error_count = 0
+        success_count = 0
         
         # Buscar en cada categoría y subcategoría
         for category in categories_data.get('results', []):
+            category_name = category.get('name', '')
+            
             for subcat in category.get('categories', []):
                 subcat_id = subcat.get('id')
+                subcat_name = subcat.get('name', '')
+                processed_count += 1
+                
+                # Evitar procesar la misma subcategoría múltiples veces
+                if subcat_id in processed_subcategories:
+                    continue
+                processed_subcategories.add(subcat_id)
+                
                 if subcat_id:
                     try:
-                        subcat_url = f"{MERCADONA_BASE_URL}/categories/{subcat_id}/?lang=es&wh=mad1"
-                        subcat_response = requests.get(subcat_url, headers=MERCADONA_HEADERS, timeout=10)
+                        # Usar caché también para subcategorías individuales
+                        subcat_products = get_subcategory_products_cached(session_search, subcat_id, subcat_name)
                         
-                        if subcat_response.status_code == 200:
-                            subcat_data = subcat_response.json()
+                        if subcat_products:  # Solo procesar si hay productos
+                            success_count += 1
+                            products_found_in_subcat = 0
                             
-                            if 'products' in subcat_data:
-                                for product in subcat_data['products']:
-                                    if query.lower() in product.get('display_name', '').lower():
+                            for product in subcat_products:
+                                if is_product_match(product, query_normalized, query_words):
+                                    try:
                                         formatted_product = format_mercadona_product(product)
-                                        formatted_product['subcategory'] = subcat.get('name', 'Sin nombre')
-                                        all_products.append(formatted_product)
-                    except:
+                                        formatted_product['category'] = category_name
+                                        formatted_product['subcategory'] = subcat_name
+                                        
+                                        # Aplicar filtros si existen
+                                        if apply_filters(formatted_product, filters):
+                                            all_products.append(formatted_product)
+                                            products_found_in_subcat += 1
+                                            
+                                    except Exception as e:
+                                        # Solo log en debug para errores de formateo
+                                        if current_app.debug:
+                                            logger.debug(f"Error formateando producto {product.get('id', 'unknown')}: {str(e)}")
+                                        continue
+                        
+                    except Exception as e:
+                        error_count += 1
+                        # Solo log de errores críticos, no warnings
+                        if "403" not in str(e) and "NoneType" not in str(e):
+                            logger.warning(f"Error procesando subcategoría {subcat_id}: {str(e)}")
                         continue
         
-        return jsonify({
+        # Eliminar duplicados basándose en el ID del producto
+        unique_products = []
+        seen_ids = set()
+        for product in all_products:
+            if product['id'] not in seen_ids:
+                seen_ids.add(product['id'])
+                unique_products.append(product)
+        
+        # Ordenar resultados por relevancia
+        sorted_products = sort_products_by_relevance(unique_products, query_normalized, query_words)
+        
+        search_duration = (datetime.now() - search_start_time).total_seconds()
+        
+        # Preparar resultado
+        result = {
             'success': True,
-            'products': all_products,
-            'query': query
+            'products': sorted_products,
+            'query': query,
+            'total_found': len(sorted_products),
+            'search_terms': query_words,
+            'search_duration_seconds': round(search_duration, 3),
+            'from_cache': False,
+            'applied_filters': filters,
+            'searched_subcategories': len(processed_subcategories),
+            'stats': {
+                'total_subcategories_processed': processed_count,
+                'successful_subcategories': success_count,
+                'error_subcategories': error_count
+            }
+        }
+        
+        # Guardar en caché siempre
+        search_cache.set(query, result, filters if filters else None)
+        
+        # Log final conciso
+        logger.info(f"✅ '{query}': {len(sorted_products)} productos, {search_duration:.2f}s, {success_count}/{processed_count} subcategorías OK")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"❌ Error crítico en búsqueda '{query}': {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Error interno en la búsqueda',
+            'details': str(e) if current_app.debug else "Error interno del servidor"
+        }), 500
+
+def get_mercadona_categories_cached(session):
+    """Obtener categorías con caché (usando la caché global existente)"""
+    global _mercadona_categories_cache
+    
+    # Si hay cache y no ha caducado
+    if (_mercadona_categories_cache.get("data") and 
+        _mercadona_categories_cache.get("timestamp") and
+        (datetime.now() - _mercadona_categories_cache["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL):
+        
+        cached_data = _mercadona_categories_cache["data"]
+        if isinstance(cached_data, dict) and cached_data.get('categories_data'):
+            return cached_data['categories_data']
+    
+    try:
+        logger.info("🔄 Obteniendo categorías...")
+        url = f"{MERCADONA_BASE_URL}/categories/?lang=es&wh=mad1"
+        response = session.get(url, timeout=15)
+        
+        if response.status_code == 200:
+            categories_data = response.json()
+            
+            # Validar que los datos son correctos
+            if not categories_data.get('results'):
+                logger.error("❌ Respuesta de categorías sin 'results'")
+                return None
+            
+            # Guardar en cache con estructura mejorada
+            _mercadona_categories_cache["data"] = {
+                'success': True,
+                'categories': [
+                    {
+                        'id': cat.get('id'),
+                        'name': cat.get('name', 'Sin nombre'),
+                        'subcategories_count': len(cat.get('categories', []))
+                    }
+                    for cat in categories_data.get('results', [])
+                ],
+                'categories_data': categories_data
+            }
+            _mercadona_categories_cache["timestamp"] = datetime.now()
+            
+            logger.info(f"✅ {len(categories_data.get('results', []))} categorías obtenidas")
+            return categories_data
+        else:
+            logger.error(f"❌ Error HTTP {response.status_code} obteniendo categorías")
+        
+    except Exception as e:
+        logger.error(f"❌ Error crítico obteniendo categorías: {str(e)}")
+    
+    return None
+
+def get_subcategory_products_cached(session, subcat_id, subcat_name):
+    """Obtener productos de subcategoría con caché y manejo robusto de errores"""
+    cache_key = f"subcat_{subcat_id}"
+    
+    # Verificar si está en la caché global
+    cached_data = _mercadona_categories_cache.get(cache_key)
+    if cached_data and (datetime.now() - cached_data["timestamp"]).total_seconds() < _CATEGORIES_CACHE_TTL:
+        return cached_data["data"]
+    
+    try:
+        subcat_url = f"{MERCADONA_BASE_URL}/categories/{subcat_id}/?lang=es&wh=mad1"
+        response = session.get(subcat_url, timeout=8)
+        
+        if response.status_code == 200:
+            subcat_data = response.json()
+            products = []
+            
+            # Procesar productos directos
+            for product in subcat_data.get('products', []):
+                if product and isinstance(product, dict):  # Validar que el producto no es None
+                    products.append(product)
+            
+            # Procesar sub-subcategorías
+            for sub_subcat in subcat_data.get('categories', []):
+                if sub_subcat and isinstance(sub_subcat, dict):
+                    for product in sub_subcat.get('products', []):
+                        if product and isinstance(product, dict):
+                            products.append(product)
+            
+            # Guardar en caché solo si hay productos válidos
+            if products:
+                _mercadona_categories_cache[cache_key] = {
+                    "data": products,
+                    "timestamp": datetime.now()
+                }
+            
+            return products
+            
+        elif response.status_code == 403:
+            # 403 es común en Mercadona, no es un error crítico
+            return []
+        else:
+            # Solo log en debug para otros errores HTTP
+            if current_app.debug:
+                logger.debug(f"HTTP {response.status_code} para subcategoría {subcat_id}")
+            return []
+        
+    except Exception as e:
+        # Solo log errores no relacionados con None o 403
+        if current_app.debug and "NoneType" not in str(e):
+            logger.debug(f"Error subcategoría {subcat_id}: {str(e)}")
+        return []
+    
+    try:
+        subcat_url = f"{MERCADONA_BASE_URL}/categories/{subcat_id}/?lang=es&wh=mad1"
+        response = session.get(subcat_url, timeout=8)
+        
+        if response.status_code == 200:
+            subcat_data = response.json()
+            products = []
+            
+            # Procesar productos directos
+            for product in subcat_data.get('products', []):
+                products.append(product)
+            
+            # Procesar sub-subcategorías
+            for sub_subcat in subcat_data.get('categories', []):
+                for product in sub_subcat.get('products', []):
+                    products.append(product)
+            
+            # Guardar en caché
+            _mercadona_categories_cache[cache_key] = {
+                "data": products,
+                "timestamp": datetime.now()
+            }
+            
+            return products
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo subcategoría {subcat_id}: {str(e)}")
+    
+    return []
+
+
+def apply_filters(product, filters):
+    """Aplicar filtros al producto con validación robusta"""
+    if not filters or not product:
+        return True
+    
+    try:
+        # Filtro de precio mínimo
+        if filters.get('min_price'):
+            try:
+                price = float(product.get('price', '0'))
+                if price < float(filters['min_price']):
+                    return False
+            except (ValueError, TypeError):
+                pass
+        
+        # Filtro de precio máximo
+        if filters.get('max_price'):
+            try:
+                price = float(product.get('price', '999'))
+                if price > float(filters['max_price']):
+                    return False
+            except (ValueError, TypeError):
+                pass
+        
+        # Filtro de categoría
+        if filters.get('category'):
+            category = product.get('category', '')
+            if category and filters['category'].lower() not in category.lower():
+                return False
+        
+        # Filtro solo productos con descuento
+        if filters.get('discount_only'):
+            if not product.get('is_discounted', False):
+                return False
+        
+        return True
+        
+    except Exception as e:
+        if current_app.debug:
+            logger.debug(f"Error aplicando filtros: {str(e)}")
+        return True
+
+@main.route('/api/mercadona/cache/stats', methods=['GET'])
+@login_required
+def get_cache_stats():
+    """Obtener estadísticas de la caché de búsquedas"""
+    try:
+        stats = search_cache.get_stats()
+        
+        # Añadir estadísticas de la caché de categorías
+        categories_cache_size = len(_mercadona_categories_cache)
+        
+        return jsonify({
+            "success": True,
+            "search_cache": stats,
+            "categories_cache_entries": categories_cache_size,
+            "categories_cache_ttl_seconds": _CATEGORIES_CACHE_TTL,
+            "timestamp": datetime.now().isoformat()
         })
         
     except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de caché: {str(e)}")
+        return jsonify({"error": "Error obteniendo estadísticas"}), 500
+
+
+@main.route('/api/mercadona/cache/clear', methods=['POST'])
+@login_required
+def clear_search_cache():
+    """Limpiar caché de búsquedas (solo admin)"""
+    try:
+        # Solo admin puede limpiar caché
+        if session.get('user') != 'Joso':
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        
+        # Limpiar caché de búsquedas
+        search_cache.clear()
+        
+        # Limpiar caché de categorías
+        global _mercadona_categories_cache
+        _mercadona_categories_cache.clear()
+        
+        logger.info(f"🧹 Caché limpiada por: {session.get('user')}")
+        
         return jsonify({
-            'success': False,
-            'error': 'Error en la búsqueda'
-        }), 500
+            "success": True,
+            "message": "Caché limpiada correctamente",
+            "cleared_by": session.get('user'),
+            "timestamp": datetime.now().isoformat()
+        })
         
+    except Exception as e:
+        logger.error(f"Error limpiando caché: {str(e)}")
+        return jsonify({"error": "Error limpiando caché"}), 500
+
+
+def is_product_match(product, query_normalized, query_words):
+    """
+    Determinar si un producto coincide con la búsqueda usando coincidencias parciales flexibles
+    """
+    # Validar que el producto no es None y tiene los campos necesarios
+    if not product or not isinstance(product, dict):
+        return False
+    
+    # Obtener campos con validación de None
+    product_name = product.get('display_name') or ""
+    product_brand = product.get('brand') or ""
+    product_packaging = product.get('packaging') or ""
+    
+    # Convertir a lowercase de forma segura
+    product_name = product_name.lower() if product_name else ""
+    product_brand = product_brand.lower() if product_brand else ""
+    product_packaging = product_packaging.lower() if product_packaging else ""
+    
+    # Texto completo del producto para búsqueda
+    full_product_text = f"{product_name} {product_brand} {product_packaging}".strip()
+    
+    # Si no hay texto para buscar, no es una coincidencia
+    if not full_product_text:
+        return False
+    
+    # Método 1: Coincidencia directa de la query completa
+    if query_normalized in full_product_text:
+        return True
+    
+    # Método 2: Todas las palabras de la query deben estar presentes
+    if len(query_words) > 1:
+        words_found = 0
+        for word in query_words:
+            if len(word) >= 2 and word in full_product_text:
+                words_found += 1
         
+        # Si encontramos al menos el 70% de las palabras, es una coincidencia
+        if words_found >= len(query_words) * 0.7:
+            return True
+    
+    # Método 3: Coincidencia parcial inteligente para palabras individuales
+    for word in query_words:
+        if len(word) >= 3:
+            product_words = full_product_text.split()
+            for prod_word in product_words:
+                if prod_word.startswith(word) or word in prod_word:
+                    return True
+    
+    return False
+
+
+def sort_products_by_relevance(products, query_normalized, query_words):
+    """
+    Ordenar productos por relevancia de la búsqueda con validación robusta
+    """
+    def calculate_relevance_score(product):
+        # Validar producto
+        if not product or not isinstance(product, dict):
+            return 0
+        
+        product_name = (product.get('name') or "").lower()
+        product_brand = (product.get('brand') or "").lower()
+        
+        score = 0
+        
+        # Coincidencia exacta en el nombre = máxima puntuación
+        if query_normalized == product_name:
+            score += 100
+        
+        # Coincidencia al inicio del nombre
+        elif product_name.startswith(query_normalized):
+            score += 80
+        
+        # Query completa contenida en el nombre
+        elif query_normalized in product_name:
+            score += 60
+        
+        # Puntuación por palabras individuales
+        for word in query_words:
+            if len(word) >= 2:
+                if word in product_name:
+                    score += 10
+                if word in product_brand:
+                    score += 5
+        
+        # Bonus por productos más populares
+        try:
+            price = float(product.get('price', '999'))
+            if price < 5:
+                score += 5
+            elif price < 10:
+                score += 2
+        except (ValueError, TypeError):
+            pass
+        
+        # Bonus por productos con descuento
+        if product.get('is_discounted', False):
+            score += 3
+        
+        return score
+    
+    # Ordenar por puntuación descendente
+    return sorted(products, key=calculate_relevance_score, reverse=True)
+
+
 @main.route('/api/add_shopping_item', methods=['POST'])
 @login_required
 def add_shopping_item():
@@ -1868,10 +2435,10 @@ def add_shopping_item():
         if quantity < 1 or quantity > 99:
             return jsonify({"error": "Cantidad inválida (1-99)"}), 400
         
-        # Datos opcionales
+        # Datos opcionales con manejo seguro
         packaging = data.get('packaging', '').strip()
-        price = data.get('price', '0').strip()
-        size = data.get('size', '').strip()
+        price = str(data.get('price', '0')).strip()  # Convertir a string primero
+        size = str(data.get('size', '')).strip() if data.get('size') is not None else ''
         size_format = data.get('size_format', '').strip()
         source = data.get('source', 'mercadona')
         
@@ -1950,7 +2517,7 @@ def add_shopping_item():
         return jsonify({"error": "Datos inválidos"}), 400
     except Exception as e:
         logger.error(f"Error add_shopping_item: {e}")
-        return jsonify({"error": "Error al añadir producto"}), 500        
+        return jsonify({"error": "Error al añadir producto"}), 500       
 
 
 # ==========================================
