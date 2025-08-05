@@ -16,6 +16,17 @@
         <button type="submit">
             <i class="fas fa-plus"></i> Añadir producto
         </button>
+        <div class="list-actions">
+            <button id="markAllCompleted" class="mark-completed-btn">
+                <i class="fas fa-check-double"></i> Marcar como comprado
+            </button>
+            <button id="repeatLastPurchase" class="repeat-purchase-btn">
+                <i class="fas fa-redo"></i> Repetir última compra
+            </button>
+            <button id="eliminarTodo" class="clear-list-btn">
+                <i class="fas fa-trash-alt"></i> Vaciar lista
+            </button>
+        </div>
     </form>
 
     {% if items %}
@@ -43,15 +54,6 @@
         </li>
         {% endfor %}
     </ul>
-
-    <div class="list-actions">
-        <button id="markAllCompleted" class="mark-completed-btn">
-            <i class="fas fa-check-double"></i> Marcar como comprado
-        </button>
-        <button id="eliminarTodo" class="clear-list-btn">
-            <i class="fas fa-trash-alt"></i> Vaciar lista
-        </button>
-    </div>
     {% else %}
     <div class="empty-message">
         <p>Tu lista está vacía.</p>
@@ -105,7 +107,7 @@
     // Variables globales
     let currentEditId = null;
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // Animar items al cargar
         const items = document.querySelectorAll('.shopping-item');
         items.forEach((item, index) => {
@@ -122,15 +124,15 @@
     // Añadir nuevo producto
     document.getElementById('addItemForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        
+
         // Obtener valores
         const nombre = document.getElementById('itemNombre').value.trim();
         const cantidad = document.getElementById('itemCantidad').value.trim();
         const unidad = document.getElementById('itemUnidad').value.trim();
-        
+
         if (!nombre || !cantidad || !unidad) {
             showNotification('Por favor, completa todos los campos', 'error');
             return;
@@ -151,9 +153,9 @@
                 // Mostrar éxito
                 submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Añadido!';
                 submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
-                
+
                 showNotification(`¡${nombre} añadido a la lista! 🛒`, 'success');
-                
+
                 setTimeout(() => {
                     window.location.reload();
                 }, 800);
@@ -162,13 +164,13 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            
+
             // Mostrar error
             submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
             submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-            
+
             showNotification('Error al añadir el producto', 'error');
-            
+
             setTimeout(() => {
                 submitBtn.innerHTML = originalText;
                 submitBtn.style.background = '';
@@ -183,7 +185,7 @@
             const listItem = e.target.closest('li');
             const id = listItem.dataset.id;
             const productName = listItem.querySelector('.item-name').textContent.trim().replace('🛒 ', '');
-            
+
             const result = await showConfirmDialog(
                 '¿Eliminar producto?',
                 `¿Estás seguro de que quieres eliminar "${productName}" de la lista?`,
@@ -194,27 +196,27 @@
             if (result) {
                 const originalBtn = e.target.closest('.delete-btn');
                 const originalText = originalBtn.innerHTML;
-                
+
                 originalBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 originalBtn.disabled = true;
 
                 try {
                     const res = await fetch(`/api/lista_compra/${id}`, { method: 'DELETE' });
-                    
+
                     if (res.ok) {
                         // Animación de eliminación
                         listItem.style.animation = 'itemSlideOut 0.4s ease forwards';
-                        
+
                         setTimeout(() => {
                             listItem.remove();
-                            
+
                             // Verificar si quedan items
                             const remainingItems = document.querySelectorAll('.shopping-item').length;
                             if (remainingItems === 1) { // 1 porque aún no se ha removido del DOM
                                 setTimeout(() => window.location.reload(), 300);
                             }
                         }, 400);
-                        
+
                         showNotification(`¡${productName} eliminado! 🗑️`, 'success');
                     } else {
                         throw new Error('Error del servidor');
@@ -234,20 +236,20 @@
         btn.addEventListener('click', (e) => {
             const listItem = e.target.closest('li');
             const id = listItem.dataset.id;
-            
+
             // Obtener nombre limpio
             const nombreElement = listItem.querySelector('.item-name');
             const nombre = nombreElement.textContent.trim().replace(/^[🛒\s]*/, '');
-            
+
             // Obtener cantidad y unidad
             const qtyElement = listItem.querySelector('.item-qty');
             const qtyText = qtyElement.textContent.trim().replace(/^[📦\s]*/, '');
-            
+
             // Extraer cantidad y unidad usando regex más robusto
             const match = qtyText.match(/^([\d.,]+)\s*(.*)$/);
             const cantidad = match ? match[1].replace(',', '.') : '';
             const unidad = match ? match[2].trim() : '';
-            
+
             openEditModal(id, nombre, cantidad, unidad);
         });
     });
@@ -255,16 +257,16 @@
     // Función para abrir modal de edición
     function openEditModal(id, nombre, cantidad, unidad) {
         currentEditId = id;
-        
+
         document.getElementById('editItemId').value = id;
         document.getElementById('editItemNombre').value = nombre;
         document.getElementById('editItemCantidad').value = cantidad;
         document.getElementById('editItemUnidad').value = unidad;
-        
+
         const modal = document.getElementById('editModal');
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        
+
         setTimeout(() => {
             document.getElementById('editItemNombre').focus();
         }, 100);
@@ -275,7 +277,7 @@
         const modal = document.getElementById('editModal');
         modal.style.animation = 'modalFadeOut 0.3s ease forwards';
         document.body.style.overflow = 'auto';
-        
+
         setTimeout(() => {
             modal.style.display = 'none';
             modal.style.animation = '';
@@ -287,7 +289,7 @@
     // Event listeners para cerrar modal
     document.querySelector('.close-modal-btn').addEventListener('click', closeEditModal);
     document.querySelector('.cancel-btn').addEventListener('click', closeEditModal);
-    
+
     document.getElementById('editModal').addEventListener('click', (e) => {
         if (e.target === e.currentTarget) {
             closeEditModal();
@@ -304,15 +306,15 @@
     // Enviar formulario de edición
     document.getElementById('editItemForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        
+
         const id = document.getElementById('editItemId').value;
         const nombre = document.getElementById('editItemNombre').value.trim();
         const cantidad = document.getElementById('editItemCantidad').value.trim();
         const unidad = document.getElementById('editItemUnidad').value.trim();
-        
+
         if (!nombre || !cantidad || !unidad) {
             showNotification('Por favor, completa todos los campos', 'error');
             return;
@@ -333,9 +335,9 @@
                 // Mostrar éxito
                 submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Guardado!';
                 submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
-                
+
                 showNotification('¡Producto actualizado! ✏️', 'success');
-                
+
                 setTimeout(() => {
                     closeEditModal();
                     setTimeout(() => window.location.reload(), 300);
@@ -345,13 +347,13 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            
+
             // Mostrar error
             submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
             submitBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-            
+
             showNotification('Error al actualizar el producto', 'error');
-            
+
             setTimeout(() => {
                 submitBtn.innerHTML = originalText;
                 submitBtn.style.background = '';
@@ -373,29 +375,42 @@
 
             if (result) {
                 const originalText = markAllBtn.innerHTML;
-                
+
                 markAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
                 markAllBtn.disabled = true;
 
                 try {
-                    // Simular procesamiento (aquí iría la lógica real)
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
+                    // Primero obtenemos los items actuales
+                    const itemsRes = await fetch('/api/lista_compra');
+                    const items = await itemsRes.json();
+
+                    // Guardamos en el historial
+                    const historyRes = await fetch('/api/lista_compra/history', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            items,
+                            date: new Date().toISOString()
+                        })
+                    });
+
+                    // Luego eliminamos los items actuales
+                    await fetch('/api/lista_compra_all', { method: 'DELETE' });
+
                     markAllBtn.innerHTML = '<i class="fas fa-check"></i> ¡Completado!';
                     markAllBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
-                    
+
                     showNotification('¡Compra completada! 🛍️', 'success');
-                    
+
                     setTimeout(() => {
-                        // Aquí podrías mover los items a un historial
                         window.location.reload();
                     }, 1500);
                 } catch (error) {
                     console.error('Error:', error);
-                    
+
                     markAllBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
                     markAllBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-                    
+
                     setTimeout(() => {
                         markAllBtn.innerHTML = originalText;
                         markAllBtn.style.background = '';
@@ -405,7 +420,6 @@
             }
         });
     }
-
     // Eliminar toda la lista
     const eliminarTodoBtn = document.getElementById('eliminarTodo');
     if (eliminarTodoBtn) {
@@ -419,19 +433,19 @@
 
             if (result) {
                 const originalText = eliminarTodoBtn.innerHTML;
-                
+
                 eliminarTodoBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vaciando...';
                 eliminarTodoBtn.disabled = true;
 
                 try {
                     const res = await fetch('/api/lista_compra_all', { method: 'DELETE' });
-                    
+
                     if (res.ok) {
                         eliminarTodoBtn.innerHTML = '<i class="fas fa-check"></i> ¡Vaciada!';
                         eliminarTodoBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
-                        
+
                         showNotification('¡Lista vaciada completamente! 🗑️', 'success');
-                        
+
                         setTimeout(() => {
                             window.location.reload();
                         }, 1000);
@@ -440,12 +454,12 @@
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    
+
                     eliminarTodoBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
                     eliminarTodoBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-                    
+
                     showNotification('Error al vaciar la lista', 'error');
-                    
+
                     setTimeout(() => {
                         eliminarTodoBtn.innerHTML = originalText;
                         eliminarTodoBtn.style.background = '';
@@ -464,13 +478,13 @@
             <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
             ${message}
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.classList.add('show');
         }, 100);
-        
+
         setTimeout(() => {
             notification.classList.remove('show');
             setTimeout(() => {
@@ -502,36 +516,36 @@
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(dialog);
             document.body.style.overflow = 'hidden';
-            
+
             // Animación de entrada
             setTimeout(() => {
                 dialog.style.opacity = '1';
                 dialog.querySelector('.confirm-dialog').style.transform = 'translateY(0) scale(1)';
             }, 10);
-            
+
             // Event listeners
             dialog.querySelector('.confirm-primary').onclick = () => {
                 closeDialog(true);
             };
-            
+
             dialog.querySelector('.confirm-cancel').onclick = () => {
                 closeDialog(false);
             };
-            
+
             dialog.onclick = (e) => {
                 if (e.target === dialog) {
                     closeDialog(false);
                 }
             };
-            
+
             function closeDialog(result) {
                 dialog.style.opacity = '0';
                 dialog.querySelector('.confirm-dialog').style.transform = 'translateY(-20px) scale(0.95)';
                 document.body.style.overflow = 'auto';
-                
+
                 setTimeout(() => {
                     dialog.remove();
                     resolve(result);
@@ -543,626 +557,812 @@
     // Auto-completar sugerencias (opcional)
     const nombreInput = document.getElementById('itemNombre');
     const sugerencias = ['Leche', 'Pan', 'Huevos', 'Queso', 'Tomates', 'Cebolla', 'Ajo', 'Pollo', 'Arroz', 'Pasta', 'Aceite', 'Sal', 'Azúcar', 'Harina'];
-    
+
     if (nombreInput) {
-        nombreInput.addEventListener('input', function() {
+        nombreInput.addEventListener('input', function () {
             const valor = this.value.toLowerCase();
             if (valor.length > 0) {
-                const coincidencias = sugerencias.filter(item => 
+                const coincidencias = sugerencias.filter(item =>
                     item.toLowerCase().includes(valor)
                 );
-                
+
                 // Aquí podrías mostrar las sugerencias en un dropdown
                 // Por simplicidad, no lo implementamos aquí
+            }
+        });
+    }
+
+    document.getElementById('repeatLastPurchase')?.addEventListener('click', async () => {
+        const result = await showConfirmDialog(
+            '¿Repetir última compra?',
+            '¿Quieres cargar los productos de tu última compra? Esto reemplazará los productos actuales en la lista.',
+            'Sí, repetir',
+            'Cancelar'
+        );
+
+        if (result) {
+            const btn = document.getElementById('repeatLastPurchase');
+            const originalText = btn.innerHTML;
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/lista_compra/last_purchase');
+
+                if (res.ok) {
+                    const lastPurchase = await res.json();
+
+                    // Primero vaciamos la lista actual
+                    const deleteRes = await fetch('/api/lista_compra_all', { method: 'DELETE' });
+
+                    if (deleteRes.ok) {
+                        // Añadimos los items de la última compra
+                        const addPromises = lastPurchase.items.map(item => {
+                            return fetch('/api/lista_compra', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    nombre: item.nombre,
+                                    cantidad: item.cantidad,
+                                    unidad: item.unidad
+                                })
+                            });
+                        });
+
+                        await Promise.all(addPromises);
+
+                        btn.innerHTML = '<i class="fas fa-check"></i> ¡Lista cargada!';
+                        btn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+
+                        showNotification('¡Última compra cargada con éxito! 🔄', 'success');
+
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 800);
+                    } else {
+                        throw new Error('Error al vaciar la lista actual');
+                    }
+                } else {
+                    throw new Error('Error al obtener la última compra');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+                btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+
+                showNotification('Error al cargar la última compra', 'error');
+
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+            }
+        }
+    });
+
+    // Modificar la función de marcar como comprado para guardar el historial
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', async () => {
+            const result = await showConfirmDialog(
+                '¿Compra completada?',
+                '¿Has terminado de comprar todos los productos de la lista?',
+                'Sí, marcar como comprado',
+                'Cancelar'
+            );
+
+            if (result) {
+                const originalText = markAllBtn.innerHTML;
+
+                markAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                markAllBtn.disabled = true;
+
+                try {
+                    // Primero obtenemos los items actuales
+                    const itemsRes = await fetch('/api/lista_compra');
+                    const items = await itemsRes.json();
+
+                    // Guardamos en el historial
+                    const historyRes = await fetch('/api/lista_compra/history', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            items,
+                            date: new Date().toISOString()
+                        })
+                    });
+
+                    // Luego eliminamos los items actuales
+                    await fetch('/api/lista_compra_all', { method: 'DELETE' });
+
+                    markAllBtn.innerHTML = '<i class="fas fa-check"></i> ¡Completado!';
+                    markAllBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+
+                    showNotification('¡Compra completada! 🛍️', 'success');
+
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } catch (error) {
+                    console.error('Error:', error);
+
+                    markAllBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+                    markAllBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+
+                    setTimeout(() => {
+                        markAllBtn.innerHTML = originalText;
+                        markAllBtn.style.background = '';
+                        markAllBtn.disabled = false;
+                    }, 2000);
+                }
             }
         });
     }
 </script>
 
 <style>
-/* Estilos adicionales específicos para el HTML */
-.shopping-item {
-    position: relative;
-}
+    /* Estilos adicionales específicos para el HTML */
+    .shopping-item {
+        position: relative;
+    }
 
-.item-name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 1.1rem;
-    margin-bottom: 5px;
-}
+    .item-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+    }
 
-.item-name i {
-    color: var(--accent-primary);
-}
+    .item-name i {
+        color: var(--accent-primary);
+    }
 
-.item-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
+    .item-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
 
-.edit-btn {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
-    border: none;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: var(--transition);
-    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
-    position: relative;
-    overflow: hidden;
-}
+    .edit-btn {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        border: none;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: var(--transition);
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
 
-.edit-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: all 0.6s ease;
-}
+    .edit-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: all 0.6s ease;
+    }
 
-.edit-btn:hover::before {
-    left: 100%;
-}
+    .edit-btn:hover::before {
+        left: 100%;
+    }
 
-.edit-btn:hover {
-    background: linear-gradient(135deg, #d97706, #b45309);
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
-}
+    .edit-btn:hover {
+        background: linear-gradient(135deg, #d97706, #b45309);
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+    }
 
-.list-actions {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin: 25px 0;
-}
+    .list-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin: 25px 0;
+    }
 
-.mark-completed-btn {
-    background: var(--success-color);
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 12px;
-    font-size: 1rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-    transition: var(--transition);
-    position: relative;
-    overflow: hidden;
-}
+    .mark-completed-btn {
+        background: var(--success-color);
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
 
-.mark-completed-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: all 0.6s ease;
-}
+    .mark-completed-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: all 0.6s ease;
+    }
 
-.mark-completed-btn:hover::before {
-    left: 100%;
-}
+    .mark-completed-btn:hover::before {
+        left: 100%;
+    }
 
-.mark-completed-btn:hover {
-    background: linear-gradient(135deg, #059669, #047857);
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 15px 40px rgba(16, 185, 129, 0.5);
-}
+    .mark-completed-btn:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 15px 40px rgba(16, 185, 129, 0.5);
+    }
 
-/* Modal de edición */
-.modal-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(10px);
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    transition: all 0.3s ease;
-}
+    /* Modal de edición */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        transition: all 0.3s ease;
+    }
 
-.modal-content {
-    background: var(--container-bg-light);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--border-radius);
-    width: 90%;
-    max-width: 500px;
-    box-shadow: var(--shadow-heavy);
-    transform: translateY(-20px) scale(0.95);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
+    .modal-content {
+        background: var(--container-bg-light);
+        backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--border-radius);
+        width: 90%;
+        max-width: 500px;
+        box-shadow: var(--shadow-heavy);
+        transform: translateY(-20px) scale(0.95);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
 
-.modal-content::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--lista-gradient);
-}
+    .modal-content::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--lista-gradient);
+    }
 
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 25px 30px 15px;
-    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
-}
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 25px 30px 15px;
+        border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+    }
 
-.modal-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.4rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+    .modal-header h3 {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 1.4rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
 
-.modal-header h3 i {
-    color: var(--accent-primary);
-}
+    .modal-header h3 i {
+        color: var(--accent-primary);
+    }
 
-.close-modal-btn {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 8px;
-    transition: var(--transition);
-}
+    .close-modal-btn {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 8px;
+        transition: var(--transition);
+    }
 
-.close-modal-btn:hover {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    transform: scale(1.1);
-}
+    .close-modal-btn:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        transform: scale(1.1);
+    }
 
-.form-group {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 20px;
-    padding: 0 30px;
-}
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 20px;
+        padding: 0 30px;
+    }
 
-.form-group label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
+    .form-group label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
 
-.form-group label i {
-    color: var(--accent-primary);
-    width: 16px;
-}
+    .form-group label i {
+        color: var(--accent-primary);
+        width: 16px;
+    }
 
-.form-group input {
-    padding: 12px 16px;
-    border: 2px solid rgba(99, 102, 241, 0.2);
-    border-radius: 12px;
-    font-size: 1rem;
-    transition: var(--transition);
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    color: var(--text-primary);
-}
+    .form-group input {
+        padding: 12px 16px;
+        border: 2px solid rgba(99, 102, 241, 0.2);
+        border-radius: 12px;
+        font-size: 1rem;
+        transition: var(--transition);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        color: var(--text-primary);
+    }
 
-.form-group input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    background: rgba(255, 255, 255, 0.95);
-    transform: translateY(-2px);
-}
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        transform: translateY(-2px);
+    }
 
-.form-buttons {
-    display: flex;
-    gap: 15px;
-    padding: 20px 30px 30px;
-}
+    .form-buttons {
+        display: flex;
+        gap: 15px;
+        padding: 20px 30px 30px;
+    }
 
-.form-buttons button {
-    flex: 1;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 1rem;
-    transition: var(--transition);
-    position: relative;
-    overflow: hidden;
-}
+    .form-buttons button {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 1rem;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
 
-.form-buttons button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: all 0.6s ease;
-}
+    .form-buttons button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: all 0.6s ease;
+    }
 
-.form-buttons button:hover::before {
-    left: 100%;
-}
+    .form-buttons button:hover::before {
+        left: 100%;
+    }
 
-.form-buttons button[type="submit"] {
-    background: var(--success-color);
-    color: white;
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-}
+    .form-buttons button[type="submit"] {
+        background: var(--success-color);
+        color: white;
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    }
 
-.form-buttons button[type="submit"]:hover {
-    background: linear-gradient(135deg, #059669, #047857);
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
-}
+    .form-buttons button[type="submit"]:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
+    }
 
-.cancel-btn {
-    background: rgba(107, 114, 128, 0.1);
-    color: var(--text-secondary);
-    border: 2px solid rgba(107, 114, 128, 0.2);
-}
+    .cancel-btn {
+        background: rgba(107, 114, 128, 0.1);
+        color: var(--text-secondary);
+        border: 2px solid rgba(107, 114, 128, 0.2);
+    }
 
-.cancel-btn:hover {
-    background: rgba(107, 114, 128, 0.2);
-    color: var(--text-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(107, 114, 128, 0.2);
-}
+    .cancel-btn:hover {
+        background: rgba(107, 114, 128, 0.2);
+        color: var(--text-primary);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(107, 114, 128, 0.2);
+    }
 
-/* Dialog de confirmación */
-.confirm-dialog-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(10px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1001;
-    opacity: 0;
-    transition: all 0.3s ease;
-}
+    /* Dialog de confirmación */
+    .confirm-dialog-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1001;
+        opacity: 0;
+        transition: all 0.3s ease;
+    }
 
-.confirm-dialog {
-    background: var(--container-bg-light);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--border-radius);
-    width: 90%;
-    max-width: 450px;
-    box-shadow: var(--shadow-heavy);
-    transform: translateY(-20px) scale(0.95);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
+    .confirm-dialog {
+        background: var(--container-bg-light);
+        backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--border-radius);
+        width: 90%;
+        max-width: 450px;
+        box-shadow: var(--shadow-heavy);
+        transform: translateY(-20px) scale(0.95);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
 
-.confirm-dialog::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-}
+    .confirm-dialog::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
 
-.confirm-dialog-header {
-    padding: 25px 30px 15px;
-}
+    .confirm-dialog-header {
+        padding: 25px 30px 15px;
+    }
 
-.confirm-dialog-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.4rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+    .confirm-dialog-header h3 {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 1.4rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
 
-.confirm-dialog-header i {
-    color: #f59e0b;
-}
+    .confirm-dialog-header i {
+        color: #f59e0b;
+    }
 
-.confirm-dialog-body {
-    padding: 0 30px 20px;
-}
+    .confirm-dialog-body {
+        padding: 0 30px 20px;
+    }
 
-.confirm-dialog-body p {
-    margin: 0;
-    color: var(--text-secondary);
-    line-height: 1.5;
-}
+    .confirm-dialog-body p {
+        margin: 0;
+        color: var(--text-secondary);
+        line-height: 1.5;
+    }
 
-.confirm-dialog-actions {
-    padding: 20px 30px 30px;
-    display: flex;
-    gap: 15px;
-}
+    .confirm-dialog-actions {
+        padding: 20px 30px 30px;
+        display: flex;
+        gap: 15px;
+    }
 
-.confirm-btn {
-    flex: 1;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: var(--transition);
-    position: relative;
-    overflow: hidden;
-}
+    .confirm-btn {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
 
-.confirm-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: all 0.6s ease;
-}
+    .confirm-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: all 0.6s ease;
+    }
 
-.confirm-btn:hover::before {
-    left: 100%;
-}
+    .confirm-btn:hover::before {
+        left: 100%;
+    }
 
-.confirm-primary {
-    background: var(--success-color);
-    color: white;
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-}
+    .confirm-primary {
+        background: var(--success-color);
+        color: white;
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    }
 
-.confirm-primary:hover {
-    background: linear-gradient(135deg, #059669, #047857);
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
-}
+    .confirm-primary:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
+    }
 
-.confirm-cancel {
-    background: rgba(107, 114, 128, 0.1);
-    color: var(--text-secondary);
-    border: 2px solid rgba(107, 114, 128, 0.2);
-}
+    .confirm-cancel {
+        background: rgba(107, 114, 128, 0.1);
+        color: var(--text-secondary);
+        border: 2px solid rgba(107, 114, 128, 0.2);
+    }
 
-.confirm-cancel:hover {
-    background: rgba(107, 114, 128, 0.2);
-    color: var(--text-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(107, 114, 128, 0.2);
-}
+    .confirm-cancel:hover {
+        background: rgba(107, 114, 128, 0.2);
+        color: var(--text-primary);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(107, 114, 128, 0.2);
+    }
 
-/* Notificaciones */
-.notification {
-    position: fixed;
-    top: 100px;
-    right: 30px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    padding: 15px 20px;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
-    transform: translateX(400px);
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 1002;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    max-width: 300px;
-}
+    /* Notificaciones */
+    .notification {
+        position: fixed;
+        top: 100px;
+        right: 30px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 15px 20px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+        transform: translateX(400px);
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1002;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        max-width: 300px;
+    }
 
-.notification.show {
-    transform: translateX(0);
-    opacity: 1;
-}
-
-.notification-success {
-    border-left: 4px solid #22c55e;
-    color: #15803d;
-}
-
-.notification-success i {
-    color: #22c55e;
-}
-
-.notification-error {
-    border-left: 4px solid #ef4444;
-    color: #dc2626;
-}
-
-.notification-error i {
-    color: #ef4444;
-}
-
-/* Animaciones */
-@keyframes itemSlideOut {
-    0% {
+    .notification.show {
         transform: translateX(0);
         opacity: 1;
     }
-    100% {
-        transform: translateX(100px);
-        opacity: 0;
-    }
-}
 
-@keyframes modalFadeOut {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-}
+    .notification-success {
+        border-left: 4px solid #22c55e;
+        color: #15803d;
+    }
 
-/* Tema oscuro */
-body.dark .modal-content,
-body.dark .confirm-dialog {
-    background: var(--container-bg-dark);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
+    .notification-success i {
+        color: #22c55e;
+    }
 
-body.dark .modal-header h3,
-body.dark .confirm-dialog-header h3 {
-    color: #f3f4f6;
-}
+    .notification-error {
+        border-left: 4px solid #ef4444;
+        color: #dc2626;
+    }
 
-body.dark .form-group label,
-body.dark .confirm-dialog-body p {
-    color: #f3f4f6;
-}
+    .notification-error i {
+        color: #ef4444;
+    }
 
-body.dark .form-group input {
-    background: rgba(42, 42, 42, 0.8);
-    border: 2px solid rgba(139, 92, 246, 0.3);
-    color: #f3f4f6;
-}
+    /* Animaciones */
+    @keyframes itemSlideOut {
+        0% {
+            transform: translateX(0);
+            opacity: 1;
+        }
 
-body.dark .form-group input:focus {
-    background: rgba(42, 42, 42, 0.95);
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
-}
+        100% {
+            transform: translateX(100px);
+            opacity: 0;
+        }
+    }
 
-body.dark .notification {
-    background: rgba(30, 30, 30, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
+    @keyframes modalFadeOut {
+        0% {
+            opacity: 1;
+        }
 
-body.dark .notification-success {
-    color: #4ade80;
-}
+        100% {
+            opacity: 0;
+        }
+    }
 
-body.dark .notification-error {
-    color: #f87171;
-}
+    /* Tema oscuro */
+    body.dark .modal-content,
+    body.dark .confirm-dialog {
+        background: var(--container-bg-dark);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
 
-/* Responsive mejorado */
-@media screen and (max-width: 768px) {
-    .list-actions {
-        flex-direction: column;
-        gap: 12px;
+    body.dark .modal-header h3,
+    body.dark .confirm-dialog-header h3 {
+        color: #f3f4f6;
     }
-    
-    .mark-completed-btn,
-    .clear-list-btn {
-        width: 100%;
-    }
-    
-    ul.shopping-list li {
-        flex-direction: column;
-        gap: 12px;
-    }
-    
-    .item-actions {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .edit-btn,
-    .delete-btn {
-        flex: 1;
-        text-align: center;
-        padding: 10px;
-    }
-    
-    .modal-content {
-        width: 95%;
-        margin: 20px;
-    }
-    
-    .modal-header,
-    .form-group,
-    .form-buttons {
-        padding-left: 20px;
-        padding-right: 20px;
-    }
-    
-    .form-buttons {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .confirm-dialog {
-        width: 95%;
-        margin: 20px;
-    }
-    
-    .confirm-dialog-actions {
-        flex-direction: column;
-        gap: 10px;
-    }
-}
 
-@media screen and (max-width: 480px) {
-    .add-item-form {
-        gap: 12px;
+    body.dark .form-group label,
+    body.dark .confirm-dialog-body p {
+        color: #f3f4f6;
     }
-    
-    .add-item-form input {
-        font-size: 0.95rem;
+
+    body.dark .form-group input {
+        background: rgba(42, 42, 42, 0.8);
+        border: 2px solid rgba(139, 92, 246, 0.3);
+        color: #f3f4f6;
     }
-    
-    .notification {
-        top: 90px;
-        right: 15px;
-        left: 15px;
-        max-width: none;
-        font-size: 0.9rem;
+
+    body.dark .form-group input:focus {
+        background: rgba(42, 42, 42, 0.95);
+        border-color: #8b5cf6;
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
     }
-    
-    .modal-header h3,
-    .confirm-dialog-header h3 {
-        font-size: 1.2rem;
+
+    body.dark .notification {
+        background: rgba(30, 30, 30, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
-    .form-group input {
-        font-size: 0.95rem;
+
+    body.dark .notification-success {
+        color: #4ade80;
     }
-    
-    .item-name {
+
+    body.dark .notification-error {
+        color: #f87171;
+    }
+
+    /* Responsive mejorado */
+    @media screen and (max-width: 768px) {
+        .list-actions {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .mark-completed-btn,
+        .clear-list-btn {
+            width: 100%;
+        }
+
+        ul.shopping-list li {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .item-actions {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .edit-btn,
+        .delete-btn {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .modal-content {
+            width: 95%;
+            margin: 20px;
+        }
+
+        .modal-header,
+        .form-group,
+        .form-buttons {
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+
+        .form-buttons {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .confirm-dialog {
+            width: 95%;
+            margin: 20px;
+        }
+
+        .confirm-dialog-actions {
+            flex-direction: column;
+            gap: 10px;
+        }
+    }
+
+    @media screen and (max-width: 480px) {
+        .add-item-form {
+            gap: 12px;
+        }
+
+        .add-item-form input {
+            font-size: 0.95rem;
+        }
+
+        .notification {
+            top: 90px;
+            right: 15px;
+            left: 15px;
+            max-width: none;
+            font-size: 0.9rem;
+        }
+
+        .modal-header h3,
+        .confirm-dialog-header h3 {
+            font-size: 1.2rem;
+        }
+
+        .form-group input {
+            font-size: 0.95rem;
+        }
+
+        .item-name {
+            font-size: 1rem;
+        }
+
+        .item-qty {
+            font-size: 0.85rem;
+        }
+    }
+
+    /* Estilo para el botón de repetir compra */
+    .repeat-purchase-btn {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 12px;
         font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
     }
-    
-    .item-qty {
-        font-size: 0.85rem;
+
+    .repeat-purchase-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: all 0.6s ease;
     }
-}
+
+    .repeat-purchase-btn:hover::before {
+        left: 100%;
+    }
+
+    .repeat-purchase-btn:hover {
+        background: linear-gradient(135deg, #4f46e5, #4338ca);
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 15px 40px rgba(99, 102, 241, 0.5);
+    }
+
+    /* Ajustes para los botones en móvil */
+    @media screen and (max-width: 768px) {
+        .list-actions {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .mark-completed-btn,
+        .repeat-purchase-btn,
+        .clear-list-btn {
+            width: 100%;
+        }
+    }
 </style>
 {% endblock %}

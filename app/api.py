@@ -458,6 +458,37 @@ def get_user_profile(nombre):
     except Exception as e:
         logger.error(f"Error get_user_profile: {e}")
         return jsonify({"error": "Error al obtener perfil"}), 500
+    
+@api.route('/api/lista_compra/last_purchase', methods=['GET'])
+@login_required
+def get_last_purchase():
+    """Obtener los productos de la última compra marcada como completada"""
+    try:
+        # Buscar en el historial la última compra completada
+        last_purchase = mongo.db.completed_shopping.find_one(
+            {},
+            sort=[("completed_at", -1)]
+        )
+        
+        if not last_purchase:
+            return jsonify({
+                "success": False,
+                "error": "No se encontraron compras anteriores",
+                "items": []
+            }), 404
+            
+        return jsonify({
+            "success": True,
+            "items": last_purchase.get("items", []),
+            "completed_at": last_purchase.get("completed_at")
+        })
+        
+    except Exception as e:
+        logger.error(f"Error get_last_purchase: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Error al obtener última compra"
+        }), 500
 
 
 # ===================================================
@@ -1154,3 +1185,55 @@ def add_mercadona_to_list():
     except Exception as e:
         logger.error(f"Error add_mercadona_to_list: {e}")
         return jsonify({'error': 'Error al añadir producto a la lista'}), 500
+    
+@api.route('/api/lista_compra/history', methods=['POST'])
+@login_required
+def save_shopping_history():
+    """Guardar la lista de compra actual en el historial"""
+    try:
+        data = request.get_json()
+        items = data.get('items', [])
+        
+        if not items:
+            return jsonify({"error": "Lista vacía"}), 400
+            
+        history_entry = {
+            "items": items,
+            "completed_by": session.get('user'),
+            "completed_at": datetime.now()
+        }
+        
+        result = mongo.db.completed_shopping.insert_one(history_entry)
+        
+        return jsonify({
+            "success": True,
+            "inserted_id": str(result.inserted_id)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error save_shopping_history: {e}")
+        return jsonify({"error": "Error al guardar historial"}), 500
+    
+@api.route('/api/lista_compra/mark_completed', methods=['POST'])
+def mark_completed():
+    try:
+        # Primero obtener todos los items actuales
+        current_items = list(db.lista_compra.find({}, {'_id': 0}))
+        
+        if not current_items:
+            return jsonify({'error': 'La lista está vacía'}), 400
+        
+        # Guardar en el historial
+        history_record = {
+            'items': current_items,
+            'date': datetime.now().isoformat()
+        }
+        db.purchase_history.insert_one(history_record)
+        
+        # Luego vaciar la lista actual
+        db.lista_compra.delete_many({})
+        
+        return jsonify({'message': 'Lista marcada como comprada y guardada en historial'}), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

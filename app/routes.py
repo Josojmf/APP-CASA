@@ -2517,7 +2517,9 @@ def add_shopping_item():
         return jsonify({"error": "Datos inválidos"}), 400
     except Exception as e:
         logger.error(f"Error add_shopping_item: {e}")
-        return jsonify({"error": "Error al añadir producto"}), 500       
+        return jsonify({"error": "Error al añadir producto"}), 500     
+    
+  
 
 
 # ==========================================
