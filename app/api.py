@@ -1473,16 +1473,12 @@ def export_full_stats():
             # --- Archivo de tareas ---
             tasks_csv = StringIO()
             writer = csv.writer(tasks_csv)
-            writer.writerow(['Nombre', 'Fecha Completado', 'Completado Por'])
+            writer.writerow(['Nombre', 'Completado Por'])
             for task in tasks:
-                completion_date = task.get('completion_date', '')
-                if isinstance(completion_date, datetime):
-                    completion_date = completion_date.strftime('%Y-%m-%d')
-                writer.writerow([
-                    task.get('task_name', ''),
-                    completion_date,
-                    task.get('completed_by', '')
-                ])
+                # solo titulo y usuario
+                task_name = task.get('titulo', 'Desconocido')
+                completed_by = task.get('usuario', 'Desconocido')
+                writer.writerow([task_name, completed_by])
             zip_file.writestr('tareas_completadas.csv', tasks_csv.getvalue())
 
             # --- Archivo de compras ---
