@@ -68,36 +68,157 @@
 
 {% block extra_js %}
 <script>
-    // Variables globales
+    // ===== VARIABLES GLOBALES =====
     let planes = [];
+    
+    // Variables para drag & drop tradicional (escritorio)
     let draggedElement = null;
     let draggedId = null;
+    
+    // Variables para drag & drop táctil (móvil)
+    let touchStartY = 0;
+    let touchCurrentY = 0;
+    let touchOffset = { x: 0, y: 0 };
+    let dragPreview = null;
+    let isDragging = false;
+    let dropTargets = [];
 
-    // Cargar planes al iniciar
+    // ===== DETECCIÓN DE DISPOSITIVO =====
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               ('ontouchstart' in window) || 
+               (navigator.maxTouchPoints > 0);
+    }
+
+    // ===== INICIALIZACIÓN =====
     document.addEventListener('DOMContentLoaded', async () => {
         console.log('🚀 Inicializando planes...');
+        console.log('📱 Dispositivo móvil:', isMobileDevice());
+        
+        // Añadir estilos específicos para móvil
+        if (isMobileDevice()) {
+            addMobileStyles();
+        }
+        
         await loadPlanes();
         setupEventListeners();
     });
 
-    // Configurar event listeners
+    // ===== ESTILOS DINÁMICOS PARA MÓVIL =====
+    function addMobileStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .plan-card.touch-dragging {
+                opacity: 0.3 !important;
+                transform: scale(0.95);
+                transition: transform 0.2s ease;
+            }
+
+            .plan-card.dragging {
+                cursor: grabbing;
+                z-index: 1000;
+            }
+
+            .drag-preview {
+                background: var(--plan-bg, #fff);
+                border-radius: 12px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.3) !important;
+                border: 2px solid #3b82f6 !important;
+            }
+
+            .plan-card.drop-target {
+                transform: translateY(-3px);
+                box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4) !important;
+                border: 2px solid #3b82f6;
+                background: rgba(59, 130, 246, 0.05);
+                transition: all 0.2s ease;
+            }
+
+            .plan-card.drop-before::before {
+                content: '';
+                position: absolute;
+                top: -6px;
+                left: 10px;
+                right: 10px;
+                height: 4px;
+                background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+                border-radius: 2px;
+                z-index: 1000;
+                box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
+            }
+
+            .plan-card.drop-after::after {
+                content: '';
+                position: absolute;
+                bottom: -6px;
+                left: 10px;
+                right: 10px;
+                height: 4px;
+                background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+                border-radius: 2px;
+                z-index: 1000;
+                box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
+            }
+
+            .plan-card.drop-success {
+                animation: dropSuccess 0.8s ease-out;
+            }
+
+            @keyframes dropSuccess {
+                0% { 
+                    transform: scale(1); 
+                    background-color: transparent;
+                }
+                30% { 
+                    transform: scale(1.02); 
+                    background-color: rgba(16, 185, 129, 0.1);
+                    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+                }
+                100% { 
+                    transform: scale(1); 
+                    background-color: transparent;
+                }
+            }
+
+            .plan-card {
+                padding-right: 60px;
+            }
+            
+            .plan-card::after {
+                content: '⋮⋮';
+                position: absolute;
+                right: 15px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #9ca3af;
+                font-size: 20px;
+                line-height: 1;
+                letter-spacing: -3px;
+                opacity: 0.6;
+                pointer-events: none;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // ===== EVENT LISTENERS =====
     function setupEventListeners() {
         // Botón añadir plan
         document.getElementById('addPlanBtn').addEventListener('click', openPlanModal);
-
+        
         // Botón cancelar modal
         document.getElementById('cancelPlanBtn').addEventListener('click', closePlanModal);
-
+        
         // Formulario de nuevo plan
         document.getElementById('planForm').addEventListener('submit', handlePlanSubmit);
-
+        
         // Cerrar modal con ESC
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closePlanModal();
             }
         });
-
+        
         // Click fuera del modal para cerrar
         document.getElementById('overlayPlan').addEventListener('click', (e) => {
             if (e.target.id === 'overlayPlan') {
@@ -106,12 +227,12 @@
         });
     }
 
-    // Cargar planes desde la API
+    // ===== CARGAR PLANES =====
     async function loadPlanes() {
         try {
             console.log('📥 Cargando planes...');
             const response = await fetch('/api/planes');
-
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -122,7 +243,7 @@
         } catch (error) {
             console.error('❌ Error cargando planes:', error);
             showToast('⚠️ Error al cargar planes: ' + error.message, 'error');
-
+            
             // Mostrar mensaje de error en el contenedor
             const container = document.getElementById('planesList');
             container.innerHTML = `
@@ -138,7 +259,7 @@
         }
     }
 
-    // Renderizar la lista de planes
+    // ===== RENDERIZAR PLANES =====
     function renderPlanes() {
         const container = document.getElementById('planesList');
         container.innerHTML = '';
@@ -159,8 +280,12 @@
             planElement.className = `plan-card priority-${plan.prioridad}`;
             planElement.dataset.id = plan._id || plan.id;
             planElement.dataset.order = index;
-            planElement.draggable = true;
-
+            
+            // Solo hacer draggable en escritorio
+            if (!isMobileDevice()) {
+                planElement.draggable = true;
+            }
+            
             planElement.innerHTML = `
                 <div class="plan-content">
                     <h3>${escapeHtml(plan.titulo)}</h3>
@@ -183,7 +308,7 @@
                     </button>
                 </div>
             `;
-
+            
             container.appendChild(planElement);
         });
 
@@ -191,39 +316,312 @@
         setupDragAndDrop();
     }
 
-    // Configurar drag and drop mejorado
+    // ===== CONFIGURAR DRAG AND DROP =====
     function setupDragAndDrop() {
         const container = document.getElementById('planesList');
         const cards = container.querySelectorAll('.plan-card');
 
         cards.forEach(card => {
-            // Eventos de drag
-            card.addEventListener('dragstart', handleDragStart);
-            card.addEventListener('dragend', handleDragEnd);
-
-            // Eventos de drop
-            card.addEventListener('dragover', handleDragOver);
-            card.addEventListener('dragenter', handleDragEnter);
-            card.addEventListener('dragleave', handleDragLeave);
-            card.addEventListener('drop', handleDrop);
+            if (isMobileDevice()) {
+                // Eventos táctiles para móviles
+                setupTouchEvents(card);
+            } else {
+                // Eventos de mouse para escritorio
+                setupMouseEvents(card);
+            }
         });
 
-        // También permitir drop en el contenedor vacío
-        container.addEventListener('dragover', handleDragOver);
-        container.addEventListener('drop', handleDrop);
+        // También permitir drop en el contenedor para escritorio
+        if (!isMobileDevice()) {
+            container.addEventListener('dragover', handleDragOver);
+            container.addEventListener('drop', handleDropMouse);
+        }
     }
 
+    // ===== EVENTOS TÁCTILES PARA MÓVILES =====
+    function setupTouchEvents(card) {
+        let longPressTimer;
+        let hasMoved = false;
+        let startPos = { x: 0, y: 0 };
+
+        // Touch start - iniciar posible drag
+        card.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            startPos = { x: touch.clientX, y: touch.clientY };
+            hasMoved = false;
+
+            // Long press para iniciar drag (600ms)
+            longPressTimer = setTimeout(() => {
+                if (!hasMoved) {
+                    startTouchDrag(e, card);
+                }
+            }, 600);
+
+            // Prevenir scroll mientras se evalúa el long press
+            e.preventDefault();
+        }, { passive: false });
+
+        // Touch move - detectar movimiento
+        card.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const deltaX = Math.abs(touch.clientX - startPos.x);
+            const deltaY = Math.abs(touch.clientY - startPos.y);
+
+            // Si se mueve más de 10px, cancelar long press
+            if (deltaX > 10 || deltaY > 10) {
+                hasMoved = true;
+                clearTimeout(longPressTimer);
+            }
+
+            // Si ya está en modo drag, mover el elemento
+            if (isDragging && draggedElement === card) {
+                handleTouchMove(e);
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Touch end - finalizar drag
+        card.addEventListener('touchend', (e) => {
+            clearTimeout(longPressTimer);
+            
+            if (isDragging && draggedElement === card) {
+                handleTouchEnd(e);
+            }
+        });
+    }
+
+    // ===== INICIAR DRAG TÁCTIL =====
+    function startTouchDrag(e, card) {
+        e.preventDefault();
+        
+        draggedElement = card;
+        draggedId = card.dataset.id;
+        isDragging = true;
+
+        console.log('🔄 Iniciando drag táctil:', draggedId);
+
+        // Vibración de feedback (si está disponible)
+        if (navigator.vibrate) {
+            navigator.vibrate(100);
+        }
+
+        // Crear preview del elemento siendo arrastrado
+        createDragPreview(card, e.touches[0]);
+
+        // Añadir clase visual
+        card.classList.add('dragging', 'touch-dragging');
+
+        // Hacer otros elementos semi-transparentes
+        document.querySelectorAll('.plan-card:not(.dragging)').forEach(otherCard => {
+            otherCard.style.opacity = '0.5';
+        });
+
+        // Calcular offset desde el punto de toque
+        const rect = card.getBoundingClientRect();
+        const touch = e.touches[0];
+        touchOffset = {
+            x: touch.clientX - rect.left,
+            y: touch.clientY - rect.top
+        };
+
+        // Actualizar targets de drop
+        updateDropTargets();
+    }
+
+    // ===== CREAR PREVIEW VISUAL =====
+    function createDragPreview(card, touch) {
+        dragPreview = card.cloneNode(true);
+        dragPreview.classList.add('drag-preview');
+        dragPreview.style.cssText = `
+            position: fixed;
+            top: ${touch.clientY - touchOffset.y}px;
+            left: ${touch.clientX - touchOffset.x}px;
+            width: ${card.offsetWidth}px;
+            pointer-events: none;
+            z-index: 10000;
+            opacity: 0.9;
+            transform: rotate(3deg) scale(1.05);
+            transition: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 2px solid #3b82f6;
+        `;
+        
+        document.body.appendChild(dragPreview);
+    }
+
+    // ===== MANEJAR MOVIMIENTO TÁCTIL =====
+    function handleTouchMove(e) {
+        if (!isDragging || !dragPreview) return;
+
+        const touch = e.touches[0];
+        
+        // Mover el preview
+        dragPreview.style.left = `${touch.clientX - touchOffset.x}px`;
+        dragPreview.style.top = `${touch.clientY - touchOffset.y}px`;
+
+        // Encontrar elemento bajo el dedo
+        const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        const dropTarget = elementBelow?.closest('.plan-card');
+
+        // Limpiar highlights previos
+        document.querySelectorAll('.plan-card').forEach(card => {
+            card.classList.remove('drag-over', 'drop-target', 'drop-before', 'drop-after');
+        });
+
+        // Highlight del target actual
+        if (dropTarget && dropTarget !== draggedElement) {
+            dropTarget.classList.add('drag-over', 'drop-target');
+            
+            // Determinar si insertar antes o después
+            const rect = dropTarget.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            
+            if (touch.clientY < midY) {
+                dropTarget.classList.add('drop-before');
+            } else {
+                dropTarget.classList.add('drop-after');
+            }
+        }
+    }
+
+    // ===== FINALIZAR DRAG TÁCTIL =====
+    async function handleTouchEnd(e) {
+        if (!isDragging) return;
+
+        console.log('✋ Finalizando drag táctil');
+
+        // Vibración de finalización
+        if (navigator.vibrate) {
+            navigator.vibrate([50, 30, 50]);
+        }
+
+        try {
+            // Encontrar el target de drop
+            const changedTouch = e.changedTouches[0];
+            const elementBelow = document.elementFromPoint(changedTouch.clientX, changedTouch.clientY);
+            const dropTarget = elementBelow?.closest('.plan-card');
+
+            if (dropTarget && dropTarget !== draggedElement) {
+                console.log('📍 Drop táctil en:', dropTarget.dataset.id);
+                await performDrop(draggedElement, dropTarget, changedTouch);
+            } else {
+                console.log('❌ Drop táctil cancelado - no hay target válido');
+                showToast('⚠️ Drag cancelado', 'info');
+            }
+
+        } catch (error) {
+            console.error('❌ Error en drop táctil:', error);
+            showToast('⚠️ Error al reordenar', 'error');
+        } finally {
+            cleanupTouchDrag();
+        }
+    }
+
+    // ===== REALIZAR DROP (COMÚN) =====
+    async function performDrop(draggedEl, dropTarget, position) {
+        try {
+            const container = document.getElementById('planesList');
+            const allCards = Array.from(container.querySelectorAll('.plan-card'));
+            
+            const draggedIndex = allCards.indexOf(draggedEl);
+            const targetIndex = allCards.indexOf(dropTarget);
+            
+            console.log(`🔄 Moviendo de posición ${draggedIndex} a ${targetIndex}`);
+            
+            if (draggedIndex === -1 || targetIndex === -1) {
+                throw new Error('Índices inválidos para drag/drop');
+            }
+            
+            // Determinar posición de inserción
+            let insertBefore = null;
+            
+            if (position && position.clientY) {
+                const rect = dropTarget.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                insertBefore = position.clientY < midY;
+            } else {
+                insertBefore = draggedIndex > targetIndex;
+            }
+            
+            // Mover en el DOM
+            if (insertBefore) {
+                container.insertBefore(draggedEl, dropTarget);
+            } else {
+                container.insertBefore(draggedEl, dropTarget.nextSibling);
+            }
+            
+            // Actualizar orden en servidor
+            await updatePlanOrder();
+            
+            // Feedback visual de éxito
+            draggedEl.classList.add('drop-success');
+            setTimeout(() => {
+                if (draggedEl?.classList) {
+                    draggedEl.classList.remove('drop-success');
+                }
+            }, 1000);
+            
+            showToast('✅ Orden actualizado correctamente', 'success');
+            
+        } catch (error) {
+            console.error('❌ Error realizando drop:', error);
+            showToast('⚠️ Error al reordenar: ' + error.message, 'error');
+            await loadPlanes(); // Recargar en caso de error
+        }
+    }
+
+    // ===== LIMPIAR DRAG TÁCTIL =====
+    function cleanupTouchDrag() {
+        // Remover preview
+        if (dragPreview) {
+            dragPreview.remove();
+            dragPreview = null;
+        }
+
+        // Limpiar clases y estilos
+        document.querySelectorAll('.plan-card').forEach(card => {
+            card.style.opacity = '1';
+            card.classList.remove(
+                'dragging', 'touch-dragging', 'drag-over', 
+                'drop-target', 'drop-before', 'drop-after'
+            );
+        });
+
+        // Reset variables
+        isDragging = false;
+        draggedElement = null;
+        draggedId = null;
+        touchOffset = { x: 0, y: 0 };
+        dropTargets = [];
+    }
+
+    // ===== ACTUALIZAR TARGETS DE DROP =====
+    function updateDropTargets() {
+        dropTargets = Array.from(document.querySelectorAll('.plan-card'))
+            .filter(card => card !== draggedElement);
+    }
+
+    // ===== EVENTOS DE MOUSE PARA ESCRITORIO =====
+    function setupMouseEvents(card) {
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('dragenter', handleDragEnter);
+        card.addEventListener('dragleave', handleDragLeave);
+        card.addEventListener('drop', handleDropMouse);
+    }
+
+    // ===== DRAG START PARA MOUSE =====
     function handleDragStart(e) {
         draggedElement = e.currentTarget;
         draggedId = e.currentTarget.dataset.id;
-
+        
         e.currentTarget.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
-
-        console.log('🔄 Arrastrando plan:', draggedId);
-
-        // Hacer que otros elementos sean más transparentes
+        
+        console.log('🔄 Arrastrando plan (mouse):', draggedId);
+        
         setTimeout(() => {
             document.querySelectorAll('.plan-card:not(.dragging)').forEach(card => {
                 card.style.opacity = '0.5';
@@ -231,29 +629,42 @@
         }, 0);
     }
 
-    function handleDragEnd(e) {
-        console.log('✋ Fin del arrastre');
-
-        // Safely remove classes
-        if (e.currentTarget && e.currentTarget.classList) {
-            e.currentTarget.classList.remove('dragging');
+    // ===== DROP PARA MOUSE =====
+    async function handleDropMouse(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const dropTarget = e.currentTarget;
+        dropTarget.classList.remove('drag-over', 'drop-target');
+        
+        if (!draggedElement || dropTarget === draggedElement) {
+            return false;
         }
 
-        // Restaurar opacidad para todos los elementos
+        await performDrop(draggedElement, dropTarget, { clientY: e.clientY });
+        return false;
+    }
+
+    // ===== DRAG END PARA MOUSE =====
+    function handleDragEnd(e) {
+        console.log('✋ Fin del arrastre (mouse)');
+        
+        if (e.currentTarget?.classList) {
+            e.currentTarget.classList.remove('dragging');
+        }
+        
         document.querySelectorAll('.plan-card').forEach(card => {
-            if (card.style) {
-                card.style.opacity = '1';
-            }
+            if (card.style) card.style.opacity = '1';
             if (card.classList) {
                 card.classList.remove('drag-over', 'drop-target');
             }
         });
-
-        // Reset global variables
+        
         draggedElement = null;
         draggedId = null;
     }
 
+    // ===== EVENTOS DE DRAG (SIN CAMBIOS) =====
     function handleDragOver(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
@@ -267,81 +678,12 @@
     }
 
     function handleDragLeave(e) {
-        if (e.currentTarget && e.currentTarget.classList) {
+        if (e.currentTarget?.classList) {
             e.currentTarget.classList.remove('drag-over');
         }
     }
 
-    // Fixed handleDrop function and related drag/drop code for planes.html
-
-    // Replace the existing handleDrop function with this corrected version:
-    async function handleDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const dropTarget = e.currentTarget;
-        dropTarget.classList.remove('drag-over', 'drop-target');
-
-        // Check if we have valid dragged element and it's not dropping on itself
-        if (!draggedElement || !draggedId || dropTarget === draggedElement) {
-            return false;
-        }
-
-        console.log('📍 Drop en:', dropTarget.dataset.id);
-
-        try {
-            // Store reference to dragged element before it might be modified
-            const draggedRef = draggedElement;
-
-            // Obtener todos los elementos del contenedor
-            const container = document.getElementById('planesList');
-            const allCards = Array.from(container.querySelectorAll('.plan-card'));
-
-            // Encontrar las posiciones
-            const draggedIndex = allCards.indexOf(draggedElement);
-            const targetIndex = allCards.indexOf(dropTarget);
-
-            console.log(`🔄 Moviendo de posición ${draggedIndex} a ${targetIndex}`);
-
-            // Only proceed if we have valid indices
-            if (draggedIndex === -1 || targetIndex === -1) {
-                console.warn('⚠️ Índices inválidos para drag/drop');
-                return false;
-            }
-
-            // Mover en el DOM
-            if (draggedIndex < targetIndex) {
-                container.insertBefore(draggedElement, dropTarget.nextSibling);
-            } else {
-                container.insertBefore(draggedElement, dropTarget);
-            }
-
-            // Actualizar el orden en el servidor
-            await updatePlanOrder();
-
-            // Feedback visual - check if element still exists
-            if (draggedRef && draggedRef.classList) {
-                draggedRef.classList.add('drop-success');
-                setTimeout(() => {
-                    if (draggedRef && draggedRef.classList) {
-                        draggedRef.classList.remove('drop-success');
-                    }
-                }, 1000);
-            }
-
-            showToast('✅ Orden actualizado correctamente', 'success');
-
-        } catch (error) {
-            console.error('❌ Error en drop:', error);
-            showToast('⚠️ Error al reordenar: ' + error.message, 'error');
-            // Recargar para restaurar el orden original
-            await loadPlanes();
-        }
-
-        return false;
-    }
-
-    // Actualizar orden de planes en el servidor
+    // ===== ACTUALIZAR ORDEN EN SERVIDOR =====
     async function updatePlanOrder() {
         try {
             const container = document.getElementById('planesList');
@@ -397,65 +739,65 @@
         }
     }
 
-    // Eliminar plan
+    // ===== ELIMINAR PLAN =====
     async function deletePlan(planId) {
         if (!planId) {
             showToast('⚠️ ID de plan no válido', 'error');
             return;
         }
-
+        
         if (!confirm('¿Estás seguro de que quieres eliminar este plan?')) {
             return;
         }
 
         try {
             console.log('🗑️ Eliminando plan:', planId);
-
-            const response = await fetch(`/api/planes/${planId}`, {
-                method: 'DELETE'
+            
+            const response = await fetch(`/api/planes/${planId}`, { 
+                method: 'DELETE' 
             });
-
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             await loadPlanes();
             showToast('🗑️ Plan eliminado correctamente', 'success');
-
+            
         } catch (error) {
             console.error('❌ Error eliminando plan:', error);
             showToast('⚠️ Error al eliminar: ' + error.message, 'error');
         }
     }
 
-    // Mover plan al top
+    // ===== MOVER PLAN AL TOP =====
     async function movePlanToTop(planId) {
         if (!planId) {
             showToast('⚠️ ID de plan no válido', 'error');
             return;
         }
-
+        
         try {
             console.log('⬆️ Moviendo plan al top:', planId);
-
-            const response = await fetch(`/api/planes/${planId}/top`, {
-                method: 'PUT'
+            
+            const response = await fetch(`/api/planes/${planId}/top`, { 
+                method: 'PUT' 
             });
-
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             await loadPlanes();
             showToast('⬆️ Plan movido al inicio', 'success');
-
+            
         } catch (error) {
             console.error('❌ Error moviendo plan:', error);
             showToast('⚠️ Error al mover: ' + error.message, 'error');
         }
     }
 
-    // Manejar envío del formulario
+    // ===== MANEJAR ENVÍO DE FORMULARIO =====
     async function handlePlanSubmit(e) {
         e.preventDefault();
 
@@ -477,7 +819,7 @@
 
         try {
             console.log('📤 Creando nuevo plan:', { titulo, descripcion, prioridad });
-
+            
             const response = await fetch('/api/planes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -499,7 +841,7 @@
             closePlanModal();
             await loadPlanes();
             showToast('✅ Plan añadido correctamente', 'success');
-
+            
         } catch (error) {
             console.error('❌ Error creando plan:', error);
             showToast('⚠️ Error al guardar: ' + error.message, 'error');
@@ -509,7 +851,7 @@
         }
     }
 
-    // Abrir modal de nuevo plan
+    // ===== MODAL =====
     function openPlanModal() {
         document.getElementById('overlayPlan').style.display = 'flex';
         document.body.style.overflow = 'hidden';
@@ -518,14 +860,13 @@
         }, 100);
     }
 
-    // Cerrar modal
     function closePlanModal() {
         document.getElementById('overlayPlan').style.display = 'none';
         document.body.style.overflow = 'auto';
         document.getElementById('planForm').reset();
     }
 
-    // Funciones auxiliares
+    // ===== FUNCIONES AUXILIARES =====
     function getPriorityIcon(priority) {
         switch (parseInt(priority)) {
             case 1: return '🔴';
@@ -565,7 +906,7 @@
         return div.innerHTML;
     }
 
-    // Sistema de notificaciones mejorado
+    // ===== SISTEMA DE NOTIFICACIONES =====
     function showToast(message, type = 'info') {
         const container = document.getElementById('toast-container');
         if (!container) {
@@ -587,7 +928,7 @@
             max-width: 300px;
             word-wrap: break-word;
         `;
-
+        
         toast.innerHTML = `
             <div style="display: flex; align-items: center; gap: 8px;">
                 <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
@@ -613,10 +954,7 @@
         }, 4000);
     }
 
-    // Hacer funciones globales para los onclick
+    // ===== FUNCIONES GLOBALES =====
     window.deletePlan = deletePlan;
     window.movePlanToTop = movePlanToTop;
     window.loadPlanes = loadPlanes;
-
-</script>
-{% endblock %}

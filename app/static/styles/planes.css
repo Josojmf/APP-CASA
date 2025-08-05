@@ -1,4 +1,4 @@
-/* Estilos base para planes */
+/* ===== VARIABLES CSS ===== */
 :root {
     --plan-high: #ef4444;
     --plan-medium: #f59e0b;
@@ -13,14 +13,14 @@
     --accent-primary: #4CAF50;
 }
 
-/* Contenedor principal */
+/* ===== CONTENEDOR PRINCIPAL ===== */
 .planes-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
 }
 
-/* Lista de planes */
+/* ===== LISTA DE PLANES ===== */
 .planes-list {
     display: flex;
     flex-direction: column;
@@ -28,7 +28,7 @@
     position: relative;
 }
 
-/* Tarjeta de plan */
+/* ===== TARJETA DE PLAN ===== */
 .plan-card {
     background: var(--plan-bg);
     border-radius: 12px;
@@ -43,6 +43,9 @@
     border-left: 5px solid var(--plan-medium);
     cursor: grab;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none; /* Importante: previene scroll durante drag */
 }
 
 .plan-card::before {
@@ -70,7 +73,7 @@
     cursor: grabbing;
 }
 
-/* Prioridades */
+/* ===== PRIORIDADES ===== */
 .plan-card.priority-1 {
     border-left-color: var(--plan-high);
 }
@@ -83,7 +86,7 @@
     border-left-color: var(--plan-low);
 }
 
-/* Contenido del plan */
+/* ===== CONTENIDO DEL PLAN ===== */
 .plan-content {
     flex: 1;
     min-width: 0;
@@ -128,191 +131,7 @@
     font-weight: 600;
 }
 
-/* Acciones del plan */
-.plan-actions {
-    display: flex;
-    gap: 10px;
-    margin-left: 15px;
-    opacity: 0;
-    transition: var(--transition);
-}
-
-.plan-card:hover .plan-actions {
-    opacity: 1;
-}
-
-.plan-delete, .plan-top {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.plan-delete {
-    background: rgba(239, 68, 68, 0.1);
-    color: var(--plan-high);
-}
-
-.plan-top {
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--plan-low);
-}
-
-.plan-delete:hover {
-    background: var(--plan-high);
-    color: white;
-    transform: scale(1.1);
-}
-
-.plan-top:hover {
-    background: var(--plan-low);
-    color: white;
-    transform: scale(1.1);
-}
-
-/* Sin planes */
-.no-plans {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-secondary);
-    font-style: italic;
-    background: rgba(16, 185, 129, 0.05);
-    border-radius: 12px;
-    border: 1px dashed rgba(16, 185, 129, 0.3);
-}
-
-.no-plans i {
-    font-size: 2rem;
-    color: var(--plan-low);
-    margin-bottom: 10px;
-    display: block;
-}
-
-/* Efectos de drag & drop */
-.plan-card.dragging {
-    opacity: 0.5;
-    transform: scale(1.02);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    background: white;
-}
-
-.plan-card.invisible {
-    opacity: 0;
-}
-
-.plan-card.drop-target {
-    box-shadow: 0 0 0 2px var(--accent-primary);
-    position: relative;
-}
-
-.plan-card.drop-target::after {
-    content: '';
-    position: absolute;
-    top: -5px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background-color: var(--accent-primary);
-}
-
-.plan-card.drop-success {
-    animation: pulseSuccess 1s ease;
-}
-
-@keyframes pulseSuccess {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-
-/* Indicador de drop */
-.drop-indicator {
-    height: 2px;
-    background-color: var(--accent-primary);
-    margin: 5px 0;
-    display: none;
-}
-
-.planes-list.drag-over .drop-indicator {
-    display: block;
-}
-
-/* Tema oscuro */
-body.dark {
-    --plan-bg: rgba(30, 30, 30, 0.95);
-    --plan-border: rgba(255, 255, 255, 0.1);
-    --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-}
-
-body.dark .no-plans {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px dashed rgba(16, 185, 129, 0.4);
-}
-
-body.dark .plan-card.dragging {
-    background: #2d3748;
-}
-
-/* Responsive */
-@media (max-width: 600px) {
-    .planes-container {
-        padding: 15px;
-    }
-    
-    .plan-card {
-        padding: 15px;
-    }
-    
-    .plan-actions {
-        opacity: 1; /* Mostrar siempre en móvil */
-    }
-}
-
-/* AÑADIR estos estilos al final de planes.css */
-
-/* Efectos de drag & drop mejorados */
-.plan-card.dragging {
-    opacity: 0.8;
-    transform: scale(1.05) rotate(2deg);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
-    background: white;
-    z-index: 1000;
-    position: relative;
-}
-
-.plan-card.drag-over {
-    border: 2px dashed var(--accent-primary);
-    background: rgba(76, 175, 80, 0.1);
-    transform: scale(1.02);
-}
-
-.plan-card.drop-success {
-    animation: dropSuccess 0.6s ease-out;
-}
-
-@keyframes dropSuccess {
-    0% { 
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
-    }
-    50% { 
-        transform: scale(1.05);
-        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0.3);
-    }
-    100% { 
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
-    }
-}
-
-/* Botones de acción mejorados */
+/* ===== ACCIONES DEL PLAN ===== */
 .plan-actions {
     display: flex;
     gap: 8px;
@@ -366,7 +185,109 @@ body.dark .plan-card.dragging {
     transform: scale(0.95);
 }
 
-/* Overlay del modal */
+/* ===== SIN PLANES ===== */
+.no-plans {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-style: italic;
+    background: rgba(16, 185, 129, 0.05);
+    border-radius: 12px;
+    border: 1px dashed rgba(16, 185, 129, 0.3);
+}
+
+.no-plans i {
+    font-size: 2rem;
+    color: var(--plan-low);
+    margin-bottom: 10px;
+    display: block;
+}
+
+/* ===== EFECTOS DE DRAG & DROP ESCRITORIO ===== */
+.plan-card.dragging {
+    opacity: 0.8;
+    transform: scale(1.05) rotate(2deg);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+    background: white;
+    z-index: 1000;
+    position: relative;
+    cursor: grabbing;
+}
+
+.plan-card.drag-over {
+    border: 2px dashed var(--accent-primary);
+    background: rgba(76, 175, 80, 0.1);
+    transform: scale(1.02);
+}
+
+.plan-card.drop-success {
+    animation: dropSuccess 0.6s ease-out;
+}
+
+@keyframes dropSuccess {
+    0% { 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0.3);
+    }
+    100% { 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+/* ===== EFECTOS ESPECÍFICOS PARA MÓVIL ===== */
+.plan-card.touch-dragging {
+    opacity: 0.3 !important;
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+}
+
+.drag-preview {
+    background: var(--plan-bg, #fff);
+    border-radius: 12px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.3) !important;
+    border: 2px solid #3b82f6 !important;
+}
+
+.plan-card.drop-target {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4) !important;
+    border: 2px solid #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+    transition: all 0.2s ease;
+}
+
+.plan-card.drop-before::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 10px;
+    right: 10px;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    border-radius: 2px;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
+}
+
+.plan-card.drop-after::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 10px;
+    right: 10px;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    border-radius: 2px;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.5);
+}
+
+/* ===== OVERLAY DEL MODAL ===== */
 .overlay {
     display: none;
     position: fixed;
@@ -404,7 +325,7 @@ body.dark .plan-card.dragging {
     }
 }
 
-/* Formulario */
+/* ===== FORMULARIO ===== */
 .form-group {
     margin-bottom: 20px;
 }
@@ -426,6 +347,7 @@ body.dark .plan-card.dragging {
     font-size: 14px;
     transition: border-color 0.2s ease;
     font-family: inherit;
+    box-sizing: border-box;
 }
 
 .form-group input:focus,
@@ -480,7 +402,7 @@ body.dark .plan-card.dragging {
     transform: none !important;
 }
 
-/* Botón flotante */
+/* ===== BOTÓN FLOTANTE ===== */
 .floating-btn {
     position: fixed;
     bottom: 24px;
@@ -510,7 +432,7 @@ body.dark .plan-card.dragging {
     transform: scale(0.95);
 }
 
-/* Estados de error */
+/* ===== ESTADOS DE ERROR ===== */
 .error-message {
     background: #fef2f2;
     border: 1px solid #fecaca;
@@ -534,14 +456,22 @@ body.dark .plan-card.dragging {
     background: #2563eb;
 }
 
-/* Toast notifications */
+/* ===== TOAST NOTIFICATIONS ===== */
 .toast {
     position: relative;
     overflow: hidden;
 }
 
-/* Responsive mejoras */
-@media (max-width: 600px) {
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    .planes-container {
+        padding: 15px;
+    }
+    
+    .plan-card {
+        padding: 15px;
+    }
+    
     .plan-actions {
         opacity: 1; /* Mostrar siempre en móvil */
         transform: translateX(0);
@@ -550,6 +480,15 @@ body.dark .plan-card.dragging {
     .overlay-content {
         margin: 20px;
         width: calc(100% - 40px);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        font-size: 16px; /* Previene zoom automático en iOS */
+        min-height: 44px; /* Área táctil mínima */
     }
     
     .form-buttons {
@@ -559,6 +498,9 @@ body.dark .plan-card.dragging {
     .form-buttons button {
         width: 100%;
         justify-content: center;
+        min-height: 48px;
+        font-size: 16px;
+        padding: 12px 24px;
     }
     
     .floating-btn {
@@ -567,10 +509,89 @@ body.dark .plan-card.dragging {
         width: 50px;
         height: 50px;
         font-size: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    /* Aumentar área táctil de los botones */
+    .plan-actions button {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 12px;
+        font-size: 16px;
+    }
+    
+    /* Mejorar contraste en hover/active para móvil */
+    .plan-card:active {
+        background-color: rgba(59, 130, 246, 0.05);
+        transform: scale(0.98);
     }
 }
 
-/* Tema oscuro mejorado */
+/* ===== DISPOSITIVOS MÓVILES ESPECÍFICOS ===== */
+@media (hover: none) and (pointer: coarse) {
+    .plan-card {
+        padding-right: 60px; /* Espacio para el indicador */
+    }
+    
+    .plan-card::after {
+        content: '⋮⋮';
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 20px;
+        line-height: 1;
+        letter-spacing: -3px;
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    .plan-card:focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
+    }
+    
+    /* Feedback visual para long press */
+    .plan-card.long-press-active {
+        background-color: rgba(59, 130, 246, 0.1);
+        transform: scale(0.98);
+        transition: all 0.1s ease;
+    }
+}
+
+/* ===== TOAST NOTIFICATIONS EN MÓVIL ===== */
+@media (max-width: 768px) {
+    #toast-container {
+        top: 10px !important;
+        right: 10px !important;
+        left: 10px !important;
+    }
+    
+    .toast {
+        max-width: none !important;
+        width: 100%;
+        font-size: 14px;
+    }
+}
+
+/* ===== TEMA OSCURO ===== */
+body.dark {
+    --plan-bg: rgba(30, 30, 30, 0.95);
+    --plan-border: rgba(255, 255, 255, 0.1);
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+}
+
+body.dark .no-plans {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px dashed rgba(16, 185, 129, 0.4);
+}
+
+body.dark .plan-card.dragging {
+    background: #2d3748;
+}
+
 body.dark .overlay-content {
     background: #1f2937;
     color: #f3f4f6;
@@ -588,4 +609,31 @@ body.dark .form-group input:focus,
 body.dark .form-group textarea:focus,
 body.dark .form-group select:focus {
     border-color: var(--accent-primary);
+}
+
+body.dark .error-message {
+    background: #7f1d1d;
+    border-color: #dc2626;
+    color: #fecaca;
+}
+
+/* ===== MEJORAS DE ACCESIBILIDAD ===== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===== FOCUS VISIBLE MEJORADO ===== */
+.plan-card:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+.plan-delete:focus-visible,
+.plan-top:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
 }
