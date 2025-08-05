@@ -15,6 +15,8 @@ from pywebpush import WebPushException, webpush
 from app import mongo
 from app.socket_utils import notificar_tarea_a_usuario
 
+import io
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1237,3 +1239,474 @@ def mark_completed():
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@api.route('/api/change_user_image/<user_id>', methods=['PUT'])
+@login_required
+def change_user_image(user_id):
+    """Cambiar imagen de perfil de un usuario"""
+    try:
+        data = request.json
+        imagen = data.get("imagen", "").strip()
+        
+        if not imagen:
+            return jsonify({"error": "La imagen es obligatoria"}), 400
+            
+        # Verificar que el usuario existe
+        obj_id = ObjectId(user_id)
+        user = mongo.db.users.find_one({"_id": obj_id})
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        # Actualizar imagen
+        mongo.db.users.update_one(
+            {"_id": obj_id},
+            {"$set": {"imagen": imagen}}
+        )
+        
+        return jsonify({
+            "success": True,
+            "message": "Imagen actualizada correctamente"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error change_user_image: {e}")
+        return jsonify({"error": "Error al actualizar imagen"}), 500
+    
+# Añadir estas rutas a tu aplicación Flask
+
+@api.route('/api/tasks_stats')
+@login_required
+def get_tasks_stats():
+    """Obtener estadísticas de tareas para el gráfico"""
+    try:
+        period = int(request.args.get('period', 30))
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=period)
+        
+        # Agrupar tareas completadas por día
+        pipeline = [
+            {"$match": {
+                "completed_at": {
+                    "$gte": start_date,
+                    "$lte": end_date
+                }
+            }},
+            {"$group": {
+                "_id": {
+                    "$dateToString": {
+                        "format": "%Y-%m-%d",
+                        "date": "$completed_at"
+                    }
+                },
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id": 1}}
+        ]
+        
+        results = list(mongo.db.completed_tasks.aggregate(pipeline))
+        
+        # Crear datos para el gráfico
+        labels = []
+        values = []
+        
+        # Rellenar todos los días del periodo
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y-%m-%d')
+            labels.append(current_date.strftime('%d %b'))
+            
+            # Buscar si hay datos para este día
+            day_data = next((item for item in results if item['_id'] == date_str), None)
+            values.append(day_data['count'] if day_data else 0)
+            
+            current_date += timedelta(days=1)
+        
+        return jsonify({
+            "labels": labels,
+            "values": values
+        })
+        
+    except Exception as e:
+        logger.error(f"Error get_tasks_stats: {e}")
+        return jsonify({"error": "Error al obtener estadísticas"}), 500
+
+    
+@api.route('/api/tasks_stats')
+@login_required
+def tasks_stats():
+    """API para obtener estadísticas de tareas para el gráfico"""
+    try:
+        period = int(request.args.get('period', 30))
+        now = datetime.now()
+        start_date = now - timedelta(days=period)
+        
+        # Agrupar tareas por día
+        pipeline = [
+            {
+                "$match": {
+                    "completion_date": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$completion_date"
+                        }
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"_id": 1}}
+        ]
+        
+        results = list(mongo.db.completed_tasks.aggregate(pipeline))
+        
+        # Formatear datos para Chart.js
+        labels = []
+        values = []
+        
+        # Rellenar todos los días del periodo
+        for i in range(period + 1):
+            current_date = start_date + timedelta(days=i)
+            date_str = current_date.strftime("%Y-%m-%d")
+            labels.append(current_date.strftime("%d %b"))
+            
+            # Buscar si hay datos para este día
+            found = next((item for item in results if item["_id"] == date_str), None)
+            values.append(found["count"] if found else 0)
+        
+        return jsonify({
+            "labels": labels,
+            "values": values
+        })
+    except Exception as e:
+        logger.error(f"Error en tasks_stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+import csv
+from io import StringIO
+from flask import make_response
+
+def get_stats_data(period_days):
+    """Obtiene estadísticas de la base de datos para el periodo especificado"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=period_days)
+    
+    pipeline = [
+        {
+            "$match": {
+                "timestamp": {"$gte": start_date, "$lte": end_date}
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "$dateToString": {
+                        "format": "%Y-%m-%d",
+                        "date": "$timestamp"
+                    }
+                },
+                "completed_tasks": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$status", "completed"]}, 1, 0]
+                    }
+                },
+                "active_users": {
+                    "$sum": {
+                        "$cond": ["$is_active", 1, 0]
+                    }
+                }
+            }
+        },
+        {"$sort": {"_id": 1}}
+    ]
+    
+    results = list(mongo.db.user_activities.aggregate(pipeline))
+    
+    # Formatear los resultados
+    stats = []
+    for result in results:
+        stats.append({
+            "date": result["_id"],
+            "completed_tasks": result["completed_tasks"],
+            "active_users": result["active_users"]
+        })
+    
+    return stats
+
+import zipfile
+from io import BytesIO
+
+
+@api.route('/api/export_full_stats')
+def export_full_stats():
+    try:
+        # 1. Exportar tareas completadas
+        tasks = list(mongo.db.completed_tasks.find({}, {
+            "_id": 0,
+            "task_name": 1,
+            "completion_date": 1,
+            "completed_by": 1
+        }))
+
+        # 2. Exportar lista de compras completadas (con manejo de items mejorado)
+        shopping = list(mongo.db.completed_shopping.find({}, {
+            "_id": 0,
+            "items": 1,
+            "completed_date": 1,
+            "completed_by": 1
+        }))
+
+        # 3. Exportar usuarios
+        users = list(mongo.db.users.find({}, {
+            "_id": 0,
+            "nombre": 1,
+            "email": 1,
+            "last_login": 1
+        }))
+
+        # Crear CSV múltiple en un ZIP
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            # --- Archivo de tareas ---
+            tasks_csv = StringIO()
+            writer = csv.writer(tasks_csv)
+            writer.writerow(['Nombre', 'Fecha Completado', 'Completado Por'])
+            for task in tasks:
+                completion_date = task.get('completion_date', '')
+                if isinstance(completion_date, datetime):
+                    completion_date = completion_date.strftime('%Y-%m-%d')
+                writer.writerow([
+                    task.get('task_name', ''),
+                    completion_date,
+                    task.get('completed_by', '')
+                ])
+            zip_file.writestr('tareas_completadas.csv', tasks_csv.getvalue())
+
+            # --- Archivo de compras ---
+            shopping_csv = StringIO()
+            writer = csv.writer(shopping_csv)
+            writer.writerow(['Productos', 'Cantidad', 'Fecha', 'Comprado Por'])
+            for shop in shopping:
+                # Manejo seguro de items (ahora soporta diccionarios)
+                items_list = []
+                for item in shop.get('items', []):
+                    if isinstance(item, dict):
+                        # Si el item es un diccionario, extraemos nombre y cantidad
+                        name = item.get('nombre', item.get('name', 'Desconocido'))
+                        qty = item.get('cantidad', item.get('quantity', 1))
+                        items_list.append(f"{name} ({qty})")
+                    else:
+                        items_list.append(str(item))
+                
+                # Manejo de fechas
+                shop_date = shop.get('completed_date', '')
+                if isinstance(shop_date, datetime):
+                    shop_date = shop_date.strftime('%Y-%m-%d')
+                
+                writer.writerow([
+                    ', '.join(items_list),  # Items formateados
+                    len(shop.get('items', [])),  # Cantidad total de items
+                    shop_date,
+                    shop.get('completed_by', '')
+                ])
+            zip_file.writestr('compras_completadas.csv', shopping_csv.getvalue())
+
+            # --- Archivo de usuarios ---
+            users_csv = StringIO()
+            writer = csv.writer(users_csv)
+            writer.writerow(['Nombre', 'Email', 'Último Login'])
+            for user in users:
+                last_login = user.get('last_login', '')
+                if isinstance(last_login, datetime):
+                    last_login = last_login.strftime('%Y-%m-%d %H:%M')
+                writer.writerow([
+                    user.get('nombre', ''),
+                    user.get('email', ''),
+                    last_login
+                ])
+            zip_file.writestr('usuarios.csv', users_csv.getvalue())
+
+        zip_buffer.seek(0)
+        response = make_response(zip_buffer.getvalue())
+        response.headers['Content-Disposition'] = 'attachment; filename=full_export.zip'
+        response.headers['Content-type'] = 'application/zip'
+
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": "Error en la exportación",
+            "details": str(e),
+            "type": type(e).__name__
+        }), 500
+
+@api.route('/api/add_user', methods=['POST'])
+@login_required
+def add_user():
+    """Añadir nuevo usuario"""
+    try:
+        data = request.json
+        nombre = data.get("nombre", "").strip()
+        imagen = data.get("imagen", "")
+
+        if not nombre:
+            return jsonify({"error": "El nombre es obligatorio"}), 400
+
+        # Verificar si ya existe
+        if mongo.db.users.find_one({"nombre": {"$regex": f"^{nombre}$", "$options": "i"}}):
+            return jsonify({"error": "Ya existe un usuario con ese nombre"}), 409
+
+        # Procesar imagen
+        if imagen and imagen.startswith("data:image/"):
+            imagen = imagen.split(",")[1]
+        
+        if imagen:
+            imagen = imagen.strip()
+
+        # Crear usuario
+        new_user = {
+            "nombre": nombre,
+            "encasa": True,
+            "imagen": imagen,
+            "tareas": [],
+            "calendario": [],
+            "created_by": session.get('user'),
+            "created_at": datetime.now()
+        }
+
+        result = mongo.db.users.insert_one(new_user)
+        
+        return jsonify({
+            "success": True, 
+            "user_id": str(result.inserted_id)
+        }), 201
+    except Exception as e:
+        logger.error(f"Error add_user: {e}")
+        return jsonify({"error": "Error al crear usuario"}), 500
+
+@api.route('/api/delete_user/<user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    """Eliminar usuario"""
+    try:
+        current_user = session.get('user')
+        logger.info(f"Intento de eliminación por: {current_user}, ID objetivo: {user_id}")
+        obj_id = ObjectId(user_id)
+        # Obtener información del usuario antes de eliminar
+        user = mongo.db.users.find_one({"_id": obj_id})
+        if not user:
+            logger.warning(f"Usuario no encontrado: {user_id}")
+            return jsonify({
+                "error": "Usuario no encontrado",
+                "message": f"No existe usuario con ID {user_id}"
+            }), 404
+
+        # Registrar acción
+        logger.info(f"Eliminando usuario: {user['nombre']} (ID: {user_id})")
+
+        # Eliminar usuario
+        mongo.db.users.delete_one({"_id": obj_id})
+        
+        # Limpiar datos relacionados
+        nombre_usuario = user.get("nombre")
+        result_subs = mongo.db.subscriptions.delete_many({"user": nombre_usuario})
+        result_tasks = mongo.db.completed_tasks.delete_many({"completed_by": nombre_usuario})
+        
+        logger.info(f"Datos relacionados eliminados: "
+                    f"{result_subs.deleted_count} suscripciones, "
+                    f"{result_tasks.deleted_count} tareas completadas")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Usuario {nombre_usuario} eliminado correctamente",
+            "deleted_subs": result_subs.deleted_count,
+            "deleted_tasks": result_tasks.deleted_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error crítico en delete_user: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "error": "Error interno del servidor",
+            "message": str(e)
+        }), 500
+
+@api.route('/api/toggle_theme', methods=['POST'])
+@login_required
+def toggle_theme():
+    """Cambiar tema de la aplicación"""
+    try:
+        data = request.json
+        new_theme = data.get("theme")
+        
+        if new_theme not in ['light', 'dark']:
+            return jsonify({"error": "Tema inválido"}), 400
+            
+        session["theme"] = new_theme
+        return jsonify({"success": True, "theme": new_theme})
+    except Exception as e:
+        logger.error(f"Error toggle_theme: {e}")
+        return jsonify({"error": "Error al cambiar tema"}), 500
+
+@api.route('/api/storage_details')
+def get_storage_details():
+    try:
+        # Verificar la conexión de manera correcta
+        if mongo.db is None:
+            return jsonify({"error": "Conexión a la base de datos no establecida"}), 500
+        
+        # Probar la conexión
+        mongo.db.command('ping')
+        
+        # Obtener estadísticas de la base de datos
+        db_stats = mongo.db.command("dbstats")
+        
+        # Obtener estadísticas de las colecciones
+        collections_stats = {}
+        for collection_name in mongo.db.list_collection_names():
+            try:
+                collections_stats[collection_name] = mongo.db.command("collstats", collection_name)
+            except Exception as coll_error:
+                collections_stats[collection_name] = {"error": str(coll_error)}
+        
+        # Formatear la respuesta
+        response = {
+            "database": {
+                "name": mongo.db.name,
+                "size_bytes": db_stats.get("dataSize", 0),
+                "storage_size_bytes": db_stats.get("storageSize", 0),
+                "collections_count": db_stats.get("collections", 0),
+                "objects_count": db_stats.get("objects", 0),
+                "indexes_count": db_stats.get("indexes", 0),
+                "index_size_bytes": db_stats.get("indexSize", 0)
+            },
+            "collections": {
+                collection: {
+                    "size_bytes": stats.get("size", 0),
+                    "storage_size_bytes": stats.get("storageSize", 0),
+                    "count": stats.get("count", 0),
+                    "avg_obj_size_bytes": stats.get("avgObjSize", 0),
+                    "indexes_count": len(stats.get("indexSizes", {})),
+                    "index_size_bytes": sum(stats.get("indexSizes", {}).values())
+                } if not isinstance(stats, dict) or "error" not in stats else {
+                    "error": stats["error"]
+                }
+                for collection, stats in collections_stats.items()
+            }
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": "Error al obtener detalles de almacenamiento",
+            "message": str(e),
+            "type": type(e).__name__
+        }), 500

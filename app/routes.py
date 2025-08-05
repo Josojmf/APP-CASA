@@ -825,140 +825,96 @@ def lista_compra():
         logger.error(f"Error lista_compra: {e}")
         return "Error al cargar lista de compra", 500
 
+from datetime import datetime, timedelta
+from bson import ObjectId
+
 @main.route('/configuracion')
 @login_required
 def configuracion():
     """Página de configuración"""
     try:
+        # Obtener todos los usuarios
         users = list(mongo.db.users.find())
         for user in users:
             user['_id'] = str(user['_id'])
-        
-        # Estadísticas del sistema
+
+        # Estadísticas básicas
         total_subscriptions = mongo.db.subscriptions.count_documents({})
         total_completed_tasks = mongo.db.completed_tasks.count_documents({})
         
+        # Cálculo de tendencias de tareas
+        now = datetime.now()
+        last_period_end = now - timedelta(days=30)
+        last_period_start = last_period_end - timedelta(days=30)
+        
+        # Tareas completadas en el último periodo (30 días)
+        current_tasks = mongo.db.completed_tasks.count_documents({
+            "completion_date": {"$gte": last_period_end}
+        })
+        
+        # Tareas completadas en el periodo anterior
+        previous_tasks = mongo.db.completed_tasks.count_documents({
+            "completion_date": {"$gte": last_period_start, "$lt": last_period_end}
+        })
+        
+        # Cálculo de la tendencia (%)
+        tasks_trend = 0
+        if previous_tasks > 0:
+            tasks_trend = round(((current_tasks - previous_tasks) / previous_tasks) * 100, 1)
+
+        # Estadísticas de usuarios
+        new_users = mongo.db.users.count_documents({
+            "created_at": {"$gte": now - timedelta(days=30)}
+        })
+        
+        # Tendencias de usuarios
+        previous_users = mongo.db.users.count_documents({
+            "created_at": {"$gte": now - timedelta(days=60), "$lt": now - timedelta(days=30)}
+        })
+        
+        users_trend = 0
+        if previous_users > 0:
+            users_trend = round(((len(users) - previous_users) / previous_users) * 100, 1)
+
+        # Estadísticas de almacenamiento (simuladas)
+        # En una implementación real, calcularías el tamaño de las imágenes y datos
+        storage_used = round(len(users) * 0.5, 1)  # 0.5MB por usuario como ejemplo
+        storage_limit = 100  # 100MB como ejemplo
+        storage_percentage = round((storage_used / storage_limit) * 100, 1)
+
+        # Datos para el gráfico de tareas (últimos 7 días)
+        task_stats = []
+        for i in range(7, 0, -1):
+            day = now - timedelta(days=i)
+            next_day = day + timedelta(days=1)
+            count = mongo.db.completed_tasks.count_documents({
+                "completion_date": {
+                    "$gte": day,
+                    "$lt": next_day
+                }
+            })
+            task_stats.append(count)
+
         system_stats = {
             "total_users": len(users),
             "total_subscriptions": total_subscriptions,
             "total_completed_tasks": total_completed_tasks,
-            "current_theme": session.get('theme', 'light')
+            "current_theme": session.get('theme', 'light'),
+            "tasks_trend": tasks_trend,
+            "users_trend": users_trend,
+            "users_change": new_users,
+            "storage_used": storage_used,
+            "storage_percentage": storage_percentage,
+            "task_stats": task_stats  # Para el gráfico
         }
         
         return render_template("configuracion.html", 
-                             users=users,
-                             system_stats=system_stats)
+                            users=users,
+                            system_stats=system_stats)
     except Exception as e:
         logger.error(f"Error configuracion: {e}")
         return "Error al cargar configuración", 500
 
-@main.route('/api/add_user', methods=['POST'])
-@login_required
-def add_user():
-    """Añadir nuevo usuario"""
-    try:
-        data = request.json
-        nombre = data.get("nombre", "").strip()
-        imagen = data.get("imagen", "")
-
-        if not nombre:
-            return jsonify({"error": "El nombre es obligatorio"}), 400
-
-        # Verificar si ya existe
-        if mongo.db.users.find_one({"nombre": {"$regex": f"^{nombre}$", "$options": "i"}}):
-            return jsonify({"error": "Ya existe un usuario con ese nombre"}), 409
-
-        # Procesar imagen
-        if imagen and imagen.startswith("data:image/"):
-            imagen = imagen.split(",")[1]
-        
-        if imagen:
-            imagen = imagen.strip()
-
-        # Crear usuario
-        new_user = {
-            "nombre": nombre,
-            "encasa": True,
-            "imagen": imagen,
-            "tareas": [],
-            "calendario": [],
-            "created_by": session.get('user'),
-            "created_at": datetime.now()
-        }
-
-        result = mongo.db.users.insert_one(new_user)
-        
-        return jsonify({
-            "success": True, 
-            "user_id": str(result.inserted_id)
-        }), 201
-    except Exception as e:
-        logger.error(f"Error add_user: {e}")
-        return jsonify({"error": "Error al crear usuario"}), 500
-
-@main.route('/api/delete_user/<user_id>', methods=['DELETE'])
-@login_required
-def delete_user(user_id):
-    """Eliminar usuario"""
-    try:
-        current_user = session.get('user')
-        logger.info(f"Intento de eliminación por: {current_user}, ID objetivo: {user_id}")
-        obj_id = ObjectId(user_id)
-        # Obtener información del usuario antes de eliminar
-        user = mongo.db.users.find_one({"_id": obj_id})
-        if not user:
-            logger.warning(f"Usuario no encontrado: {user_id}")
-            return jsonify({
-                "error": "Usuario no encontrado",
-                "message": f"No existe usuario con ID {user_id}"
-            }), 404
-
-        # Registrar acción
-        logger.info(f"Eliminando usuario: {user['nombre']} (ID: {user_id})")
-
-        # Eliminar usuario
-        mongo.db.users.delete_one({"_id": obj_id})
-        
-        # Limpiar datos relacionados
-        nombre_usuario = user.get("nombre")
-        result_subs = mongo.db.subscriptions.delete_many({"user": nombre_usuario})
-        result_tasks = mongo.db.completed_tasks.delete_many({"completed_by": nombre_usuario})
-        
-        logger.info(f"Datos relacionados eliminados: "
-                    f"{result_subs.deleted_count} suscripciones, "
-                    f"{result_tasks.deleted_count} tareas completadas")
-        
-        return jsonify({
-            "success": True,
-            "message": f"Usuario {nombre_usuario} eliminado correctamente",
-            "deleted_subs": result_subs.deleted_count,
-            "deleted_tasks": result_tasks.deleted_count
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Error crítico en delete_user: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({
-            "error": "Error interno del servidor",
-            "message": str(e)
-        }), 500
-
-@main.route('/api/toggle_theme', methods=['POST'])
-@login_required
-def toggle_theme():
-    """Cambiar tema de la aplicación"""
-    try:
-        data = request.json
-        new_theme = data.get("theme")
-        
-        if new_theme not in ['light', 'dark']:
-            return jsonify({"error": "Tema inválido"}), 400
-            
-        session["theme"] = new_theme
-        return jsonify({"success": True, "theme": new_theme})
-    except Exception as e:
-        logger.error(f"Error toggle_theme: {e}")
-        return jsonify({"error": "Error al cambiar tema"}), 500
 
 @main.route("/chat")
 @login_required

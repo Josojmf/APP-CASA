@@ -39,36 +39,25 @@
     <!-- Sección de gestión de usuarios -->
     <section class="user-management" aria-labelledby="users-heading">
         <h2 id="users-heading">👥 Gestión de usuarios</h2>
-        
+
         <!-- Formulario para añadir usuario -->
         <form id="addUserForm" class="add-user-form" aria-labelledby="add-user-heading">
             <h3 id="add-user-heading" class="sr-only">Añadir nuevo usuario</h3>
-            
+
             <div class="form-group">
                 <label for="nuevoUsuario" class="sr-only">Nombre del usuario</label>
-                <input 
-                    type="text" 
-                    id="nuevoUsuario" 
-                    placeholder="Nombre del nuevo usuario" 
-                    required 
-                    aria-describedby="name-help"
-                    autocomplete="name"
-                >
+                <input type="text" id="nuevoUsuario" placeholder="Nombre del nuevo usuario" required
+                    aria-describedby="name-help" autocomplete="name">
                 <small id="name-help" class="help-text">Introduce el nombre completo del usuario</small>
             </div>
-            
+
             <div class="form-group">
                 <label for="imagenUsuario" class="sr-only">Imagen de perfil</label>
-                <input 
-                    type="file" 
-                    id="imagenUsuario" 
-                    accept="image/png, image/jpeg" 
-                    required 
-                    aria-describedby="image-help"
-                >
+                <input type="file" id="imagenUsuario" accept="image/png, image/jpeg" required
+                    aria-describedby="image-help">
                 <small id="image-help" class="help-text">Sube una imagen JPG o PNG (max 5MB)</small>
             </div>
-            
+
             <button type="submit" class="add-user-btn">
                 <span>Añadir usuario</span>
             </button>
@@ -79,54 +68,193 @@
             {% for user in users %}
             <li>
                 <span class="user-info">
-                    <div class="user-avatar">👤</div>
+                    <div class="user-avatar">
+                        {% if user.imagen %}
+                        <img src="data:image/jpeg;base64,{{ user.imagen }}" alt="{{ user.nombre }}">
+                        {% else %}
+                        👤
+                        {% endif %}
+                    </div>
                     <div>
                         <div class="user-name">{{ user.nombre }}</div>
                         <div class="user-status">{% if user.encasa %}🟢 En casa{% else %}🔴 Fuera{% endif %}</div>
                     </div>
                 </span>
-                <button class="delete-btn" onclick="eliminarUsuario('{{ user._id }}')">Eliminar</button>
+                <div class="user-actions">
+                    <button class="change-img-btn" onclick="mostrarModalCambioImagen('{{ user._id }}')">
+                        Cambiar imagen
+                    </button>
+                    <button class="delete-btn" onclick="eliminarUsuario('{{ user._id }}')">
+                        Eliminar
+                    </button>
+                </div>
             </li>
             {% endfor %}
         </ul>
+
+        <!-- Modal para cambiar imagen -->
+        <div id="changeImageModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="cerrarModal()">&times;</span>
+                <h3>Cambiar imagen de perfil</h3>
+                <form id="changeImageForm">
+                    <input type="hidden" id="userIdToChange">
+                    <div class="form-group">
+                        <label for="nuevaImagen">Nueva imagen:</label>
+                        <input type="file" id="nuevaImagen" accept="image/png, image/jpeg" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Actualizar</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección de estadísticas -->
+    <section class="analytics dashboard-section" aria-labelledby="analytics-heading">
+        <div class="section-header">
+            <h2 id="analytics-heading" class="section-title">
+                <span class="icon">📊</span>
+                <span>Estadísticas de Uso</span>
+                <button id="refreshStats" class="refresh-btn" aria-label="Actualizar estadísticas">
+                    <span class="refresh-icon">🔄</span>
+                </button>
+            </h2>
+            <div class="time-filter">
+                <select id="statsPeriod" class="time-select">
+                    <option value="7">Últimos 7 días</option>
+                    <option value="30" selected>Últimos 30 días</option>
+                    <option value="90">Últimos 90 días</option>
+                    <option value="365">Último año</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Tarjeta de Tareas Completadas -->
+            <div class="stat-card task-stats">
+                <div class="stat-header">
+                    <h3 class="stat-title">Tareas completadas</h3>
+                    <div class="stat-icon">✅</div>
+                </div>
+                <div class="stat-main">
+                    <div class="stat-value">{{ system_stats.total_completed_tasks }}</div>
+                    <div
+                        class="stat-comparison {% if system_stats.tasks_trend > 0 %}positive{% else %}negative{% endif %}">
+                        {% if system_stats.tasks_trend > 0 %}+{% endif %}{{ system_stats.tasks_trend }}%
+                        <span class="trend-icon">{% if system_stats.tasks_trend > 0 %}↑{% else %}↓{% endif %}</span>
+                    </div>
+                </div>
+                <div class="stat-footer">
+                    <small>vs periodo anterior</small>
+                    <button class="stat-details-btn" onclick="showTasksChart()">Ver detalles</button>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Usuarios Activos -->
+            <div class="stat-card user-stats">
+                <div class="stat-header">
+                    <h3 class="stat-title">Usuarios activos</h3>
+                    <div class="stat-icon">👥</div>
+                </div>
+                <div class="stat-main">
+                    <div class="stat-value">{{ system_stats.total_users }}</div>
+                    <div
+                        class="stat-comparison {% if system_stats.users_trend > 0 %}positive{% else %}negative{% endif %}">
+                        {% if system_stats.users_trend > 0 %}+{% endif %}{{ system_stats.users_change }}
+                        <span class="trend-icon">{% if system_stats.users_trend > 0 %}↑{% else %}↓{% endif %}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Almacenamiento -->
+            <div class="stat-card storage-stats">
+                <div class="stat-header">
+                    <h3 class="stat-title">Almacenamiento</h3>
+                    <div class="stat-icon">💾</div>
+                </div>
+                <div class="stat-main">
+                    <div class="stat-value">{{ system_stats.storage_used }}<span class="stat-unit">MB</span></div>
+                    <div class="stat-comparison">
+                        {{ system_stats.storage_percentage }}% usado
+                    </div>
+                </div>
+                <div class="stat-footer">
+                    <div class="storage-progress">
+                        <div class="progress-bar" style="width: {{ system_stats.storage_percentage }}%"></div>
+                    </div>
+                    <button class="stat-details-btn" onclick="showStorageDetails()">Gestionar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico de Tareas -->
+        <div id="tasksChartContainer" class="chart-container hidden">
+            <div class="chart-header">
+                <h3>Evolución de tareas completadas</h3>
+                <button class="close-chart" onclick="hideChart('tasksChartContainer')">×</button>
+            </div>
+            <canvas id="tasksChart"></canvas>
+        </div>
+
+        <!-- Detalles de Almacenamiento -->
+        <div id="storageDetailsContainer" class="chart-container hidden">
+            <div class="chart-header">
+                <h3>Uso de almacenamiento</h3>
+                <button class="close-chart" onclick="hideChart('storageDetailsContainer')">×</button>
+            </div>
+            <div class="storage-details">
+                <div class="storage-breakdown">
+                    <h4>Desglose por tipo de datos:</h4>
+                    <canvas id="storageBreakdownChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="analytics-actions">
+            <button id="exportData" class="action-btn export-btn">
+                <span class="btn-icon">📤</span>
+                <span>Exportar datos</span>
+            </button>
+            <button id="advancedAnalytics" class="action-btn analytics-btn">
+                <span class="btn-icon">📈</span>
+                <span>Análisis avanzado</span>
+            </button>
+        </div>
     </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // Función para mostrar mensajes de feedback
     function showFeedback(message, type) {
-        // Crear elemento si no existe
-        let feedbackEl = document.querySelector('.feedback-message');
-        if (!feedbackEl) {
-            feedbackEl = document.createElement('div');
-            feedbackEl.className = 'feedback-message';
-            document.body.appendChild(feedbackEl);
-        }
-        
-        feedbackEl.textContent = message;
+        const feedbackEl = document.createElement('div');
         feedbackEl.className = `feedback-message show ${type}`;
-        
-        // Ocultar después de 3 segundos
+        feedbackEl.textContent = message;
+        document.body.appendChild(feedbackEl);
+
         setTimeout(() => {
             feedbackEl.classList.remove('show');
+            setTimeout(() => feedbackEl.remove(), 500);
         }, 3000);
     }
 
     // Función para eliminar usuario
-    function eliminarUsuario(userId) {
+    async function eliminarUsuario(userId) {
         if (confirm("¿Estás seguro de que quieres eliminar este usuario?")) {
-            fetch(`/api/delete_user/${userId}`, { method: "DELETE" })
-                .then(res => {
-                    if (res.ok) {
-                        showFeedback("✅ Usuario eliminado correctamente", "success");
-                        // Recargar después de 1 segundo para mostrar feedback
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        showFeedback("⚠️ Error al eliminar usuario", "error");
-                    }
-                });
+            try {
+                const res = await fetch(`/api/delete_user/${userId}`, { method: "DELETE" });
+                if (res.ok) {
+                    showFeedback("✅ Usuario eliminado correctamente", "success");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    const error = await res.json();
+                    showFeedback(`⚠️ ${error.message || "Error al eliminar usuario"}`, "error");
+                }
+            } catch (error) {
+                showFeedback("⚠️ Error de conexión", "error");
+            }
         }
     }
 
@@ -147,37 +275,50 @@
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = async function () {
-            const base64Img = reader.result;
+        if (archivo.size > 5 * 1024 * 1024) {
+            showFeedback("La imagen no debe exceder los 5MB.", "error");
+            return;
+        }
 
-            const res = await fetch("/api/add_user", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nombre, imagen: base64Img })
-            });
+        try {
+            const reader = new FileReader();
+            reader.onload = async function () {
+                const base64Img = reader.result.split(',')[1];
 
-            if (res.ok) {
-                showFeedback(`✅ Usuario "${nombre}" añadido correctamente`, "success");
-                // Recargar después de 1 segundo para mostrar feedback
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showFeedback("⚠️ Error al añadir usuario", "error");
-            }
-        };
-        reader.readAsDataURL(archivo);
+                const res = await fetch("/api/add_user", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ nombre, imagen: base64Img })
+                });
+
+                if (res.ok) {
+                    showFeedback(`✅ Usuario "${nombre}" añadido correctamente`, "success");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    const error = await res.json();
+                    showFeedback(`⚠️ ${error.message || "Error al añadir usuario"}`, "error");
+                }
+            };
+            reader.readAsDataURL(archivo);
+        } catch (error) {
+            showFeedback("⚠️ Error al procesar la imagen", "error");
+        }
     });
 
     // Botón para eliminar todas las tareas
     document.getElementById("clearTasksBtn").addEventListener("click", async () => {
         if (confirm("¿Estás seguro de que quieres eliminar todas las tareas?")) {
-            const res = await fetch("/api/clear_all_tasks", { method: "POST" });
-            if (res.ok) {
-                showFeedback("✅ Todas las tareas han sido eliminadas", "success");
-                // Recargar después de 1 segundo para mostrar feedback
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showFeedback("⚠️ Error al eliminar las tareas", "error");
+            try {
+                const res = await fetch("/api/clear_all_tasks", { method: "POST" });
+                if (res.ok) {
+                    showFeedback("✅ Todas las tareas han sido eliminadas", "success");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    const error = await res.json();
+                    showFeedback(`⚠️ ${error.message || "Error al eliminar tareas"}`, "error");
+                }
+            } catch (error) {
+                showFeedback("⚠️ Error de conexión", "error");
             }
         }
     });
@@ -187,27 +328,31 @@
         const switchElement = document.getElementById("themeSwitch");
         const themeStatus = document.getElementById("theme-status");
         const body = document.body;
-        
+
         // Establecer estado inicial del interruptor
         const currentTheme = "{{ session.get('theme', 'light') }}";
         switchElement.checked = currentTheme === "dark";
-        
+
         switchElement.addEventListener("change", async () => {
             const newTheme = switchElement.checked ? "dark" : "light";
-            
+
             // Cambio visual inmediato
             body.classList.remove("light", "dark");
             body.classList.add(newTheme);
             themeStatus.textContent = newTheme === "dark" ? "Tema oscuro activo" : "Tema claro activo";
-            
+
             // Guardar preferencia en el servidor
-            const res = await fetch("/api/toggle_theme", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ theme: newTheme })
-            });
-            
-            if (!res.ok) {
+            try {
+                const res = await fetch("/api/toggle_theme", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ theme: newTheme })
+                });
+
+                if (!res.ok) {
+                    throw new Error("Error al cambiar el tema");
+                }
+            } catch (error) {
                 showFeedback("⚠️ Error al cambiar el tema", "error");
                 // Revertir cambios si hay error
                 body.classList.remove(newTheme);
@@ -216,6 +361,285 @@
                 themeStatus.textContent = currentTheme === "dark" ? "Tema oscuro activo" : "Tema claro activo";
             }
         });
+    });
+
+    // Funciones para el modal de cambio de imagen
+    function mostrarModalCambioImagen(userId) {
+        document.getElementById('userIdToChange').value = userId;
+        document.getElementById('changeImageModal').style.display = 'block';
+    }
+
+    function cerrarModal() {
+        document.getElementById('changeImageModal').style.display = 'none';
+        document.getElementById('changeImageForm').reset();
+    }
+
+    document.getElementById('changeImageForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const userId = document.getElementById('userIdToChange').value;
+        const imagenInput = document.getElementById('nuevaImagen');
+        const archivo = imagenInput.files[0];
+
+        if (!archivo) {
+            showFeedback("Debes seleccionar una imagen.", "error");
+            return;
+        }
+
+        if (!["image/jpeg", "image/png"].includes(archivo.type)) {
+            showFeedback("Solo se permiten imágenes JPG o PNG.", "error");
+            return;
+        }
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async function () {
+                const base64Img = reader.result.split(',')[1];
+
+                const res = await fetch(`/api/change_user_image/${userId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ imagen: base64Img })
+                });
+
+                if (res.ok) {
+                    showFeedback("✅ Imagen actualizada correctamente", "success");
+                    cerrarModal();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    const error = await res.json();
+                    showFeedback(`⚠️ ${error.message || "Error al actualizar imagen"}`, "error");
+                }
+            };
+            reader.readAsDataURL(archivo);
+        } catch (error) {
+            showFeedback("⚠️ Error al procesar la imagen", "error");
+        }
+    });
+
+    // Variables para los gráficos
+    let tasksChart = null;
+    let usersActivityChart = null;
+    let storageBreakdownChart = null;
+
+    // Función para mostrar el gráfico de tareas
+    async function showTasksChart() {
+        try {
+            const period = document.getElementById('statsPeriod').value;
+            const response = await fetch(`/api/tasks_stats?period=${period}`);
+            const data = await response.json();
+
+            const container = document.getElementById('tasksChartContainer');
+            container.classList.remove('hidden');
+
+            const ctx = document.getElementById('tasksChart').getContext('2d');
+
+            if (tasksChart) tasksChart.destroy();
+
+            tasksChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Tareas completadas',
+                        data: data.values,
+                        backgroundColor: 'rgba(74, 111, 165, 0.2)',
+                        borderColor: 'rgba(74, 111, 165, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        } catch (error) {
+            showFeedback("⚠️ Error al cargar los datos de tareas", "error");
+        }
+    }
+
+    // Función para mostrar detalles de almacenamiento
+    async function showStorageDetails() {
+        try {
+            const response = await fetch('/api/storage_details');
+            const data = await response.json();
+
+            // Transformar datos para el gráfico
+            const storageData = {
+                labels: [],
+                values: [],
+                colors: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)'
+                ]
+            };
+
+            // Procesar cada colección
+            for (const [collection, stats] of Object.entries(data.collections)) {
+                storageData.labels.push(collection);
+                // Convertir bytes a MB con 2 decimales
+                storageData.values.push(parseFloat((stats.size_bytes / (1024 * 1024)).toFixed(2)));
+            }
+
+            // Agregar espacio restante si es relevante
+            const totalUsedMB = parseFloat((data.database.size_bytes / (1024 * 1024)).toFixed(2));
+            const totalStorageMB = parseFloat((data.database.storage_size_bytes / (1024 * 1024)).toFixed(2));
+            const freeSpaceMB = parseFloat((totalStorageMB - totalUsedMB).toFixed(2));
+
+            if (freeSpaceMB > 0) {
+                storageData.labels.push("Espacio libre");
+                storageData.values.push(freeSpaceMB);
+                storageData.colors.push('rgba(200, 200, 200, 0.7)');
+            }
+
+            const container = document.getElementById('storageDetailsContainer');
+            container.classList.remove('hidden');
+            container.innerHTML = `
+            <div class="chart-header">
+                <h3>Uso de almacenamiento</h3>
+                <button class="close-chart" onclick="hideChart('storageDetailsContainer')">×</button>
+            </div>
+            <div class="storage-details">
+                <div class="storage-summary">
+                    <div class="storage-total">
+                        <span class="storage-label">Total usado:</span>
+                        <span class="storage-value">${totalUsedMB} MB</span>
+                    </div>
+                    <div class="storage-total">
+                        <span class="storage-label">Capacidad total:</span>
+                        <span class="storage-value">${totalStorageMB} MB</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: ${data.database.storage_percentage || 0}%"></div>
+                    </div>
+                </div>
+                <div class="storage-breakdown">
+                    <h4>Desglose por colección:</h4>
+                    <canvas id="storageBreakdownChart"></canvas>
+                </div>
+            </div>
+        `;
+
+            const ctx = document.getElementById('storageBreakdownChart').getContext('2d');
+
+            if (storageBreakdownChart) storageBreakdownChart.destroy();
+
+            storageBreakdownChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: storageData.labels,
+                    datasets: [{
+                        data: storageData.values,
+                        backgroundColor: storageData.colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return `${label}: ${value} MB (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error("Error loading storage details:", error);
+            showFeedback("⚠️ Error al cargar los detalles de almacenamiento", "error");
+        }
+    }
+    // Función para ocultar gráficos
+    function hideChart(containerId) {
+        document.getElementById(containerId).classList.add('hidden');
+    }
+
+    // Actualizar estadísticas al cambiar el periodo
+    document.getElementById('statsPeriod').addEventListener('change', function () {
+        // Si hay algún gráfico visible, actualizarlo
+        if (!document.getElementById('tasksChartContainer').classList.contains('hidden')) {
+            showTasksChart();
+        }
+
+    });
+
+    // Botón de refrescar
+    document.getElementById('refreshStats').addEventListener('click', function () {
+        // Actualizar el gráfico o vista actual
+        if (!document.getElementById('tasksChartContainer').classList.contains('hidden')) {
+            showTasksChart();
+        } else if (!document.getElementById('storageDetailsContainer').classList.contains('hidden')) {
+            showStorageDetails();
+        } else {
+            // Si no hay gráficos visibles, actualizar las tarjetas principales
+            location.reload();
+        }
+        showFeedback("Estadísticas actualizadas", "success");
+    });
+
+    // Exportar datos
+    document.getElementById('exportData').addEventListener('click', async function () {
+        try {
+            const response = await fetch('/api/export_full_stats');
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Error en la exportación");
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showFeedback("✅ Exportación completada (ZIP descargado)", "success");
+        } catch (error) {
+            showFeedback(`⚠️ ${error.message}`, "error");
+            console.error("Export error:", error);
+        }
+    });
+
+    // Análisis avanzado
+    document.getElementById('advancedAnalytics').addEventListener('click', function () {
+        // Mostrar todos los gráficos en una vista avanzada
+        document.getElementById('tasksChartContainer').classList.remove('hidden');
+        document.getElementById('storageDetailsContainer').classList.remove('hidden');
+
+        // Inicializar todos los gráficos
+        showTasksChart();
+        showStorageDetails();
+    });
+
+    // Cerrar modal al hacer clic fuera del contenido
+    window.addEventListener('click', function (event) {
+        const modal = document.getElementById('changeImageModal');
+        if (event.target === modal) {
+            cerrarModal();
+        }
     });
 </script>
 {% endblock %}
