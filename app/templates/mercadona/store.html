@@ -4,134 +4,560 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/mercadona.css') }}">
 <style>
-    /* Estilos adicionales */
-    #categories-section, #products-section {
-        transition: all 0.3s ease;
+    /* Variables CSS para consistencia */
+    :root {
+        --primary-color: #00a651;
+        --secondary-color: #e8f5e8;
+        --text-primary: #2d3748;
+        --text-secondary: #718096;
+        --border-color: #e2e8f0;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    
-    .back-button {
-        background: #f3f4f6;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
+
+    /* Layout principal */
+    .main-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    /* Header de navegación */
+    .navigation-header {
+        background: white;
+        border-bottom: 1px solid var(--border-color);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        transition: var(--transition);
+    }
+
+    .nav-content {
+        display: flex;
+        align-items: center;
+        justify-content: between;
+        padding: 1rem 0;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    /* Breadcrumb */
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+    }
+
+    .breadcrumb-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .breadcrumb-separator {
+        color: var(--text-secondary);
+        margin: 0 0.5rem;
+    }
+
+    .breadcrumb-link {
+        color: var(--primary-color);
+        text-decoration: none;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: var(--transition);
+    }
+
+    .breadcrumb-link:hover {
+        text-decoration: underline;
+    }
+
+    /* Botón de volver mejorado */
+    .back-button {
         display: inline-flex;
         align-items: center;
+        gap: 0.5rem;
+        background: var(--secondary-color);
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: var(--transition);
+        cursor: pointer;
     }
-    
+
     .back-button:hover {
-        background: #e5e7eb;
+        background: var(--primary-color);
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: var(--shadow);
     }
-    
-    .search-container {
+
+    /* Búsqueda mejorada */
+    .search-section {
+        flex: 1;
+        max-width: 400px;
         position: relative;
-        width: 100%;
-        max-width: 300px;
     }
-    
-    .search-container input {
+
+    .search-input {
         width: 100%;
-        padding: 8px 16px 8px 40px;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        font-size: 14px;
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: var(--transition);
+        background: white;
     }
-    
-    .search-container i {
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(0, 166, 81, 0.1);
+    }
+
+    .search-icon {
         position: absolute;
-        left: 12px;
+        left: 0.75rem;
         top: 50%;
         transform: translateY(-50%);
-        color: #9ca3af;
+        color: var(--text-secondary);
+        pointer-events: none;
     }
-    
-    .categories-grid, .products-grid {
+
+    .search-clear {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 4px;
         opacity: 0;
-        transform: translateY(10px);
-        animation: fadeInUp 0.5s forwards;
+        transition: var(--transition);
     }
-    
+
+    .search-clear.visible {
+        opacity: 1;
+    }
+
+    .search-clear:hover {
+        background: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    /* Stats bar */
+    .stats-bar {
+        background: linear-gradient(135deg, var(--primary-color), #008a45);
+        color: white;
+        padding: 0.75rem 0;
+    }
+
+    .stats-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        font-size: 0.875rem;
+    }
+
+    .stats-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .stats-item i {
+        opacity: 0.8;
+    }
+
+    /* Secciones principales */
+    .main-section {
+        padding: 2rem 0;
+        transition: var(--transition);
+    }
+
+    .section-header {
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+
+    .section-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .section-subtitle {
+        color: var(--text-secondary);
+        font-size: 1.125rem;
+    }
+
+    /* Grid de categorías */
+    .categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1.5rem;
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeInUp 0.6s forwards;
+    }
+
+    .category-card {
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .category-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(0, 166, 81, 0.1), transparent);
+        transition: left 0.5s;
+    }
+
+    .category-card:hover::before {
+        left: 100%;
+    }
+
+    .category-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px -8px rgba(0, 166, 81, 0.3);
+        border-color: var(--primary-color);
+    }
+
+    .category-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+
+    .category-name {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .category-subcategories {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+    }
+
+    .category-id-badge {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: var(--secondary-color);
+        color: var(--primary-color);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    /* Grid de productos */
+    .products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeInUp 0.6s forwards;
+    }
+
+    .product-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: var(--transition);
+        position: relative;
+    }
+
+    .product-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+        border-color: var(--primary-color);
+    }
+
+    /* Loading states */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--transition);
+    }
+
+    .loading-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-color);
+        border-top: 3px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    /* Animaciones */
     @keyframes fadeInUp {
         to {
             opacity: 1;
             transform: translateY(0);
         }
     }
-    
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .slide-in-up {
+        animation: slideInUp 0.5s ease-out forwards;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Estados de visibilidad */
+    .hidden {
+        display: none !important;
+    }
+
+    .fade-out {
+        opacity: 0;
+        transform: translateY(-10px);
+        pointer-events: none;
+    }
+
+    .fade-in {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: all;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
-        .search-container {
-            max-width: 100%;
-            margin-top: 12px;
+        .nav-content {
+            flex-direction: column;
+            align-items: stretch;
         }
+
+        .search-section {
+            max-width: 100%;
+        }
+
+        .stats-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .categories-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .products-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .main-container {
+            padding: 0 0.5rem;
+        }
+
+        .categories-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .products-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Mejoras de accesibilidad */
+    .category-card:focus,
+    .product-card:focus {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+    }
+
+    .back-button:focus,
+    .search-input:focus {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+    }
+
+    /* Estados de error y vacío */
+    .no-results {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--text-secondary);
+    }
+
+    .no-results i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .error-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        color: #dc2626;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Stats bar -->
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+</div>
+
+<!-- Stats Bar -->
 <div class="stats-bar">
-    <div class="container py-3">
-        <div class="flex items-center justify-between text-sm">
+    <div class="main-container">
+        <div class="stats-content">
             <div class="stats-item">
                 <i class="fas fa-warehouse"></i>
                 <span>Almacén: Madrid (MAD-123)</span>
             </div>
             <div class="stats-item">
-                <i class="fas fa-sync-alt"></i>
-                <span>Última actualización: {{ now.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+                <i class="fas fa-clock"></i>
+                <span id="last-update">{{ now.strftime("%H:%M:%S") }}</span>
             </div>
+            <div class="stats-item">
+                <i class="fas fa-shopping-list"></i>
+                <span id="cart-count">{{ stats.current_list_items }} productos en tu lista</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Navigation Header -->
+<div class="navigation-header">
+    <div class="main-container">
+        <div class="nav-content">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb">
+                <span class="breadcrumb-item">
+                    <i class="fas fa-store"></i>
+                    <span class="breadcrumb-link" onclick="showCategories()">Mercadona</span>
+                </span>
+                <span id="breadcrumb-separator" class="breadcrumb-separator hidden">
+                    <i class="fas fa-chevron-right"></i>
+                </span>
+                <span id="breadcrumb-category" class="breadcrumb-item hidden">
+                    <span id="breadcrumb-category-name"></span>
+                </span>
+            </div>
+
+            <!-- Búsqueda Universal -->
+            <div class="search-section">
+                <div style="position: relative;">
+                    <i class="fas fa-search search-icon"></i>
+                    <input 
+                        type="text" 
+                        id="universal-search" 
+                        class="search-input"
+                        placeholder="Buscar productos en Mercadona..."
+                        autocomplete="off"
+                        aria-label="Buscar productos"
+                    >
+                    <button id="search-clear" class="search-clear" aria-label="Limpiar búsqueda">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Botón de Volver (solo visible en productos) -->
+            <button id="back-to-categories" class="back-button hidden" aria-label="Volver a categorías">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver</span>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Main Content -->
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Categories Section - Visible por defecto -->
-    <div id="categories-section" class="fade-in">
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Categorías de Productos</h2>
-            <p class="text-gray-600">Selecciona una categoría para ver sus productos</p>
-            
-            <!-- Búsqueda global -->
-            <div class="search-container mt-4">
-                <input type="text" id="search-products" placeholder="Buscar en todas las categorías...">
-                <i class="fas fa-search"></i>
-            </div>
+<div class="main-container">
+    <!-- Categories Section -->
+    <div id="categories-section" class="main-section fade-in">
+        <div class="section-header">
+            <h1 class="section-title">Categorías de Productos</h1>
+            <p class="section-subtitle">Explora nuestro catálogo organizado por categorías</p>
         </div>
         
         <div id="categories-grid" class="categories-grid">
-            <!-- Categorías se cargan dinámicamente -->
+            <!-- Las categorías se cargan dinámicamente -->
         </div>
     </div>
 
-    <!-- Products Section - Oculto inicialmente -->
-    <div id="products-section" class="hidden fade-in">
-        <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <div>
-                <button id="back-to-categories" class="back-button">
-                    <i class="fas fa-arrow-left mr-2"></i> Volver a categorías
-                </button>
-                <h2 id="category-title" class="text-2xl font-bold text-gray-900 mt-4"></h2>
-                <p id="products-count" class="text-gray-600"></p>
-            </div>
-            
-            <!-- Búsqueda en categoría actual -->
-            <div class="search-container">
-                <input type="text" id="search-in-category" placeholder="Buscar en esta categoría...">
-                <i class="fas fa-search"></i>
-            </div>
+    <!-- Products Section -->
+    <div id="products-section" class="main-section hidden">
+        <div class="section-header">
+            <h1 id="products-title" class="section-title"></h1>
+            <p id="products-subtitle" class="section-subtitle"></p>
         </div>
-
+        
         <div id="products-grid" class="products-grid">
-            <!-- Los productos se cargan aquí vía JavaScript -->
+            <!-- Los productos se cargan dinámicamente -->
         </div>
     </div>
 </div>
 
-<!-- Product Modal -->
-<div id="product-modal" class="product-modal">
+<!-- Product Modal (simplificado para el ejemplo) -->
+<div id="product-modal" class="product-modal hidden">
     <div class="modal-content">
         <div class="p-6">
             <!-- Modal content se llena vía JavaScript -->
@@ -139,564 +565,528 @@
     </div>
 </div>
 
-<!-- Toast Notifications -->
+<!-- Toast Container -->
 <div id="toast-container" class="toast-container">
     <!-- Toast messages aparecen aquí -->
 </div>
 
 <script>
-    // Variables globales
-    let currentCategory = null;
-    let allProducts = [];
-    let filteredProducts = [];
-    let categoriesData = [];
+// ========================================
+// VARIABLES GLOBALES
+// ========================================
+let currentState = {
+    view: 'categories', // 'categories' | 'products'
+    category: null,
+    products: [],
+    filteredProducts: [],
+    searchQuery: '',
+    isLoading: false
+};
 
-    // Iconos por categoría
-    const categoryIcons = {
-        'Aceite, especias y salsas': '🫒',
-        'Agua y refrescos': '🥤',
-        'Aperitivos': '🥨',
-        'Arroz, legumbres y pasta': '🍝',
-        'Azúcar, caramelos y chocolate': '🍫',
-        'Bebé': '👶',
-        'Bodega': '🍷',
-        'Cacao, café e infusiones': '☕',
-        'Carnicería y charcutería': '🥩',
-        'Cereales': '🥣',
-        'Congelados': '🧊',
-        'Conservas': '🥫',
-        'Droguería': '🧽',
-        'Frutas y verduras': '🥕',
-        'Galletas': '🍪',
-        'Higiene y belleza': '🧴',
-        'Lácteos y huevos': '🥛',
-        'Limpieza': '🧽',
-        'Panadería y pastelería': '🍞',
-        'Pescadería': '🐟',
-        'Platos preparados': '🍽️',
-        'Zumos': '🧃'
-    };
+let categoriesData = [];
 
-    // ========================================
-    // FUNCIONES PRINCIPALES
-    // ========================================
+// Iconos por categoría
+const categoryIcons = {
+    'Aceite, especias y salsas': '🫒',
+    'Agua y refrescos': '🥤',
+    'Aperitivos': '🥨',
+    'Arroz, legumbres y pasta': '🍝',
+    'Azúcar, caramelos y chocolate': '🍫',
+    'Bebé': '👶',
+    'Bodega': '🍷',
+    'Cacao, café e infusiones': '☕',
+    'Carnicería y charcutería': '🥩',
+    'Cereales': '🥣',
+    'Congelados': '🧊',
+    'Conservas': '🥫',
+    'Droguería': '🧽',
+    'Frutas y verduras': '🥕',
+    'Galletas': '🍪',
+    'Higiene y belleza': '🧴',
+    'Lácteos y huevos': '🥛',
+    'Limpieza': '🧽',
+    'Panadería y pastelería': '🍞',
+    'Pescadería': '🐟',
+    'Platos preparados': '🍽️',
+    'Zumos': '🧃'
+};
 
-    async function loadCategories() {
-        try {
-            showLoading();
+// ========================================
+// FUNCIONES DE ESTADO Y NAVEGACIÓN
+// ========================================
 
-            const response = await fetch('/mercadona/categories');
-            const data = await response.json();
-
-            if (data.success && data.categories.length > 0) {
-                categoriesData = data.categories;
-                displayCategories(data.categories);
-                hideLoading();
-                showCategories();
-            } else {
-                throw new Error(data.error || 'No se encontraron categorías');
-            }
-        } catch (error) {
-            console.error('Error loading categories:', error);
-            showToast(`Error: ${error.message}`, 'error');
-            showError();
-        }
+function updateViewState(newView, data = {}) {
+    currentState.view = newView;
+    
+    // Actualizar UI según el estado
+    if (newView === 'categories') {
+        showCategoriesView();
+        updateBreadcrumb();
+    } else if (newView === 'products') {
+        currentState.category = data.category;
+        currentState.products = data.products || [];
+        currentState.filteredProducts = [...currentState.products];
+        showProductsView();
+        updateBreadcrumb(data.category);
     }
-
-    async function loadCategoryProducts(categoryId, categoryName) {
-        try {
-            showLoading();
-            
-            const response = await fetch(`/mercadona/category/${categoryId}`);
-            const data = await response.json();
-
-            if (data.success) {
-                currentCategory = {
-                    id: categoryId,
-                    name: categoryName,
-                    isSearch: false
-                };
-                
-                allProducts = data.products;
-                filteredProducts = [...allProducts];
-                
-                // Actualizar UI
-                document.getElementById('category-title').textContent = categoryName;
-                document.getElementById('products-count').textContent = `${filteredProducts.length} productos`;
-                
-                // Ocultar categorías y mostrar productos
-                hideCategories();
-                displayProducts();
-                showProducts();
-                
-                // Limpiar búsqueda
-                document.getElementById('search-in-category').value = '';
-            } else {
-                throw new Error(data.error || 'Error al cargar productos');
-            }
-        } catch (error) {
-            console.error('Error loading products:', error);
-            showToast('Error al cargar productos', 'error');
-        } finally {
-            hideLoading();
-        }
+    
+    // Limpiar búsqueda si cambiamos de vista
+    if (newView === 'categories') {
+        clearSearch();
     }
+}
 
-    function backToCategories() {
-        showCategories();
-        currentCategory = null;
-        allProducts = [];
-        filteredProducts = [];
+function updateBreadcrumb(category = null) {
+    const separator = document.getElementById('breadcrumb-separator');
+    const categoryElement = document.getElementById('breadcrumb-category');
+    const categoryName = document.getElementById('breadcrumb-category-name');
+    
+    if (category) {
+        separator.classList.remove('hidden');
+        categoryElement.classList.remove('hidden');
+        categoryName.textContent = category.name;
+    } else {
+        separator.classList.add('hidden');
+        categoryElement.classList.add('hidden');
     }
+}
 
-    async function searchAllProducts(query) {
-        try {
-            showLoading();
-
-            const response = await fetch(`/mercadona/search?q=${encodeURIComponent(query)}`);
-            const data = await response.json();
-
-            if (data.success) {
-                currentCategory = {
-                    id: null,
-                    name: `Resultados de: "${query}"`,
-                    isSearch: true
-                };
-
-                allProducts = data.products;
-                filteredProducts = [...allProducts];
-
-                // Actualizar UI
-                document.getElementById('category-title').textContent = currentCategory.name;
-                document.getElementById('products-count').textContent = `${filteredProducts.length} productos encontrados`;
-                
-                // Ocultar categorías y mostrar productos
-                hideCategories();
-                displayProducts();
-                showProducts();
-            } else {
-                throw new Error(data.error || 'Error en la búsqueda');
-            }
-        } catch (error) {
-            console.error('Error searching products:', error);
-            showToast(`Error: ${error.message}`, 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    // ========================================
-    // FUNCIONES DE VISUALIZACIÓN
-    // ========================================
-
-    function displayCategories(categories) {
-        const grid = document.getElementById('categories-grid');
-        if (!grid) return;
-        
-        grid.innerHTML = '';
-
-        categories.forEach((category, index) => {
-            const icon = categoryIcons[category.name] || '🛍️';
-
-            const categoryCard = document.createElement('div');
-            categoryCard.className = 'category-card slide-in-up';
-            categoryCard.style.animationDelay = `${index * 0.1}s`;
-            categoryCard.onclick = () => loadCategoryProducts(category.id, category.name);
-            
-            categoryCard.innerHTML = `
-                <div class="text-center">
-                    <div class="category-icon">${icon}</div>
-                    <h3 class="category-name">${category.name}</h3>
-                    <p class="category-subcategories">${category.subcategories_count} subcategorías</p>
-                    <div class="category-id-badge">
-                        ID: ${category.id + 100} 
-                    </div>
-                </div>
-            `;
-            
-            grid.appendChild(categoryCard);
-        });
-    }
-
-    function displayProducts() {
-        const grid = document.getElementById('products-grid');
-        const titleEl = document.getElementById('category-title');
-        const countEl = document.getElementById('products-count');
-
-        if (!grid || !titleEl || !countEl) return;
-
-        countEl.textContent = `${filteredProducts.length} productos`;
-        grid.innerHTML = '';
-
-        if (filteredProducts.length === 0) {
-            grid.innerHTML = `
-                <div class="no-results">
-                    <i class="fas fa-search fa-3x mb-4 text-gray-400"></i>
-                    <h3 class="text-xl font-semibold mb-2">No se encontraron productos</h3>
-                    <p class="text-gray-600">Intenta con otro término de búsqueda</p>
-                </div>
-            `;
-            return;
-        }
-
-        filteredProducts.forEach((product, index) => {
-            const hasDiscount = product.is_discounted || (product.previous_price && product.previous_price.trim() !== '');
-            const priceDisplay = hasDiscount ?
-                `<span class="price-main price-discount">${product.price}€</span>
-                 ${product.previous_price ? `<span class="price-old">${product.previous_price.trim()}€</span>` : ''}` :
-                `<span class="price-main price-regular">${product.price}€</span>`;
-
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card slide-in-up';
-            productCard.style.animationDelay = `${index * 0.1}s`;
-            
-            productCard.innerHTML = `
-                <div class="product-image-container">
-                    <img src="${product.thumbnail}" 
-                         alt="${product.name}" 
-                         class="product-image"
-                         onerror="this.src='/static/img/default_food.jpg'">
-                    ${hasDiscount ? '<div class="discount-badge">¡Oferta!</div>' : ''}
-                </div>
-                
-                <div class="product-content">
-                    <h3 class="product-name">${product.name}</h3>
-                    <p class="product-details">${product.packaging} • ${product.size}${product.size_format}</p>
-                    
-                    <div class="product-price-section">
-                        <div>${priceDisplay}</div>
-                        <div class="price-reference">${product.reference_price}€/${product.size_format}</div>
-                    </div>
-                    
-                    <div class="product-actions">
-                        <div class="quantity-controls">
-                            <button onclick="changeQuantity('${product.id}', -1)" class="quantity-btn">
-                                <i class="fas fa-minus text-xs"></i>
-                            </button>
-                            <span id="qty-${product.id}" class="quantity-display">1</span>
-                            <button onclick="changeQuantity('${product.id}', 1)" class="quantity-btn">
-                                <i class="fas fa-plus text-xs"></i>
-                            </button>
-                        </div>
-                        
-                        <button onclick="addToList('${product.id}', getQuantity('${product.id}'))" class="add-to-cart-btn">
-                            <i class="fas fa-plus"></i>
-                            <span>Añadir</span>
-                        </button>
-                    </div>
-                    
-                    <button onclick="showProductDetails('${product.id}')" class="details-btn">
-                        Ver detalles
-                    </button>
-                </div>
-            `;
-            
-            grid.appendChild(productCard);
-        });
-    }
-
-    // ========================================
-    // FUNCIONES DE VISIBILIDAD
-    // ========================================
-
-    function showCategories() {
-        document.getElementById('categories-section').classList.remove('hidden');
-        document.getElementById('products-section').classList.add('hidden');
-        document.getElementById('search-products').value = '';
-    }
-
-    function hideCategories() {
-        document.getElementById('categories-section').classList.add('hidden');
-    }
-
-    function showProducts() {
-        document.getElementById('categories-section').classList.add('hidden');
-        document.getElementById('products-section').classList.remove('hidden');
-    }
-
-    function showLoading() {
-        // Implementar según tu diseño
-        console.log("Loading...");
-    }
-
-    function hideLoading() {
-        // Implementar según tu diseño
-        console.log("Loading complete");
-    }
-
-    function showError() {
-        showToast('Error al cargar la aplicación', 'error');
-    }
-
-    // ========================================
-    // EVENT LISTENERS
-    // ========================================
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // Cargar categorías al inicio
-        loadCategories();
-
-        // Botón de volver
-        document.getElementById('back-to-categories').addEventListener('click', backToCategories);
-        
-        // Búsqueda global
-        document.getElementById('search-products').addEventListener('input', debounce(function(e) {
-            const query = e.target.value.trim();
-            if (query.length >= 2) {
-                searchAllProducts(query);
-            } else if (query.length === 0 && currentCategory && currentCategory.isSearch) {
-                backToCategories();
-            }
-        }, 300));
-        
-        // Búsqueda en categoría actual
-        document.getElementById('search-in-category').addEventListener('input', debounce(function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            filteredProducts = allProducts.filter(product => 
-                product.name.toLowerCase().includes(searchTerm)
-            );
-            document.getElementById('products-count').textContent = `${filteredProducts.length} productos`;
-            displayProducts();
-        }, 300));
-    });
-
-    // Función debounce para optimizar búsquedas
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    // ========================================
-    // FUNCIONES AUXILIARES (simplificadas)
-    // ========================================
-
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-        
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML = `
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-            <span>${message}</span>
-        `;
-
-        container.appendChild(toast);
-        setTimeout(() => toast.classList.add('show'), 100);
+function showCategoriesView() {
+    const categoriesSection = document.getElementById('categories-section');
+    const productsSection = document.getElementById('products-section');
+    const backButton = document.getElementById('back-to-categories');
+    
+    // Animación de salida para productos
+    if (!productsSection.classList.contains('hidden')) {
+        productsSection.classList.add('fade-out');
         setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+            productsSection.classList.add('hidden');
+            productsSection.classList.remove('fade-out');
+        }, 300);
     }
+    
+    // Mostrar categorías
+    setTimeout(() => {
+        categoriesSection.classList.remove('hidden');
+        categoriesSection.classList.add('fade-in');
+    }, 300);
+    
+    // Ocultar botón de volver
+    backButton.classList.add('hidden');
+    
+    // Actualizar placeholder de búsqueda
+    document.getElementById('universal-search').placeholder = 'Buscar productos en Mercadona...';
+}
 
-    function changeQuantity(productId, delta) {
-        const qtyEl = document.getElementById(`qty-${productId}`);
-        if (!qtyEl) return;
-        
-        let currentQty = parseInt(qtyEl.textContent);
-        currentQty = Math.max(1, currentQty + delta);
-        qtyEl.textContent = currentQty;
-    }
+function showProductsView() {
+    const categoriesSection = document.getElementById('categories-section');
+    const productsSection = document.getElementById('products-section');
+    const backButton = document.getElementById('back-to-categories');
+    
+    // Ocultar categorías con animación
+    categoriesSection.classList.add('fade-out');
+    setTimeout(() => {
+        categoriesSection.classList.add('hidden');
+        categoriesSection.classList.remove('fade-out');
+    }, 300);
+    
+    // Mostrar productos
+    setTimeout(() => {
+        productsSection.classList.remove('hidden');
+        productsSection.classList.add('fade-in');
+        displayProducts();
+    }, 300);
+    
+    // Mostrar botón de volver
+    backButton.classList.remove('hidden');
+    
+    // Actualizar títulos
+    updateProductsHeader();
+    
+    // Actualizar placeholder de búsqueda
+    const placeholder = currentState.category ? 
+        `Buscar en ${currentState.category.name}...` : 
+        'Buscar productos...';
+    document.getElementById('universal-search').placeholder = placeholder;
+}
 
-    function getQuantity(productId) {
-        const qtyEl = document.getElementById(`qty-${productId}`);
-        return qtyEl ? parseInt(qtyEl.textContent) : 1;
-    }
-
-// ========================================
-// FUNCIONES DEL MODAL DE PRODUCTO
-// ========================================
-
-async function showProductDetails(productId) {
-    try {
-        showLoading();
-
-        const response = await fetch(`/mercadona/product/${productId}`);
-        const data = await response.json();
-
-        if (data.success) {
-            const product = data.product;
-            const modal = document.getElementById('product-modal');
-            const modalContent = modal.querySelector('.p-6');
-
-            // Construir el contenido del modal
-            modalContent.innerHTML = `
-                <div class="modal-header">
-                    <h2 class="modal-title">${product.name}</h2>
-                    <button onclick="hideProductDetails()" class="modal-close">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <div class="modal-grid">
-                    <div class="modal-image-section">
-                        <img src="${product.thumbnail}" 
-                             alt="${product.name}" 
-                             class="modal-main-image"
-                             onerror="this.src='/static/img/default_food.jpg'">
-                        
-                        ${product.photos && product.photos.length > 0 ? `
-                        <div class="modal-thumbnails">
-                            ${product.photos.slice(0, 4).map(photo => `
-                                <img src="${photo.regular || photo.thumbnail}" 
-                                     class="modal-thumbnail"
-                                     onclick="changeModalImage('${photo.regular || photo.thumbnail}')">
-                            `).join('')}
-                        </div>` : ''}
-                    </div>
-                    
-                    <div class="modal-info-section">
-                        <div class="modal-badges">
-                            <span class="modal-badge badge-brand">${product.brand || 'Mercadona'}</span>
-                            ${product.origin ? `<span class="modal-badge badge-origin">${product.origin}</span>` : ''}
-                        </div>
-                        
-                        <div class="modal-price-section">
-                            <div class="modal-price">
-                                ${product.price}€
-                                <span class="modal-price-unit">/${product.size_format}</span>
-                            </div>
-                            ${product.previous_price ? `
-                            <div class="modal-old-price">
-                                Antes: ${product.previous_price}€
-                            </div>` : ''}
-                        </div>
-                        
-                        <div class="modal-details-grid">
-                            <div class="modal-detail-item">
-                                <i class="fas fa-box-open"></i>
-                                <span>${product.packaging || 'No especificado'}</span>
-                            </div>
-                            <div class="modal-detail-item">
-                                <i class="fas fa-ruler-combined"></i>
-                                <span>${product.size}${product.size_format}</span>
-                            </div>
-                            ${product.ean ? `
-                            <div class="modal-detail-item">
-                                <i class="fas fa-barcode"></i>
-                                <span>${product.ean}</span>
-                            </div>` : ''}
-                        </div>
-                        
-                        ${product.description ? `
-                        <div class="modal-description">
-                            <h3 class="modal-section-title">
-                                <i class="fas fa-align-left"></i> Descripción
-                            </h3>
-                            <p>${product.description}</p>
-                        </div>` : ''}
-                        
-                        ${product.ingredients ? `
-                        <div class="modal-ingredients">
-                            <h3 class="modal-section-title">
-                                <i class="fas fa-list"></i> Ingredientes
-                            </h3>
-                            <p>${product.ingredients}</p>
-                        </div>` : ''}
-                        
-                        ${product.storage ? `
-                        <div class="modal-storage">
-                            <h3 class="modal-section-title">
-                                <i class="fas fa-temperature-low"></i> Conservación
-                            </h3>
-                            <p>${product.storage}</p>
-                        </div>` : ''}
-                        
-                        <div class="modal-actions">
-                            <div class="modal-quantity-controls">
-                                <button onclick="changeModalQuantity(-1)" class="modal-quantity-btn">
-                                    <i class="fas fa-minus"></i>
-                                </button>
-                                <span id="modal-quantity" class="modal-quantity-display">1</span>
-                                <button onclick="changeModalQuantity(1)" class="modal-quantity-btn">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                            
-                            <button onclick="addToListFromModal('${productId}')" class="modal-add-btn">
-                                <i class="fas fa-cart-plus"></i>
-                                <span>Añadir a lista</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Mostrar el modal
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-            document.addEventListener('keydown', handleModalKeyDown);
+function updateProductsHeader() {
+    const title = document.getElementById('products-title');
+    const subtitle = document.getElementById('products-subtitle');
+    
+    if (currentState.category) {
+        if (currentState.category.isSearch) {
+            title.textContent = `Resultados de búsqueda`;
+            subtitle.textContent = `${currentState.filteredProducts.length} productos encontrados para "${currentState.searchQuery}"`;
         } else {
-            throw new Error(data.error || 'Error al obtener detalles del producto');
+            title.textContent = currentState.category.name;
+            subtitle.textContent = `${currentState.filteredProducts.length} productos disponibles`;
+        }
+    }
+}
+
+// ========================================
+// FUNCIONES DE CARGA DE DATOS
+// ========================================
+
+async function loadCategories() {
+    if (currentState.isLoading) return;
+    
+    try {
+        setLoading(true);
+        
+        const response = await fetch('/mercadona/categories');
+        const data = await response.json();
+        
+        if (data.success && data.categories.length > 0) {
+            categoriesData = data.categories;
+            displayCategories(data.categories);
+            updateViewState('categories');
+        } else {
+            throw new Error(data.error || 'No se encontraron categorías');
         }
     } catch (error) {
-        console.error('Error showing product details:', error);
+        console.error('Error loading categories:', error);
+        showToast(`Error: ${error.message}`, 'error');
+        showErrorState('categories-grid');
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function loadCategoryProducts(categoryId, categoryName) {
+    if (currentState.isLoading) return;
+    
+    try {
+        setLoading(true);
+        
+        const response = await fetch(`/mercadona/category/${categoryId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const category = {
+                id: categoryId,
+                name: categoryName,
+                isSearch: false
+            };
+            
+            updateViewState('products', {
+                category: category,
+                products: data.products
+            });
+        } else {
+            throw new Error(data.error || 'Error al cargar productos');
+        }
+    } catch (error) {
+        console.error('Error loading products:', error);
+        showToast('Error al cargar productos', 'error');
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function searchProducts(query) {
+    if (currentState.isLoading || !query.trim()) return;
+    
+    try {
+        setLoading(true);
+        currentState.searchQuery = query.trim();
+        
+        const response = await fetch(`/mercadona/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const searchCategory = {
+                id: null,
+                name: 'Resultados de búsqueda',
+                isSearch: true
+            };
+            
+            updateViewState('products', {
+                category: searchCategory,
+                products: data.products
+            });
+        } else {
+            throw new Error(data.error || 'Error en la búsqueda');
+        }
+    } catch (error) {
+        console.error('Error searching products:', error);
         showToast(`Error: ${error.message}`, 'error');
     } finally {
-        hideLoading();
+        setLoading(false);
     }
 }
 
-function hideProductDetails() {
-    const modal = document.getElementById('product-modal');
-    if (modal) {
-        modal.classList.remove('active');
+// ========================================
+// FUNCIONES DE VISUALIZACIÓN
+// ========================================
+
+function displayCategories(categories) {
+    const grid = document.getElementById('categories-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+    
+    categories.forEach((category, index) => {
+        const icon = categoryIcons[category.name] || '🛍️';
+        
+        const categoryCard = document.createElement('div');
+        categoryCard.className = 'category-card slide-in-up';
+        categoryCard.style.animationDelay = `${index * 0.1}s`;
+        categoryCard.setAttribute('tabindex', '0');
+        categoryCard.setAttribute('role', 'button');
+        categoryCard.setAttribute('aria-label', `Ver productos de ${category.name}`);
+        
+        categoryCard.innerHTML = `
+            <div class="category-icon">${icon}</div>
+            <h3 class="category-name">${category.name}</h3>
+            <p class="category-subcategories">${category.subcategories_count} subcategorías</p>
+            <div class="category-id-badge">ID: ${category.id + 100}</div>
+        `;
+        
+        // Event listeners
+        categoryCard.addEventListener('click', () => loadCategoryProducts(category.id, category.name));
+        categoryCard.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                loadCategoryProducts(category.id, category.name);
+            }
+        });
+        
+        grid.appendChild(categoryCard);
+    });
+}
+
+function displayProducts() {
+    const grid = document.getElementById('products-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+    
+    if (currentState.filteredProducts.length === 0) {
+        grid.innerHTML = `
+            <div class="no-results">
+                <i class="fas fa-search"></i>
+                <h3>No se encontraron productos</h3>
+                <p>Intenta con otros términos de búsqueda o explora las categorías</p>
+            </div>
+        `;
+        return;
+    }
+    
+    currentState.filteredProducts.forEach((product, index) => {
+        const productCard = createProductCard(product, index);
+        grid.appendChild(productCard);
+    });
+    
+    updateProductsHeader();
+}
+
+function createProductCard(product, index) {
+    const hasDiscount = product.is_discounted || (product.previous_price && product.previous_price.trim() !== '');
+    
+    const productCard = document.createElement('div');
+    productCard.className = 'product-card slide-in-up';
+    productCard.style.animationDelay = `${index * 0.05}s`;
+    
+    productCard.innerHTML = `
+        <div class="product-image-container">
+            <img src="${product.thumbnail}" 
+                 alt="${product.name}" 
+                 class="product-image"
+                 loading="lazy"
+                 onerror="this.src='/static/img/default_food.jpg'">
+            ${hasDiscount ? '<div class="discount-badge">¡Oferta!</div>' : ''}
+        </div>
+        
+        <div class="product-content">
+            <h3 class="product-name">${product.name}</h3>
+            <p class="product-details">${product.packaging} • ${product.size}${product.size_format}</p>
+            
+            <div class="product-price-section">
+                <div class="product-price">
+                    ${hasDiscount ? 
+                        `<span class="price-main price-discount">${product.price}€</span>
+                         ${product.previous_price ? `<span class="price-old">${product.previous_price.trim()}€</span>` : ''}` :
+                        `<span class="price-main price-regular">${product.price}€</span>`
+                    }
+                </div>
+                <div class="price-reference">${product.reference_price}€/${product.size_format}</div>
+            </div>
+            
+            <div class="product-actions">
+                <div class="quantity-controls">
+                    <button onclick="changeQuantity('${product.id}', -1)" class="quantity-btn" aria-label="Disminuir cantidad">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <span id="qty-${product.id}" class="quantity-display">1</span>
+                    <button onclick="changeQuantity('${product.id}', 1)" class="quantity-btn" aria-label="Aumentar cantidad">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <button onclick="addToList('${product.id}')" class="add-to-cart-btn" aria-label="Añadir ${product.name} a la lista">
+                    <i class="fas fa-plus"></i>
+                    <span>Añadir</span>
+                </button>
+            </div>
+            
+            <button onclick="showProductDetails('${product.id}')" class="details-btn">
+                Ver detalles
+            </button>
+        </div>
+    `;
+    
+    return productCard;
+}
+
+// ========================================
+// FUNCIONES DE UTILIDAD
+// ========================================
+
+function setLoading(isLoading) {
+    currentState.isLoading = isLoading;
+    const overlay = document.getElementById('loading-overlay');
+    
+    if (isLoading) {
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    } else {
+        overlay.classList.remove('active');
         document.body.style.overflow = 'auto';
-        document.removeEventListener('keydown', handleModalKeyDown);
     }
 }
 
-function handleModalKeyDown(e) {
-    if (e.key === 'Escape') {
-        hideProductDetails();
+function showErrorState(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="error-state">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Error al cargar contenido</h3>
+            <p>No se pudieron cargar los datos. Por favor, intenta de nuevo.</p>
+            <button onclick="location.reload()" class="back-button" style="margin-top: 1rem;">
+                <i class="fas fa-refresh"></i>
+                Reintentar
+            </button>
+        </div>
+    `;
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    const iconMap = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        warning: 'exclamation-triangle',
+        info: 'info-circle'
+    };
+    
+    toast.innerHTML = `
+        <i class="fas fa-${iconMap[type] || iconMap.info}"></i>
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()" class="toast-close">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Animación de entrada
+    setTimeout(() => toast.classList.add('show'), 100);
+    
+    // Auto-remove después de 5 segundos
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+function clearSearch() {
+    const searchInput = document.getElementById('universal-search');
+    const clearButton = document.getElementById('search-clear');
+    
+    searchInput.value = '';
+    clearButton.classList.remove('visible');
+    currentState.searchQuery = '';
+    
+    // Si estamos en vista de productos y era una búsqueda, volver a categorías
+    if (currentState.view === 'products' && currentState.category && currentState.category.isSearch) {
+        showCategories();
     }
 }
 
-function changeModalImage(imageUrl) {
-    const mainImage = document.querySelector('.modal-main-image');
-    if (mainImage) {
-        mainImage.src = imageUrl;
+function filterProductsInCurrentCategory(query) {
+    if (!query.trim()) {
+        currentState.filteredProducts = [...currentState.products];
+    } else {
+        const searchTerm = query.toLowerCase();
+        currentState.filteredProducts = currentState.products.filter(product => 
+            product.name.toLowerCase().includes(searchTerm) ||
+            product.packaging.toLowerCase().includes(searchTerm)
+        );
     }
-}
-
-function changeModalQuantity(delta) {
-    const quantityEl = document.getElementById('modal-quantity');
-    if (quantityEl) {
-        let current = parseInt(quantityEl.textContent) || 1;
-        current = Math.max(1, current + delta);
-        quantityEl.textContent = current;
+    
+    if (currentState.view === 'products') {
+        displayProducts();
     }
-}
-
-function getModalQuantity() {
-    const quantityEl = document.getElementById('modal-quantity');
-    return quantityEl ? parseInt(quantityEl.textContent) || 1 : 1;
 }
 
 // ========================================
-// FUNCIONES PARA AÑADIR A LISTA
+// FUNCIONES DE NAVEGACIÓN
 // ========================================
 
-function addToList(productId, quantity = 1, productName = '', packaging = '') {
-    const product = allProducts.find(p => p.id == productId);
+function showCategories() {
+    updateViewState('categories');
+}
+
+function backToCategories() {
+    showCategories();
+}
+
+// ========================================
+// FUNCIONES DE PRODUCTOS
+// ========================================
+
+function changeQuantity(productId, delta) {
+    const qtyEl = document.getElementById(`qty-${productId}`);
+    if (!qtyEl) return;
+    
+    let currentQty = parseInt(qtyEl.textContent) || 1;
+    currentQty = Math.max(1, Math.min(99, currentQty + delta));
+    qtyEl.textContent = currentQty;
+}
+
+function getQuantity(productId) {
+    const qtyEl = document.getElementById(`qty-${productId}`);
+    return qtyEl ? parseInt(qtyEl.textContent) || 1 : 1;
+}
+
+function addToList(productId) {
+    const product = currentState.products.find(p => p.id == productId) || 
+                   currentState.filteredProducts.find(p => p.id == productId);
+    
     if (!product) {
         showToast('Producto no encontrado', 'error');
         return;
     }
-
-    const nameToUse = productName || product.name;
-    const packagingToUse = packaging || product.packaging || '';
-    const price = product.price || '0';
-    const size = product.size || '';
-    const sizeFormat = product.size_format || '';
-
+    
+    const quantity = getQuantity(productId);
+    
+    // Mostrar loading en el botón
+    const addButton = document.querySelector(`button[onclick="addToList('${productId}')"]`);
+    const originalContent = addButton.innerHTML;
+    addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Añadiendo...</span>';
+    addButton.disabled = true;
+    
     fetch('/api/add_shopping_item', {
         method: 'POST',
         headers: {
@@ -705,12 +1095,12 @@ function addToList(productId, quantity = 1, productName = '', packaging = '') {
         },
         body: JSON.stringify({
             product_id: productId,
-            name: nameToUse,
+            name: product.name,
             quantity: quantity,
-            packaging: packagingToUse,
-            price: price,
-            size: size,
-            size_format: sizeFormat,
+            packaging: product.packaging || '',
+            price: product.price || '0',
+            size: product.size || '',
+            size_format: product.size_format || '',
             source: 'mercadona'
         })
     })
@@ -719,14 +1109,18 @@ function addToList(productId, quantity = 1, productName = '', packaging = '') {
         if (data.success) {
             const action = data.action || 'added';
             const message = action === 'added' ? 
-                `✅ ${nameToUse} añadido a la lista` : 
-                `🔄 ${nameToUse} actualizado (cantidad: ${data.new_quantity})`;
+                `✅ ${product.name} añadido a la lista` : 
+                `🔄 ${product.name} actualizado (cantidad: ${data.new_quantity})`;
+            
             showToast(message, 'success');
             
-            // Opcional: Actualizar la vista si es necesario
-            if (action === 'updated') {
-                updateProductQuantityInView(productId, data.new_quantity);
-            }
+            // Actualizar contador en stats bar
+            updateCartCount();
+            
+            // Resetear cantidad a 1
+            const qtyEl = document.getElementById(`qty-${productId}`);
+            if (qtyEl) qtyEl.textContent = '1';
+            
         } else {
             showToast(data.error || 'Error al añadir producto', 'error');
         }
@@ -734,40 +1128,195 @@ function addToList(productId, quantity = 1, productName = '', packaging = '') {
     .catch(error => {
         console.error('Error:', error);
         showToast('Error de conexión con el servidor', 'error');
+    })
+    .finally(() => {
+        // Restaurar botón
+        addButton.innerHTML = originalContent;
+        addButton.disabled = false;
     });
 }
 
-function addToListFromModal(productId) {
-    const quantity = getModalQuantity();
-    const product = allProducts.find(p => p.id == productId);
-
-    if (product) {
-        addToList(
-            productId, 
-            quantity, 
-            product.name, 
-            product.packaging
-        );
-        hideProductDetails();
+function updateCartCount() {
+    // Esta función se puede implementar para actualizar el contador en tiempo real
+    // Por ahora, simplemente incrementamos el número mostrado
+    const cartCountEl = document.getElementById('cart-count');
+    if (cartCountEl) {
+        const currentText = cartCountEl.textContent;
+        const currentNumber = parseInt(currentText.match(/\d+/)) || 0;
+        cartCountEl.textContent = `${currentNumber + 1} productos en tu lista`;
     }
 }
 
-function updateProductQuantityInView(productId, newQuantity) {
-    // Actualiza la cantidad mostrada en la vista si es necesario
-    const qtyElement = document.getElementById(`qty-${productId}`);
-    if (qtyElement) {
-        qtyElement.textContent = newQuantity;
-    }
+function showProductDetails(productId) {
+    // Esta función se puede expandir para mostrar el modal completo
+    console.log('Showing details for product:', productId);
+    showToast('Función de detalles en desarrollo', 'info');
 }
-
-// ========================================
-// FUNCIÓN PARA OBTENER TOKEN CSRF
-// ========================================
 
 function getCSRFToken() {
     const token = document.querySelector('meta[name="csrf-token"]');
     return token ? token.content : '';
 }
 
+// ========================================
+// EVENT LISTENERS
+// ========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar categorías al inicio
+    loadCategories();
+    
+    // Búsqueda universal con debounce
+    const searchInput = document.getElementById('universal-search');
+    const clearButton = document.getElementById('search-clear');
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function(e) {
+        const query = e.target.value.trim();
+        
+        // Mostrar/ocultar botón de limpiar
+        if (query.length > 0) {
+            clearButton.classList.add('visible');
+        } else {
+            clearButton.classList.remove('visible');
+        }
+        
+        // Limpiar timeout anterior
+        clearTimeout(searchTimeout);
+        
+        // Decidir qué tipo de búsqueda hacer
+        searchTimeout = setTimeout(() => {
+            if (query.length >= 2) {
+                // Búsqueda global si estamos en categorías o si la query es nueva
+                if (currentState.view === 'categories' || 
+                    (currentState.category && currentState.category.isSearch)) {
+                    searchProducts(query);
+                } else if (currentState.view === 'products') {
+                    // Filtrar en categoría actual
+                    filterProductsInCurrentCategory(query);
+                }
+            } else if (query.length === 0) {
+                // Limpiar búsqueda
+                if (currentState.view === 'products' && currentState.category && currentState.category.isSearch) {
+                    showCategories();
+                } else if (currentState.view === 'products') {
+                    // Mostrar todos los productos de la categoría actual
+                    currentState.filteredProducts = [...currentState.products];
+                    displayProducts();
+                }
+            }
+        }, 300);
+    });
+    
+    // Botón de limpiar búsqueda
+    clearButton.addEventListener('click', clearSearch);
+    
+    // Botón de volver a categorías
+    document.getElementById('back-to-categories').addEventListener('click', backToCategories);
+    
+    // Breadcrumb navigation
+    document.querySelector('.breadcrumb-link').addEventListener('click', showCategories);
+    
+    // Atajos de teclado
+    document.addEventListener('keydown', function(e) {
+        // ESC para volver atrás
+        if (e.key === 'Escape') {
+            if (currentState.view === 'products') {
+                backToCategories();
+            }
+        }
+        
+        // Ctrl/Cmd + K para enfocar búsqueda
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+        }
+    });
+    
+    // Actualizar tiempo cada minuto
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('last-update').textContent = now.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }, 60000);
+});
+
+// ========================================
+// UTILIDADES ADICIONALES
+// ========================================
+
+// Debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Función para manejar errores de imágenes
+function handleImageError(img) {
+    img.src = '/static/img/default_food.jpg';
+    img.onerror = null; // Prevenir bucle infinito
+}
+
+// Función para lazy loading manual si es necesario
+function lazyLoadImages() {
+    const images = document.querySelectorAll('img[data-src]');
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                img.src = img.dataset.src;
+                img.removeAttribute('data-src');
+                imageObserver.unobserve(img);
+            }
+        });
+    });
+    
+    images.forEach(img => imageObserver.observe(img));
+}
+
+// Función para scroll suave a la parte superior
+function scrollToTop() {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
+// Función para detectar si el usuario está en móvil
+function isMobile() {
+    return window.innerWidth <= 768;
+}
+
+// Optimización de rendimiento: throttle para scroll
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
+
+// Función para analytics (si se necesita)
+function trackEvent(eventName, properties = {}) {
+    console.log('Event:', eventName, properties);
+    // Aquí se puede integrar con Google Analytics, etc.
+}
+
+console.log('🛒 Mercadona Store initialized');
 </script>
 {% endblock %}

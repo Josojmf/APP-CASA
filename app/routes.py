@@ -11,6 +11,7 @@ import logging
 import json
 import traceback  
 from datetime import datetime
+import re
 #Retry 
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -1847,6 +1848,111 @@ def mercadona_search():
             'success': False,
             'error': 'Error en la búsqueda'
         }), 500
+        
+        
+@main.route('/api/add_shopping_item', methods=['POST'])
+@login_required
+def add_shopping_item():
+    """Añadir un producto individual a la lista de compra desde Mercadona"""
+    try:
+        data = request.get_json()
+        
+        # Validar datos requeridos
+        product_id = data.get('product_id')
+        name = data.get('name', '').strip()
+        quantity = int(data.get('quantity', 1))
+        
+        if not product_id or not name:
+            return jsonify({"error": "Faltan campos obligatorios"}), 400
+        
+        if quantity < 1 or quantity > 99:
+            return jsonify({"error": "Cantidad inválida (1-99)"}), 400
+        
+        # Datos opcionales
+        packaging = data.get('packaging', '').strip()
+        price = data.get('price', '0').strip()
+        size = data.get('size', '').strip()
+        size_format = data.get('size_format', '').strip()
+        source = data.get('source', 'mercadona')
+        
+        # Verificar si el producto ya existe en la lista
+        existing_item = mongo.db.lista_compra.find_one({
+            "$or": [
+                {"product_id": product_id},
+                {"nombre": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+            ],
+            "comprado": False
+        })
+        
+        if existing_item:
+            # Actualizar cantidad del producto existente
+            new_quantity = int(existing_item.get("cantidad", 1)) + quantity
+            new_quantity = min(new_quantity, 99)  # Límite máximo
+            
+            mongo.db.lista_compra.update_one(
+                {"_id": existing_item["_id"]},
+                {
+                    "$set": {
+                        "cantidad": str(new_quantity),
+                        "updated_by": session.get("user"),
+                        "updated_at": datetime.now(),
+                        "price": price,  # Actualizar precio si viene
+                        "source": source
+                    }
+                }
+            )
+            
+            return jsonify({
+                "success": True,
+                "action": "updated",
+                "new_quantity": new_quantity,
+                "message": f"Cantidad actualizada: {new_quantity}"
+            })
+        else:
+            # Crear nuevo producto en la lista
+            new_item = {
+                "product_id": product_id,
+                "nombre": name,
+                "cantidad": str(quantity),
+                "unidad": size_format if size_format else "",
+                "packaging": packaging,
+                "price": price,
+                "size": size,
+                "comprado": False,
+                "source": source,
+                "created_by": session.get("user"),
+                "created_at": datetime.now(),
+                "added_from_mercadona": True
+            }
+            
+            result = mongo.db.lista_compra.insert_one(new_item)
+            
+            # Notificar a todos los usuarios
+            try:
+                from app.api import send_push_to_all
+                send_push_to_all(
+                    title="🛒 Producto desde Mercadona",
+                    body=f"{session.get('user')} añadió: {name}",
+                    url="/lista_compra"
+                )
+            except ImportError:
+                pass  # Si no existe la función de push, continuar sin error
+            
+            return jsonify({
+                "success": True,
+                "action": "added",
+                "item_id": str(result.inserted_id),
+                "message": f"{name} añadido a la lista"
+            })
+    
+    except ValueError as e:
+        logger.error(f"Error de validación en add_shopping_item: {e}")
+        return jsonify({"error": "Datos inválidos"}), 400
+    except Exception as e:
+        logger.error(f"Error add_shopping_item: {e}")
+        return jsonify({"error": "Error al añadir producto"}), 500        
+
+
 # ==========================================
 # Manejo de errores mejorado
 # ==========================================

@@ -1084,22 +1084,22 @@ def clear_all_tasks():
 # 2. CORREGIR el decorador de la función en api.py:
 # Cambiar de @main.route a @api.route
 
-@api.route("/api/mercadona/add_to_list", methods=['POST'])
+api.route("/api/mercadona/add_to_list", methods=['POST'])
 @login_required
 def add_mercadona_to_list():
-    """Añadir producto de Mercadona a nuestra lista de compra"""
+    """Añadir producto de Mercadona a nuestra lista de compra (endpoint alternativo)"""
     try:
         data = request.get_json()
         product_id = data.get('product_id')
-        product_name = data.get('product_name')  # Nuevo: recibir nombre directamente
+        product_name = data.get('product_name')
         quantity = int(data.get('quantity', 1))
-        packaging = data.get('packaging', '')    # Nuevo: recibir empaque
+        packaging = data.get('packaging', '')
         
         if not product_id or not product_name:
             return jsonify({'error': 'Datos de producto requeridos'}), 400
             
         # Formatear nombre con detalles
-        formatted_name = product_name.title()  # Asegurar formato de título
+        formatted_name = product_name.title()
         if packaging:
             formatted_name += f" ({packaging})"
         
@@ -1125,7 +1125,7 @@ def add_mercadona_to_list():
             new_item = {
                 "nombre": formatted_name,
                 "cantidad": str(quantity),
-                "unidad": "",  # Dejar vacío o usar data.get('size_format', '')
+                "unidad": "",
                 "comprado": False,
                 "created_by": session.get("user"),
                 "created_at": datetime.now(),
