@@ -197,8 +197,9 @@ jobs:
           DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
           IMAGE_DIGEST: ${{ needs.build.outputs.image-digest }}
-          HEALTH_URL: "http://localhost:5000/health"
-          PUBLIC_HEALTH_URL: "https://www.house-app.casa/health"
+          # Usamos /login mientras no exista /health público
+          HEALTH_URL: "http://127.0.0.1:5000/login"
+          PUBLIC_HEALTH_URL: "https://www.house-app.casa/login"
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ env.SSH_USER }}
@@ -222,7 +223,7 @@ jobs:
             # Parar lo viejo SOLO después de tener la nueva imagen
             if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
               log "🛑 Stopping container $CONTAINER_NAME"
-              docker stop --time=30 "$CONTAINER_NAME" || true
+              docker stop --timeout=30 "$CONTAINER_NAME" || true
               docker rm "$CONTAINER_NAME" || true
             fi
 
@@ -235,13 +236,15 @@ jobs:
               -e SECRET_KEY='${{ secrets.SECRET_KEY }}' \
               -e GROQ_API_KEY='${{ secrets.GROQ_API_KEY }}' \
               -e FLASK_ENV='production' \
+              -e HEALTH_URL="$HEALTH_URL" \
               --restart unless-stopped \
               --memory="512m" \
               --cpus="1.0" \
-              --health-cmd="curl -fsS ${HEALTH_URL} || exit 1" \
+              --health-cmd="python -c 'import os,sys,socket,urllib.request as r; socket.setdefaulttimeout(3); url=os.environ.get(\"HEALTH_URL\",\"http://127.0.0.1:5000/login\"); sys.exit(0) if r.urlopen(url).getcode()==200 else sys.exit(1)'" \
               --health-interval=15s \
               --health-timeout=5s \
               --health-retries=5 \
+              --health-start-period=30s \
               --log-driver=json-file \
               --log-opt max-size=50m \
               --log-opt max-file=3 \
@@ -272,6 +275,7 @@ jobs:
             }
 
             log "🎉 Deploy OK: $IMAGE_REF"
+
 
   # ====================================
   # Job 4: Cleanup
