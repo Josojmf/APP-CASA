@@ -32,7 +32,6 @@ on:
 
 env:
   PROD_URL: "https://www.house-app.casa"
-  STAGING_URL: "https://staging.house-app.casa"
   TIMEOUT: 30
   RETRY_COUNT: 3
   MAX_RESPONSE_TIME: 3.0
@@ -60,22 +59,6 @@ jobs:
       - name: 📦 Install testing dependencies
         run: |
           pip install requests beautifulsoup4 selenium pytest httpx aiohttp
-
-      - name: 🔧 Setup environment
-        run: |
-          # Determinar la URL base según el contexto
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
-              echo "BASE_URL=${{ env.STAGING_URL }}" >> $GITHUB_ENV
-              echo "ENV_NAME=staging" >> $GITHUB_ENV
-            else
-              echo "BASE_URL=${{ env.PROD_URL }}" >> $GITHUB_ENV
-              echo "ENV_NAME=production" >> $GITHUB_ENV
-            fi
-          else
-            echo "BASE_URL=${{ env.PROD_URL }}" >> $GITHUB_ENV
-            echo "ENV_NAME=production" >> $GITHUB_ENV
-          fi
 
           # Crear archivo de reporte
           {
@@ -791,44 +774,6 @@ jobs:
             </div>
           attachments: health_report.md
 
-      - name: 💬 Enhanced Slack Notification
-        if: always()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          if [[ -n "$SLACK_WEBHOOK_URL" ]]; then
-            if [[ "${{ steps.assessment.outputs.overall_status }}" == "excellent" || "${{ steps.assessment.outputs.overall_status }}" == "very_good" ]]; then
-              COLOR="good"
-            elif [[ "${{ steps.assessment.outputs.overall_status }}" == "good" ]]; then
-              COLOR="warning"
-            else
-              COLOR="danger"
-            fi
-            cat > slack_payload.json << EOF
-            {
-              "text": "🏠 House App Advanced Health Check Complete",
-              "attachments": [
-                {
-                  "color": "$COLOR",
-                  "title": "Health Check Results",
-                  "title_link": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                  "fields": [
-                    {"title": "Environment","value": "${{ env.ENV_NAME }}","short": true},
-                    {"title": "Health Score","value": "${{ steps.assessment.outputs.score }}% ${{ steps.assessment.outputs.status_emoji }}","short": true},
-                    {"title": "Status","value": "${{ steps.assessment.outputs.overall_status }}","short": true},
-                    {"title": "Timestamp","value": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')","short": true}
-                  ],
-                  "footer": "House App Advanced Monitor",
-                  "footer_icon": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                  "ts": $(date +%s)
-                }
-              ]
-            }
-            EOF
-            curl -X POST -H 'Content-type: application/json' --data @slack_payload.json "$SLACK_WEBHOOK_URL"
-          else
-            echo "⚠️ SLACK_WEBHOOK_URL not configured, skipping Slack notification"
-          fi
 
       - name: 📈 Update Dynamic Status Badge
         if: always()
