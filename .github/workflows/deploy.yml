@@ -2,11 +2,18 @@ name: 🏠 House App CI/CD - Build, Test, Push & Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+
+# Necesario si vas a hacer commits desde el workflow (Black/isort)
+permissions:
+  contents: write
+
+# Evita despliegues solapados en main
+concurrency:
+  group: house-app-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/house-app
@@ -22,74 +29,72 @@ jobs:
     name: 🧪 Run Tests & Code Quality
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: 📦 Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 🐍 Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-    - name: 📥 Install dependencies
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov flake8 black safety bandit isort
+      - name: 📥 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8 black safety bandit isort
 
-    - name: 🎨 Auto-format code with Black
-      run: |
-        black .
-        
-    - name: 📏 Sort imports with isort
-      run: |
-        isort .
+      - name: ✅ Lint with flake8
+        run: flake8 . || true
 
-    - name: 💾 Commit formatting changes
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add -A
-        git diff --staged --quiet || git commit -m "🎨 Auto-format code with Black and isort"
-        git push || echo "No changes to push"
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: 🎨 Auto-format code with Black
+        run: black .
 
-    - name: 🔒 Security check with bandit
-      run: bandit -r . -f json -o bandit-report.json || true
+      - name: 📏 Sort imports with isort
+        run: isort .
 
-    - name: 🛡️ Vulnerability check with safety
-      run: safety check --output json --save-json vulnerability-report.json || true
+      - name: 💾 Commit formatting changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git diff --staged --quiet || git commit -m "🎨 Auto-format code with Black and isort"
+          git push || echo "No changes to push"
 
-    - name: 🧪 Run tests with coverage
-      run: |
-        mkdir -p tests
-        if [ -f "tests/test_basic.py" ]; then
-          pytest --cov=app --cov-report=xml --cov-report=html --junitxml=test-results.xml -v
-        else
-          echo "No tests found, creating basic test..."
-          pytest --cov=app --cov-report=xml --cov-report=html --junitxml=test-results.xml -v || echo "Tests completed with warnings"
-        fi
-      env:
-        FLASK_ENV: testing
+      - name: 🔒 Security check with bandit
+        run: bandit -r . -f json -o bandit-report.json || true
 
-    - name: 📊 Upload coverage reports (disabled)
-      run: echo "Codecov upload disabled - add CODECOV_TOKEN secret to enable"
+      - name: 🛡️ Vulnerability check with safety
+        run: safety check --output json --save-json vulnerability-report.json || true
 
-    - name: 📋 Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: |
-          test-results.xml
-          htmlcov/
-          bandit-report.json
-          vulnerability-report.json
-        retention-days: 30
+      - name: 🧪 Run tests with coverage
+        env:
+          FLASK_ENV: testing
+        run: |
+          mkdir -p tests
+          if [ -f "tests/test_basic.py" ]; then
+            pytest --cov=app --cov-report=xml --cov-report=html --junitxml=test-results.xml -v
+          else
+            echo "No tests found, running pytest anyway..."
+            pytest --cov=app --cov-report=xml --cov-report=html --junitxml=test-results.xml -v || echo "Tests completed with warnings"
+          fi
+
+      - name: 📋 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            htmlcov/
+            bandit-report.json
+            vulnerability-report.json
+          retention-days: 30
 
   # ====================================
   # Job 2: Build y push de imagen Docker
@@ -101,70 +106,74 @@ jobs:
     if: github.ref == 'refs/heads/main'
     outputs:
       image-digest: ${{ steps.build.outputs.digest }}
-      image-tag: ${{ steps.meta.outputs.tags }}
-    
+      sha-tag: ${{ env.SHA_TAG }}
+
     steps:
-    - name: 📦 Checkout repository
-      uses: actions/checkout@v4
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
 
-    - name: 🏷️ Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.DOCKER_IMAGE }}
-        tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-    - name: 🔧 Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: 🔐 Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: 🏗️ Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        build-args: |
-          BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+      - name: 🏗️ Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
 
-    - name: 🔒 Generate SBOM
-      uses: anchore/sbom-action@v0
-      with:
-        image: ${{ env.DOCKER_IMAGE }}:latest
-        format: spdx-json
-        output-file: sbom.spdx.json
+      - name: ⛳ Pick SHA tag (optional)
+        run: |
+          echo "SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep -m1 '^main-')" >> $GITHUB_ENV
 
-    - name: 🛡️ Scan image for vulnerabilities
-      uses: anchore/scan-action@v3
-      id: scan
-      with:
-        image: ${{ env.DOCKER_IMAGE }}:latest
-        fail-build: false
-        severity-cutoff: high
+      - name: 🔒 Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.DOCKER_IMAGE }}:latest
+          format: spdx-json
+          output-file: sbom.spdx.json
 
-    - name: 📋 Upload scan results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-scan-results
-        path: |
-          sbom.spdx.json
-          ${{ steps.scan.outputs.sarif }}
-        retention-days: 30
+      - name: 🛡️ Scan image for vulnerabilities
+        id: scan
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ env.DOCKER_IMAGE }}:latest
+          fail-build: false
+          severity-cutoff: high
+
+      - name: 📋 Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            sbom.spdx.json
+            ${{ steps.scan.outputs.sarif }}
+          retention-days: 30
 
   # ====================================
   # Job 3: Deploy a producción
@@ -176,94 +185,93 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://your-domain.com
-    
+      url: https://www.house-app.casa
+
     steps:
-    - name: 📦 Checkout repository (for scripts)
-      uses: actions/checkout@v4
+      - name: 📦 Checkout repository (for scripts)
+        uses: actions/checkout@v4
 
-    - name: 🚀 Deploy to DigitalOcean Droplet
-      uses: appleboy/ssh-action@v1.0.3
-      env:
-        DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
-        CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
-      with:
-        host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ env.SSH_USER }}
-        key: ${{ secrets.DROPLET_SSH_KEY }}
-        port: ${{ env.SSH_PORT }}
-        timeout: 60s
-        command_timeout: 300s
-        script_stop: true
-        envs: DOCKER_IMAGE,CONTAINER_NAME
-        script: |
-          set -euo pipefail
+      - name: 🚀 Deploy to DigitalOcean Droplet (immutable by digest)
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          IMAGE_DIGEST: ${{ needs.build.outputs.image-digest }}
+          HEALTH_URL: "http://localhost:5000/health"
+          PUBLIC_HEALTH_URL: "https://www.house-app.casa/health"
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ env.SSH_PORT }}
+          timeout: 60s
+          command_timeout: 600s
+          script_stop: true
+          envs: DOCKER_IMAGE,CONTAINER_NAME,IMAGE_DIGEST,HEALTH_URL,PUBLIC_HEALTH_URL
+          script: |
+            set -euo pipefail
+            log() { echo "[$(date +'%F %T')] $*"; }
+            fail() { echo "[ERROR] $*" >&2; exit 1; }
 
-          RED='\033[0;31m'
-          GREEN='\033[0;32m'
-          YELLOW='\033[1;33m'
-          BLUE='\033[0;34m'
-          NC='\033[0m'
+            # Imagen inmutable por digest
+            IMAGE_REF="${DOCKER_IMAGE}@${IMAGE_DIGEST}"
 
-          log() {
-              echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
-          }
+            log "⬇️ Pulling image $IMAGE_REF"
+            docker pull "$IMAGE_REF"
 
-          error() {
-              echo -e "${RED}[ERROR]${NC} $1" >&2
-          }
+            # Parar lo viejo SOLO después de tener la nueva imagen
+            if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+              log "🛑 Stopping container $CONTAINER_NAME"
+              docker stop --time=30 "$CONTAINER_NAME" || true
+              docker rm "$CONTAINER_NAME" || true
+            fi
 
-          success() {
-              echo -e "${GREEN}[SUCCESS]${NC} $1"
-          }
-
-          warning() {
-              echo -e "${YELLOW}[WARNING]${NC} $1"
-          }
-
-          log "🔄 Iniciando despliegue..."
-          
-          if docker ps | grep -q $CONTAINER_NAME; then
-              log "🛑 Deteniendo contenedor actual..."
-              docker stop --time=30 $CONTAINER_NAME 2>/dev/null || true
-              docker rm $CONTAINER_NAME 2>/dev/null || true
-          fi
-
-          log "⬇️ Descargando imagen desde Docker Hub..."
-          docker pull ${DOCKER_IMAGE}:latest
-
-          log "🚀 Iniciando nuevo contenedor..."
-          docker run -d --name $CONTAINER_NAME -p 5000:5000 \
-              -e MONGO_USER="${{ secrets.MONGO_USER }}" \
-              -e MONGO_PASS="${{ secrets.MONGO_PASS }}" \
-              -e VAPID_PUBLIC_KEY="${{ secrets.VAPID_PUBLIC_KEY }}" \
-              -e VAPID_PRIVATE_KEY="${{ secrets.VAPID_PRIVATE_KEY }}" \
-              -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-              -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-              -e FLASK_ENV="production" \
+            log "🚀 Starting container $CONTAINER_NAME"
+            docker run -d --name "$CONTAINER_NAME" -p 5000:5000 \
+              -e MONGO_USER='${{ secrets.MONGO_USER }}' \
+              -e MONGO_PASS='${{ secrets.MONGO_PASS }}' \
+              -e VAPID_PUBLIC_KEY='${{ secrets.VAPID_PUBLIC_KEY }}' \
+              -e VAPID_PRIVATE_KEY='${{ secrets.VAPID_PRIVATE_KEY }}' \
+              -e SECRET_KEY='${{ secrets.SECRET_KEY }}' \
+              -e GROQ_API_KEY='${{ secrets.GROQ_API_KEY }}' \
+              -e FLASK_ENV='production' \
               --restart unless-stopped \
               --memory="512m" \
               --cpus="1.0" \
-              --health-cmd="curl -f http://localhost:5000/health || exit 1" \
-              --health-interval=30s \
-              --health-timeout=10s \
-              --health-retries=3 \
+              --health-cmd="curl -fsS ${HEALTH_URL} || exit 1" \
+              --health-interval=15s \
+              --health-timeout=5s \
+              --health-retries=5 \
               --log-driver=json-file \
               --log-opt max-size=50m \
               --log-opt max-file=3 \
-              ${DOCKER_IMAGE}:latest
+              "$IMAGE_REF"
 
-          log "⏳ Esperando que el contenedor esté listo..."
-          sleep 15
+            log "⏳ Waiting for container to become healthy..."
+            for i in $(seq 1 40); do
+              status=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo 'starting')
+              if [ "$status" = "healthy" ]; then
+                log "✅ Container is healthy"
+                break
+              fi
+              sleep 3
+            done
 
-          if docker ps | grep -q $CONTAINER_NAME; then
-              success "✅ Despliegue exitoso!"
-              docker ps --filter "name=$CONTAINER_NAME"
-          else
-              error "❌ Despliegue fallido"
-              docker logs --tail=20 $CONTAINER_NAME
-              exit 1
-          fi
+            current=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo 'unknown')
+            if [ "$current" != "healthy" ]; then
+              echo "---- recent logs ----"
+              docker logs --tail=200 "$CONTAINER_NAME" || true
+              fail "Container did not become healthy (status=$current)"
+            fi
+
+            log "🔎 Public smoke-check ${PUBLIC_HEALTH_URL}"
+            curl -fsS --max-time 10 "${PUBLIC_HEALTH_URL}" >/dev/null || {
+              echo "---- recent logs ----"
+              docker logs --tail=200 "$CONTAINER_NAME" || true
+              fail "Public health check failed"
+            }
+
+            log "🎉 Deploy OK: $IMAGE_REF"
 
   # ====================================
   # Job 4: Cleanup
@@ -273,15 +281,21 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-production]
     if: always() && github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: 🧹 Clean up old Docker images
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ env.SSH_USER }}
-        key: ${{ secrets.DROPLET_SSH_KEY }}
-        port: ${{ env.SSH_PORT }}
-        script: |
-          docker images ${{ env.DOCKER_IMAGE }} --format "table {{.ID}}\t{{.CreatedAt}}" | tail -n +4 | awk '{print $1}' | xargs -r docker rmi || true
-          docker system prune -f --volumes || true
+      - name: 🧹 Clean up old Docker images (keep last 2)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            set -e
+            # Borra imágenes antiguas de este repo manteniendo las 2 más recientes
+            imgs=$(docker images ${{ env.DOCKER_IMAGE }} --format '{{.Repository}}:{{.Tag}} {{.CreatedAt}}' | sort -rk2 | tail -n +3 | awk '{print $1}')
+            if [ -n "$imgs" ]; then
+              echo "$imgs" | xargs -r docker rmi || true
+            fi
+            docker image prune -f || true
+            docker container prune -f || true
