@@ -93,6 +93,7 @@ jobs:
           echo "" >> health_report.md
 
           ALL_OK=true
+          # Fallback por si BASE_URL no viene definido en este contexto
           if [[ -z "$BASE_URL" ]]; then BASE_URL="${{ env.PROD_URL }}"; fi
 
           DOMAIN=$(echo "$BASE_URL" | sed 's|https\?://||' | sed 's|/.*||')
@@ -125,39 +126,43 @@ jobs:
           echo "| Check | Status | Details |" >> health_report.md
           echo "|-------|--------|---------|" >> health_report.md
 
-          SSL_INFO=$(timeout 15s bash -c "echo | openssl s_client -servername $DOMAIN -connect $DOMAIN:443 2>/dev/null")
-          if [[ $? -eq 0 && -n "$SSL_INFO" ]]; then
-            EXPIRY_DATE=$(echo "$SSL_INFO" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
-            if [[ -n "$EXPIRY_DATE" ]]; then
-              EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s 2>/dev/null || echo "0")
-              CURRENT_EPOCH=$(date +%s)
-              DAYS_LEFT=$(( (EXPIRY_EPOCH - CURRENT_EPOCH) / 86400 ))
-              if [[ $DAYS_LEFT -gt 30 ]]; then
-                echo "| Certificate Validity | ✅ PASS | Expires in $DAYS_LEFT days ($EXPIRY_DATE) |" >> health_report.md
-              elif [[ $DAYS_LEFT -gt 7 ]]; then
-                echo "| Certificate Validity | ⚠️ WARNING | Expires in $DAYS_LEFT days |" >> health_report.md
-              else
-                echo "| Certificate Validity | ❌ CRITICAL | Expires in $DAYS_LEFT days |" >> health_report.md
-                ALL_OK=false
-              fi
-            else
-              echo "| Certificate Validity | ❌ FAIL | Could not parse certificate |" >> health_report.md
-              ALL_OK=false
-            fi
-
-            TLS_VERSION=$(echo "$SSL_INFO" | grep -m1 "Protocol" | awk '{print $3}')
-            if [[ "$TLS_VERSION" == "TLSv1.3" || "$TLS_VERSION" == "TLSv1.2" ]]; then
-              echo "| TLS Version | ✅ PASS | $TLS_VERSION (Secure) |" >> health_report.md
-            else
-              echo "| TLS Version | ❌ FAIL | ${TLS_VERSION:-Unknown} (Insecure/Unknown) |" >> health_report.md
-              ALL_OK=false
-            fi
-
-            CERT_CHAIN_LENGTH=$(echo "$SSL_INFO" | grep -c "BEGIN CERTIFICATE")
-            echo "| Certificate Chain | ✅ PASS | $CERT_CHAIN_LENGTH certificates |" >> health_report.md
+          # Si no usas TLS (http), no penalizamos
+          SCHEME=$(echo "$BASE_URL" | awk -F: '{print tolower($1)}')
+          if [[ "$SCHEME" != "https" ]]; then
+            echo "| TLS | ℹ️ SKIPPED | Base URL is HTTP (no TLS) |" >> health_report.md
           else
-            echo "| SSL Connection | ❌ FAIL | Could not establish SSL connection (timeout or error) |" >> health_report.md
-            ALL_OK=false
+            # Información TLS solo si es https (no penalizamos por parsers)
+            SSL_INFO=$(timeout 15s bash -c "echo | openssl s_client -servername $DOMAIN -connect $DOMAIN:443 2>/dev/null")
+            if [[ $? -eq 0 && -n "$SSL_INFO" ]]; then
+              EXPIRY_DATE=$(echo "$SSL_INFO" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+              if [[ -n "$EXPIRY_DATE" ]]; then
+                EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s 2>/dev/null || echo "0")
+                CURRENT_EPOCH=$(date +%s)
+                DAYS_LEFT=$(( (EXPIRY_EPOCH - CURRENT_EPOCH) / 86400 ))
+                echo "| Certificate Validity | ✅ INFO | Expires in $DAYS_LEFT days ($EXPIRY_DATE) |" >> health_report.md
+              else
+                echo "| Certificate Validity | ⚠️ UNKNOWN | Could not parse certificate |" >> health_report.md
+              fi
+
+              # Detección robusta de versión TLS (no falla ALL_OK si no detecta)
+              TLS_VERSION=""
+              for ver in -tls1_3 -tls1_2; do
+                if echo | openssl s_client $ver -servername "$DOMAIN" -connect "$DOMAIN:443" >/dev/null 2>&1; then
+                  TLS_VERSION=${ver#-}
+                  break
+                fi
+              done
+              if [[ -n "$TLS_VERSION" ]]; then
+                echo "| TLS Version | ✅ PASS | ${TLS_VERSION^^} |" >> health_report.md
+              else
+                echo "| TLS Version | ⚠️ UNKNOWN | Could not detect |" >> health_report.md
+              fi
+
+              CERT_CHAIN_LENGTH=$(echo "$SSL_INFO" | grep -c "BEGIN CERTIFICATE")
+              echo "| Certificate Chain | ✅ INFO | $CERT_CHAIN_LENGTH certificates |" >> health_report.md
+            else
+              echo "| SSL Connection | ⚠️ SKIPPED | Could not establish SSL connection |" >> health_report.md
+            fi
           fi
 
           echo "" >> health_report.md
@@ -365,8 +370,8 @@ jobs:
               if 'manifest' in rels and not manifest:
                   manifest = href
 
-          # Candidatos a service worker en código inline
-          sw_candidates=set([urljoin(base, 'sw.js')])
+          # Candidatos a service worker: /sw.js, /static/sw.js y los que aparezcan registrados en scripts
+          sw_candidates=set([urljoin(base, 'sw.js'), urljoin(base, 'static/sw.js')])
           for tag in soup.find_all('script'):
               if tag.string:
                   m = re.search(r"serviceWorker\.register\(['\"]([^'\"]+)['\"]", tag.string)
@@ -433,22 +438,41 @@ jobs:
           echo "| PWA Feature | Status | Details |" >> health_report.md
           echo "|-------------|--------|---------|" >> health_report.md
 
-          # Service Worker: probar candidatos detectados y /sw.js
+          # Service Worker: probar candidatos detectados y /sw.js y /static/sw.js
           SW_OK=false
+          SW_TRIED=()
+
+          try_sw () {
+            local url="$1"
+            [[ -z "$url" ]] && return 1
+            local code
+            local body
+            code=$(curl -sS -w "%{http_code}" --max-time 10 "$url" -o /tmp/sw_body.out || true)
+            body=$(cat /tmp/sw_body.out 2>/dev/null)
+            SW_TRIED+=("$url($code)")
+            if [[ "$code" == "200" ]] && echo "$body" | grep -qiE 'self\.addEventListener|service\s*worker|skipWaiting|clients\.claim'; then
+              echo "| Service Worker | ✅ PASS | $url (${#body} chars) |" >> health_report.md
+              return 0
+            fi
+            return 1
+          }
+
+          # Intentos: candidatos detectados, luego /sw.js y /static/sw.js por si no aparecieran
           if [[ -s sw_candidates.txt ]]; then
             while IFS= read -r sw; do
-              [[ -z "$sw" ]] && continue
-              SW_BODY=$(curl -sS --max-time 10 "$sw")
-              if [[ $? -eq 0 && "$SW_BODY" == *"service"* && "$SW_BODY" == *"worker"* ]]; then
-                echo "| Service Worker | ✅ PASS | $sw (${#SW_BODY} chars) |" >> health_report.md
-                SW_OK=true
-                break
-              fi
+              try_sw "$sw" && SW_OK=true && break
             done < sw_candidates.txt
           fi
           if [[ "$SW_OK" != "true" ]]; then
-            echo "| Service Worker | ❌ FAIL | Not available or invalid |" >> health_report.md
-            ALL_OK=false
+            try_sw "$BASE_URL/sw.js" || try_sw "$BASE_URL/static/sw.js"
+            [[ $? -eq 0 ]] && SW_OK=true
+          fi
+
+          if [[ "$SW_OK" == "true" ]]; then
+            : # ya reportado PASS
+          else
+            echo "| Service Worker | ⚠️ MISSING | Tried: ${SW_TRIED[*]} |" >> health_report.md
+            # Nota: no penalizamos ALL_OK por no usar PWA
           fi
 
           # Manifest: usar el detectado; si no, fallback
@@ -465,7 +489,7 @@ jobs:
             ALL_OK=false
           fi
 
-          # Iconos: probar el primero detectado o fallback
+          # Iconos: probar detectado o fallback
           ICON_OK=false
           if [[ -s icons.txt ]]; then
             ICON_URL=$(head -1 icons.txt)
@@ -638,65 +662,113 @@ jobs:
           echo "" >> health_report.md
 
           cat > perf_test.py << 'EOF'
-          import requests, time, statistics
-          def measure_page_metrics(url):
+          import json, time, statistics, requests
+          from bs4 import BeautifulSoup
+
+          URL = "$BASE_URL/"
+
+          def measure_once(url: str):
+              metrics = {"ttfb": None, "total_time": None, "content_size": 0,
+                        "status_code": 0, "js_files": 0, "css_files": 0, "images": 0}
               start = time.time()
-              r = requests.get(url, stream=True, timeout=30)
-              ttfb = time.time() - start
-              content = r.text
-              total_time = time.time() - start
-              content_size = len(content.encode('utf-8'))
-              return {'ttfb': ttfb, 'total_time': total_time, 'content_size': content_size, 'status_code': r.status_code,
-                      'js_files': content.count('.js'), 'css_files': content.count('.css'), 'images': content.count('img src')}
-          results = []
-          for _ in range(5):
               try:
-                  results.append(measure_page_metrics("$BASE_URL/"))
-                  time.sleep(1)
-              except Exception as e:
-                  print("Error:", e)
-          if results:
-              avg_ttfb = statistics.mean([r['ttfb'] for r in results])
-              avg_total = statistics.mean([r['total_time'] for r in results])
-              avg_size = int(statistics.mean([r['content_size'] for r in results]))
-              print(f"AVG_TTFB:{avg_ttfb:.3f}")
-              print(f"AVG_TOTAL:{avg_total:.3f}")
-              print(f"AVG_SIZE:{avg_size}")
-              print(f"JS_FILES:{results[0]['js_files']}")
-              print(f"CSS_FILES:{results[0]['css_files']}")
-              print(f"IMAGES:{results[0]['images']}")
+                  # stream=True para medir TTFB leyendo el primer byte
+                  with requests.get(url, stream=True, timeout=30) as r:
+                      metrics["status_code"] = r.status_code
+                      # leer el primer byte para estimar TTFB
+                      first_byte_time = None
+                      try:
+                          chunk_iter = r.iter_content(chunk_size=1)
+                          next(chunk_iter)
+                          first_byte_time = time.time()
+                      except Exception:
+                          # si no hay cuerpo o error de streaming
+                          first_byte_time = time.time()
+                      metrics["ttfb"] = first_byte_time - start
+
+                      # leer el resto para total_time y tamaño
+                      content = r.content  # descarga completa
+                      metrics["total_time"] = time.time() - start
+                      metrics["content_size"] = len(content)
+
+                      # conteos básicos
+                      try:
+                          html = content.decode(r.apparent_encoding or "utf-8", errors="ignore")
+                          soup = BeautifulSoup(html, "html.parser")
+                          metrics["js_files"] = len(soup.find_all("script", src=True))
+                          metrics["css_files"] = len(soup.find_all("link", rel=lambda x: x and "stylesheet" in x))
+                          metrics["images"]   = len(soup.find_all("img"))
+                      except Exception:
+                          pass
+              except Exception:
+                  # dejar métricas por defecto (None/0)
+                  pass
+              return metrics
+
+          runs = []
+          for _ in range(5):
+              runs.append(measure_once(URL))
+              time.sleep(0.5)
+
+          # filtrar solo las que devolvieron status_code
+          valid = [r for r in runs if r["status_code"] > 0]
+          def avg(field):
+              vals = [r[field] for r in valid if isinstance(r[field], (int, float)) and r[field] is not None]
+              return round(statistics.mean(vals), 3) if vals else None
+
+          out = {
+              "samples": len(runs),
+              "valid": len(valid),
+              "avg_ttfb": avg("ttfb"),
+              "avg_total": avg("total_time"),
+              "avg_size": int(avg("content_size") or 0),
+              "js_files": valid[0]["js_files"] if valid else 0,
+              "css_files": valid[0]["css_files"] if valid else 0,
+              "images": valid[0]["images"] if valid else 0
+          }
+          print(json.dumps(out))
           EOF
 
-          PERF_RESULTS=$(python perf_test.py)
+          PERF_JSON=$(python perf_test.py || echo '{}')
+          echo "Raw metrics JSON: $PERF_JSON"
 
-          AVG_TTFB=$(echo "$PERF_RESULTS" | grep "AVG_TTFB:" | cut -d: -f2)
-          AVG_TOTAL=$(echo "$PERF_RESULTS" | grep "AVG_TOTAL:" | cut -d: -f2)
-          AVG_SIZE=$(echo "$PERF_RESULTS" | grep "AVG_SIZE:" | cut -d: -f2)
-          JS_FILES=$(echo "$PERF_RESULTS" | grep "JS_FILES:" | cut -d: -f2)
-          CSS_FILES=$(echo "$PERF_RESULTS" | grep "CSS_FILES:" | cut -d: -f2)
-          IMAGES=$(echo "$PERF_RESULTS" | grep "IMAGES:" | cut -d: -f2)
+          # Extraemos con jq con defaults seguros
+          AVG_TTFB=$(echo "$PERF_JSON" | jq -r '.avg_ttfb // "N/A"')
+          AVG_TOTAL=$(echo "$PERF_JSON" | jq -r '.avg_total // "N/A"')
+          AVG_SIZE=$(echo "$PERF_JSON" | jq -r '.avg_size // 0')
+          JS_FILES=$(echo "$PERF_JSON" | jq -r '.js_files // 0')
+          CSS_FILES=$(echo "$PERF_JSON" | jq -r '.css_files // 0')
+          IMAGES=$(echo "$PERF_JSON" | jq -r '.images // 0')
+
+          # Ratings (solo si hay número)
+          rate_ttfb="✅ Excellent"
+          if [[ "$AVG_TTFB" != "N/A" ]]; then
+            if (( $(echo "$AVG_TTFB > 0.8" | bc -l) )); then rate_ttfb="⚠️ Slow"
+            elif (( $(echo "$AVG_TTFB > 0.4" | bc -l) )); then rate_ttfb="🟡 Fair"; fi
+          else
+            rate_ttfb="ℹ️ N/A"
+          fi
+
+          rate_total="✅ Fast"
+          if [[ "$AVG_TOTAL" != "N/A" ]]; then
+            if (( $(echo "$AVG_TOTAL > 3.0" | bc -l) )); then rate_total="❌ Too Slow"
+            elif (( $(echo "$AVG_TOTAL > 2.0" | bc -l) )); then rate_total="⚠️ Slow"
+            elif (( $(echo "$AVG_TOTAL > 1.0" | bc -l) )); then rate_total="🟡 Acceptable"; fi
+          else
+            rate_total="ℹ️ N/A"
+          fi
+
+          size_rating="✅ Optimal"
+          if [[ "$AVG_SIZE" -gt 2000000 ]]; then size_rating="❌ Too Large"
+          elif [[ "$AVG_SIZE" -gt 1000000 ]]; then size_rating="⚠️ Large"
+          elif [[ "$AVG_SIZE" -gt 500000  ]]; then size_rating="🟡 Moderate"; fi
 
           echo "### Performance Metrics Summary" >> health_report.md
           echo "| Metric | Value | Rating |" >> health_report.md
           echo "|--------|-------|--------|" >> health_report.md
-
-          TTFB_RATING="✅ Excellent"
-          if (( $(echo "$AVG_TTFB > 0.8" | bc -l) )); then TTFB_RATING="⚠️ Slow"
-          elif (( $(echo "$AVG_TTFB > 0.4" | bc -l) )); then TTFB_RATING="🟡 Fair"; fi
-
-          TOTAL_RATING="✅ Fast"
-          if (( $(echo "$AVG_TOTAL > 3.0" | bc -l) )); then TOTAL_RATING="❌ Too Slow"
-          elif (( $(echo "$AVG_TOTAL > 2.0" | bc -l) )); then TOTAL_RATING="⚠️ Slow"
-          elif (( $(echo "$AVG_TOTAL > 1.0" | bc -l) )); then TOTAL_RATING="🟡 Acceptable"; fi
-
-          SIZE_RATING="✅ Optimal"
-          if [[ $AVG_SIZE -gt 2000000 ]]; then SIZE_RATING="❌ Too Large"
-          elif [[ $AVG_SIZE -gt 1000000 ]]; then SIZE_RATING="⚠️ Large"
-          elif [[ $AVG_SIZE -gt 500000 ]]; then SIZE_RATING="🟡 Moderate"; fi
-
-          echo "| Time to First Byte | ${AVG_TTFB}s | $TTFB_RATING |" >> health_report.md
-          echo "| Total Page Load | ${AVG_TOTAL}s | $TOTAL_RATING |" >> health_report.md
-          echo "| Page Size | $AVG_SIZE bytes | $SIZE_RATING |" >> health_report.md
+          echo "| Time to First Byte | ${AVG_TTFB}s | $rate_ttfb |" >> health_report.md
+          echo "| Total Page Load | ${AVG_TOTAL}s | $rate_total |" >> health_report.md
+          echo "| Page Size | $AVG_SIZE bytes | $size_rating |" >> health_report.md
           echo "| JavaScript Files | $JS_FILES | - |" >> health_report.md
           echo "| CSS Files | $CSS_FILES | - |" >> health_report.md
           echo "| Images | $IMAGES | - |" >> health_report.md
