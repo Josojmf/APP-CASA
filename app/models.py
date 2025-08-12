@@ -4,7 +4,4 @@ class PurchaseHistory:
         self.date = date or datetime.now()  # Fecha de la compra
 
     def to_dict(self):
-        return {
-            'items': self.items,
-            'date': self.date.isoformat()
-        }
+        return {"items": self.items, "date": self.date.isoformat()}
